@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
-import { ShoppingBag, Music, ShieldCheck, Zap, Info, Clock, AlertCircle, ExternalLink, Loader2, CheckCircle2 } from "lucide-react"
+import { ShoppingBag, Music, Info, Clock, ExternalLink, Loader2 } from "lucide-react"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { useFirestore, useUser, useCollection, useDoc } from "@/firebase"
@@ -38,30 +38,42 @@ export default function TrafficServicePage() {
   }, [db, user?.uid])
   const { data: profile } = useDoc(profileRef)
 
-  // Order history - Filter for last 3 days
+  // Simplified Order history query to avoid index issues
   const historyQuery = React.useMemo(() => {
     if (!db || !user?.uid) return null
-    
-    // Calculate 3 days ago
-    const threeDaysAgo = new Date()
-    threeDaysAgo.setDate(threeDaysAgo.getDate() - 3)
-    const timestampThreshold = Timestamp.fromDate(threeDaysAgo)
-
     return query(
       collection(db, "traffic_orders"), 
       where("userId", "==", user.uid),
-      where("createdAt", ">=", timestampThreshold),
       orderBy("createdAt", "desc")
     )
   }, [db, user?.uid])
 
-  const { data: history } = useCollection<any>(historyQuery)
+  const { data: allHistory } = useCollection<any>(historyQuery)
+
+  // Filter history in-memory for the 3-day reset requirement
+  const history = React.useMemo(() => {
+    if (!allHistory) return []
+    const threeDaysAgo = new Date()
+    threeDaysAgo.setDate(threeDaysAgo.getDate() - 3)
+    return allHistory.filter(order => {
+      const createdAt = order.createdAt?.toDate?.() || new Date()
+      return createdAt >= threeDaysAgo
+    })
+  }, [allHistory])
+
+  // Debugging log to verify userId match
+  useEffect(() => {
+    if (user && history.length > 0) {
+      console.log("DEBUG - User UID:", user.uid);
+      console.log("DEBUG - First Order UserID:", history[0].userId);
+    }
+  }, [user, history]);
 
   // Auto-Complete Logic: Change PENDING to SELESAI after 50 seconds
   useEffect(() => {
     if (!db || !history || history.length === 0) return;
 
-    const interval = setInterval(async () => {
+    const interval = setInterval(() => {
       const now = new Date().getTime();
       const pendingOrders = history.filter((order: any) => order.status === "PENDING");
 
@@ -71,20 +83,15 @@ export default function TrafficServicePage() {
         const createdAt = order.createdAt?.toDate?.()?.getTime() || 0;
         const diffInSeconds = (now - createdAt) / 1000;
 
-        // If order is older than 50 seconds, mark as SELESAI
         if (diffInSeconds >= 50) {
-          try {
-            await updateDoc(doc(db, "traffic_orders", order.id), {
-              status: "SELESAI",
-              updatedAt: serverTimestamp()
-            });
-            console.log(`Order ${order.id} automatically completed after 50s.`);
-          } catch (err) {
-            console.error("Failed to auto-complete order:", order.id, err);
-          }
+          updateDoc(doc(db, "traffic_orders", order.id), {
+            status: "SELESAI",
+            updatedAt: serverTimestamp()
+          });
+          console.log(`Order ${order.id} auto-completed.`);
         }
       }
-    }, 5000); // Check every 5 seconds
+    }, 5000);
 
     return () => clearInterval(interval);
   }, [db, history]);
@@ -129,7 +136,6 @@ export default function TrafficServicePage() {
     setOrderFeedback("processing")
 
     try {
-      // Step 1: Call Provider API
       const apiResult = await processTrafficOrder({
         apiUrl: apiSettings.apiUrl,
         apiKey: apiSettings.apiKey,
@@ -138,8 +144,7 @@ export default function TrafficServicePage() {
         quantity: views
       })
 
-      // Log to API audit logs
-      await setDoc(doc(collection(db, "api_logs")), {
+      setDoc(doc(collection(db, "api_logs")), {
         timestamp: serverTimestamp(),
         userId: user.uid,
         userEmail: user.email,
@@ -156,9 +161,8 @@ export default function TrafficServicePage() {
         throw new Error(apiResult.error || "Provider menolak pesanan.");
       }
 
-      // Step 2: Store to traffic_orders IMMEDIATELY
       const orderRef = doc(collection(db, "traffic_orders"))
-      await setDoc(orderRef, {
+      setDoc(orderRef, {
         userId: user.uid,
         username: profile.username || "Unknown",
         userEmail: user.email,
@@ -173,11 +177,9 @@ export default function TrafficServicePage() {
         updatedAt: serverTimestamp()
       })
 
-      // Step 3: Deduct coins
-      await updateDoc(profileRef!, { coins: increment(-coinCost) })
+      updateDoc(profileRef!, { coins: increment(-coinCost) })
 
-      // Step 4: Log transaction
-      await setDoc(doc(collection(db, "coin_transactions")), {
+      setDoc(doc(collection(db, "coin_transactions")), {
         userId: user.uid,
         amount: -coinCost,
         type: "traffic_order",
