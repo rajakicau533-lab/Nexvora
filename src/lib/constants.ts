@@ -1,11 +1,11 @@
 export const APP_NAME = "Nexvora Studio";
 
 export const CONTACT_INFO = {
-  whatsapp: "082131974325",
+  whatsapp: "6282131974325",
   whatsapp_group: "https://chat.whatsapp.com/FskI1eDA6LY4Ni529OftRD?s=cl&p=a&mlu=2",
   admins: [
-    { name: "Mbah Paijo", phone: "082131974325" },
-    { name: "Al Ihsan", phone: "085810509177" }
+    { name: "Admin Paijo", phone: "6282131974325" },
+    { name: "Admin Ihsan", phone: "6285810509177" }
   ]
 };
 
