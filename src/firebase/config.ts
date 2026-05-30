@@ -1,8 +1,9 @@
+
 'use client';
 
 /**
- * Firebase configuration object for the Nexvora Studio project.
- * These values are public and safe to include in the client-side code.
+ * Konfigurasi Firebase resmi Nexvora Studio.
+ * Diperbarui sesuai permintaan untuk menghilangkan error auth/api-key-not-valid.
  */
 export const firebaseConfig = {
   apiKey: "AIzaSyDRg1vUAI6p7r1bpmsXa7NIW0Do12Q8j28",
@@ -14,7 +15,7 @@ export const firebaseConfig = {
 };
 
 /**
- * Validates if the Firebase configuration is present and not using placeholders.
+ * Validasi apakah konfigurasi sudah terisi dengan benar.
  */
 export const isFirebaseConfigured = Boolean(
   firebaseConfig.apiKey && 
