@@ -1,3 +1,4 @@
+
 "use client"
 
 import React from "react"
@@ -47,7 +48,7 @@ export default function AdminActivityLogPage() {
           <p className="text-muted-foreground">Audit user interactions and system events.</p>
         </div>
         <Button onClick={handleCleanup} variant="outline" className="rounded-xl border-white/10 hover:bg-red-500/10 hover:text-red-500">
-          <Trash2 className="mr-2 h-4 w-4" /> Purge Logs (> 3 Days)
+          <Trash2 className="mr-2 h-4 w-4" /> Purge Logs (&gt; 3 Days)
         </Button>
       </div>
 
