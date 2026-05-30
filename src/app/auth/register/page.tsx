@@ -1,4 +1,3 @@
-
 "use client"
 
 import React, { useState } from "react"
@@ -8,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
-import { UserPlus, Sparkles, AlertCircle, CheckCircle2 } from "lucide-react"
+import { UserPlus, Sparkles, AlertCircle, CheckCircle2, ChevronLeft } from "lucide-react"
 import { useAuth, useFirestore } from "@/firebase"
 import { createUserWithEmailAndPassword, sendEmailVerification, signOut } from "firebase/auth"
 import { doc, setDoc, serverTimestamp, getDocs, collection, query, where } from "firebase/firestore"
@@ -32,7 +31,7 @@ export default function RegisterPage() {
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!auth || !db) {
-      setError("Firebase belum terkonfigurasi. Periksa halaman setup.")
+      setError("Sistem sedang disiapkan. Silakan refresh.")
       return
     }
     
@@ -46,7 +45,7 @@ export default function RegisterPage() {
       const querySnapshot = await getDocs(q)
       
       if (!querySnapshot.empty) {
-        throw new Error("Username sudah digunakan. Silakan pilih username lain.")
+        throw new Error("Username sudah digunakan oleh pengguna lain.")
       }
 
       // 2. Buat User di Auth
@@ -54,7 +53,6 @@ export default function RegisterPage() {
       const user = userCredential.user
 
       // 3. Simpan Profil User di Firestore
-      // Generate referral code: NXV + Random Number
       const generatedReferral = "NXV" + Math.floor(1000 + Math.random() * 9000)
       
       await setDoc(doc(db, "users", user.uid), {
@@ -72,17 +70,17 @@ export default function RegisterPage() {
       // 4. Kirim Verifikasi Email
       await sendEmailVerification(user)
       
-      // 5. Logout paksa agar tidak masuk dashboard sebelum verifikasi
+      // 5. Logout agar tidak bypass verifikasi
       await signOut(auth)
 
       setIsSuccess(true)
       toast({
-        title: "Registrasi Berhasil",
-        description: "Silakan cek email Anda untuk verifikasi.",
+        title: "Pendaftaran Berhasil!",
+        description: "Silakan verifikasi email Anda untuk melanjutkan.",
       })
     } catch (err: any) {
       console.error(err)
-      setError(err.message || "Gagal mendaftar. Silakan coba lagi.")
+      setError(err.message || "Gagal mendaftar. Periksa kembali data Anda.")
     } finally {
       setIsLoading(false)
     }
@@ -90,17 +88,19 @@ export default function RegisterPage() {
 
   if (isSuccess) {
     return (
-      <div className="min-h-screen bg-[#1A1410] flex items-center justify-center p-4">
-        <Card className="premium-card max-w-md w-full rounded-3xl p-8 text-center space-y-6">
-          <div className="w-20 h-20 bg-green-500/20 rounded-full flex items-center justify-center mx-auto">
+      <div className="min-h-screen bg-[#0F0F0F] flex items-center justify-center p-4">
+        <Card className="premium-card max-w-md w-full rounded-3xl p-8 text-center space-y-6 border-primary/20">
+          <div className="w-20 h-20 bg-green-500/10 rounded-full flex items-center justify-center mx-auto border border-green-500/20">
             <CheckCircle2 className="h-10 w-10 text-green-500" />
           </div>
-          <h2 className="text-3xl font-headline font-bold text-white">Cek Email Anda!</h2>
-          <p className="text-muted-foreground leading-relaxed">
-            Kami telah mengirimkan link verifikasi ke <b>{email}</b>. 
-            Silakan verifikasi email Anda sebelum melakukan login.
-          </p>
-          <Button asChild className="w-full h-12 rounded-xl luxury-gradient">
+          <div className="space-y-2">
+            <h2 className="text-3xl font-headline font-bold text-white">Verifikasi Email</h2>
+            <p className="text-muted-foreground leading-relaxed">
+              Link verifikasi telah dikirim ke <span className="text-white font-bold">{email}</span>. 
+              Silakan periksa folder inbox atau spam Anda.
+            </p>
+          </div>
+          <Button asChild className="w-full h-12 rounded-xl luxury-gradient font-bold">
             <Link href="/auth/login">Kembali ke Login</Link>
           </Button>
         </Card>
@@ -109,45 +109,48 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#1A1410] flex items-center justify-center p-4 text-white">
-      <div className="w-full max-w-md space-y-8">
-        <div className="text-center space-y-2">
+    <div className="min-h-screen bg-[#0F0F0F] flex flex-col items-center justify-center p-4 relative overflow-hidden">
+      {/* Background Decor */}
+      <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-primary/5 blur-[120px] rounded-full -translate-y-1/2 translate-x-1/2" />
+      <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-primary/5 blur-[120px] rounded-full translate-y-1/2 -translate-x-1/2" />
+
+      <div className="w-full max-w-md space-y-8 relative z-10">
+        <div className="text-center space-y-4">
           <Link href="/" className="inline-flex items-center gap-2 group">
-            <div className="w-12 h-12 rounded-2xl bg-primary flex items-center justify-center shadow-lg shadow-primary/20">
-              <Sparkles className="text-primary-foreground h-7 w-7" />
+            <div className="w-12 h-12 rounded-2xl bg-primary flex items-center justify-center shadow-lg shadow-primary/20 group-hover:scale-105 transition-transform">
+              <Sparkles className="text-white h-7 w-7" />
             </div>
             <span className="text-3xl font-headline font-bold text-white">Nexvora</span>
           </Link>
+          <div className="space-y-1">
+            <h1 className="text-2xl font-headline font-bold">Buat Akun Baru</h1>
+            <p className="text-muted-foreground text-sm">Bergabunglah dengan ekosistem digital premium kami.</p>
+          </div>
         </div>
 
-        <Card className="premium-card rounded-3xl border-white/10 bg-black/40">
-          <CardHeader>
-            <CardTitle className="text-2xl text-white">Daftar Akun</CardTitle>
-            <CardDescription>Bergabung dengan komunitas Nexvora Studio.</CardDescription>
-          </CardHeader>
-          <CardContent>
+        <Card className="premium-card rounded-3xl border-white/10 bg-black/60 backdrop-blur-xl">
+          <CardContent className="pt-8">
             <form onSubmit={handleRegister} className="space-y-5">
               {error && (
-                <Alert variant="destructive" className="bg-destructive/10 border-destructive/20 text-destructive">
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertTitle>Error</AlertTitle>
+                <Alert variant="destructive" className="bg-destructive/10 border-destructive/20 text-white rounded-2xl">
+                  <AlertCircle className="h-4 w-4 text-primary" />
                   <AlertDescription>{error}</AlertDescription>
                 </Alert>
               )}
               
               <div className="space-y-2">
-                <Label htmlFor="username" className="text-white">Username</Label>
+                <Label htmlFor="username" className="text-white font-semibold">Username</Label>
                 <Input 
                   id="username" 
                   placeholder="Contoh: nexvora_user" 
                   required
                   value={username}
                   onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/\s/g, ''))}
-                  className="bg-white/5 border-white/10 rounded-xl h-12 text-white"
+                  className="bg-white/5 border-white/10 rounded-xl h-12 text-white placeholder:text-muted-foreground/50 focus:border-primary/50"
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="email" className="text-white">Email</Label>
+                <Label htmlFor="email" className="text-white font-semibold">Alamat Email</Label>
                 <Input 
                   id="email" 
                   type="email" 
@@ -155,44 +158,54 @@ export default function RegisterPage() {
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="bg-white/5 border-white/10 rounded-xl h-12 text-white"
+                  className="bg-white/5 border-white/10 rounded-xl h-12 text-white placeholder:text-muted-foreground/50 focus:border-primary/50"
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="password" title="At least 8 characters" className="text-white">Password</Label>
+                <Label htmlFor="password" title="At least 8 characters" className="text-white font-semibold">Password</Label>
                 <Input 
                   id="password" 
                   type="password" 
-                  placeholder="Min. 8 Karakter" 
+                  placeholder="Minimal 8 Karakter" 
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="bg-white/5 border-white/10 rounded-xl h-12 text-white"
+                  className="bg-white/5 border-white/10 rounded-xl h-12 text-white placeholder:text-muted-foreground/50 focus:border-primary/50"
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="referral" className="text-white">Kode Referral (Opsional)</Label>
+                <Label htmlFor="referral" className="text-white font-semibold">Kode Referral (Opsional)</Label>
                 <Input 
                   id="referral" 
-                  placeholder="Masukkan kode teman" 
+                  placeholder="Punya kode dari teman?" 
                   value={referralCode}
                   onChange={(e) => setReferralCode(e.target.value)}
-                  className="bg-white/5 border-white/10 rounded-xl h-12 text-white"
+                  className="bg-white/5 border-white/10 rounded-xl h-12 text-white placeholder:text-muted-foreground/50 focus:border-primary/50"
                 />
               </div>
               <Button 
                 type="submit" 
                 disabled={isLoading}
-                className="w-full h-12 rounded-xl luxury-gradient border-none font-bold text-lg shadow-xl shadow-primary/20 mt-4"
+                className="w-full h-12 rounded-xl luxury-gradient border-none font-bold text-lg shadow-xl shadow-primary/20 mt-4 group"
               >
-                {isLoading ? "Memproses..." : <><UserPlus className="mr-2 h-5 w-5" /> Buat Akun Sekarang</>}
+                {isLoading ? (
+                  <div className="flex items-center gap-2">
+                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    Memproses...
+                  </div>
+                ) : (
+                  <>Daftar Sekarang <UserPlus className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" /></>
+                )}
               </Button>
             </form>
           </CardContent>
-          <CardFooter className="flex justify-center border-t border-white/5 pt-6">
+          <CardFooter className="flex flex-col gap-4 border-t border-white/5 pt-6 pb-8">
             <p className="text-sm text-muted-foreground">
-              Sudah punya akun? <Link href="/auth/login" className="text-primary font-bold hover:underline">Masuk Di Sini</Link>
+              Sudah punya akun? <Link href="/auth/login" className="text-primary font-bold hover:underline">Masuk di sini</Link>
             </p>
+            <Link href="/" className="text-xs text-muted-foreground flex items-center gap-1 hover:text-white transition-colors">
+              <ChevronLeft className="h-3 w-3" /> Kembali ke Beranda
+            </Link>
           </CardFooter>
         </Card>
       </div>
