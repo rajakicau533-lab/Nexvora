@@ -37,74 +37,57 @@ export default function AdminLoginPage() {
     setIsLoading(true)
     setError(null)
 
-    console.log("--- ADMIN LOGIN DEBUG START ---");
-    console.log("Input Email:", email);
+    const normalizedInputEmail = email.toLowerCase().trim();
+
+    console.log("--- ADMIN LOGIN ATTEMPT ---");
+    console.log("Input Email:", normalizedInputEmail);
 
     try {
       let user;
       try {
-        const userCredential = await signInWithEmailAndPassword(auth, email.trim(), password)
+        const userCredential = await signInWithEmailAndPassword(auth, normalizedInputEmail, password)
         user = userCredential.user
-        console.log("Firebase Auth Success. UID:", user.uid);
+        console.log("Auth Success. UID:", user.uid);
       } catch (authError: any) {
-        if ((authError.code === 'auth/user-not-found' || authError.code === 'auth/invalid-credential') && email === TARGET_ADMIN_EMAIL) {
-          console.log("Target admin not found. Attempting auto-registration...");
-          const newCredential = await createUserWithEmailAndPassword(auth, email.trim(), password);
+        // Auto-register master admin if not exists
+        if ((authError.code === 'auth/user-not-found' || authError.code === 'auth/invalid-credential') && normalizedInputEmail === TARGET_ADMIN_EMAIL) {
+          console.log("Target admin not found. Auto-registering...");
+          const newCredential = await createUserWithEmailAndPassword(auth, normalizedInputEmail, password);
           user = newCredential.user;
-          console.log("Auto-registration success. UID:", user.uid);
         } else {
-          console.error("Auth Error Code:", authError.code);
-          throw new Error("Email atau password administrator salah.");
+          throw new Error("Kredensial administrator tidak valid.");
         }
       }
 
-      console.log("Checking Firestore for UID:", user.uid);
       const adminRef = doc(db, "admins", user.uid);
-      let adminDoc;
-      
-      try {
-        adminDoc = await getDoc(adminRef);
-        console.log("Admin Doc Snapshot - Exists:", adminDoc.exists());
-      } catch (firestoreError: any) {
-        console.error("Firestore Permission Error:", firestoreError.message);
-        throw new Error("Gagal memverifikasi izin Firestore.");
+      const adminDoc = await getDoc(adminRef);
+
+      // Force create/update admin record for the target master email
+      if (normalizedInputEmail === TARGET_ADMIN_EMAIL) {
+        console.log("Ensuring admin record exists for master account...");
+        await setDoc(adminRef, {
+          email: normalizedInputEmail,
+          role: "admin",
+          status: "active",
+          updatedAt: serverTimestamp(),
+          createdAt: adminDoc.exists() ? adminDoc.data().createdAt : serverTimestamp()
+        }, { merge: true });
+      } else if (!adminDoc.exists() || adminDoc.data()?.role !== "admin") {
+        console.warn("Unauthorized access attempt.");
+        await signOut(auth);
+        throw new Error("Akses ditolak. Anda tidak memiliki izin administrator.");
       }
 
-      if (!adminDoc.exists()) {
-        if (email === TARGET_ADMIN_EMAIL) {
-          console.log("Creating missing admin record for target user...");
-          await setDoc(adminRef, {
-            email: email.toLowerCase().trim(),
-            role: "admin",
-            status: "active",
-            createdAt: serverTimestamp()
-          });
-          console.log("Admin record created successfully.");
-        } else {
-          console.warn("Access Denied: UID not found in admins collection.");
-          await signOut(auth)
-          throw new Error("Akses administrator ditolak.");
-        }
-      } else {
-        const adminData = adminDoc.data();
-        if (adminData?.role !== "admin") {
-          console.warn("Access Denied: Invalid role:", adminData?.role);
-          await signOut(auth)
-          throw new Error("Akses ditolak. Role Anda bukan admin.");
-        }
-      }
-
-      console.log("--- ADMIN LOGIN DEBUG SUCCESS ---");
+      console.log("Redirecting to admin panel...");
       toast({
         title: "Admin Authenticated",
-        description: "Redirecting to Control Center...",
+        description: "Selamat datang di Control Center.",
       })
       
       router.push("/admin")
     } catch (err: any) {
-      console.error("--- ADMIN LOGIN DEBUG ERROR ---");
-      console.error("Error Message:", err.message);
-      setError(err.message || "Terjadi kesalahan saat otentikasi admin.");
+      console.error("Login process error:", err.message);
+      setError(err.message || "Terjadi kesalahan sistem saat login.");
     } finally {
       setIsLoading(false)
     }
