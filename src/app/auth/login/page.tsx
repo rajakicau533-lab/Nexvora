@@ -36,10 +36,10 @@ export default function LoginPage() {
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email.trim(), password)
       
-      // Check verification
+      // Cek apakah email sudah diverifikasi
       if (!userCredential.user.emailVerified) {
-        setError("Email Anda belum diverifikasi. Cek inbox atau folder spam Anda.")
-        await signOut(auth)
+        setError("Email Anda belum diverifikasi. Silakan cek inbox atau folder spam Anda.")
+        await signOut(auth) // Logout kembali jika belum verifikasi
         setIsLoading(false)
         return
       }
@@ -50,8 +50,13 @@ export default function LoginPage() {
       })
       router.push("/dashboard")
     } catch (err: any) {
-      console.error(err)
-      setError("Email atau password tidak sesuai. Mohon periksa kembali.")
+      console.error("Login Error:", err)
+      let displayError = "Email atau password tidak sesuai."
+      if (err.code === 'auth/user-not-found') displayError = "Akun tidak ditemukan."
+      else if (err.code === 'auth/wrong-password') displayError = "Password salah."
+      else if (err.code === 'auth/too-many-requests') displayError = "Terlalu banyak percobaan. Coba lagi nanti."
+      
+      setError(displayError)
       setIsLoading(false)
     }
   }

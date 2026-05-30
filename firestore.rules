@@ -1,0 +1,61 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+  
+    // PROFILE USER
+    match /users/{userId} {
+      // Izinkan baca profil individu jika login
+      allow get: if request.auth != null;
+      // Izinkan list untuk pengecekan username unik saat registrasi (unauthenticated)
+      allow list: if true; 
+      // Izinkan tulis hanya jika milik sendiri
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // TRAFFIC ORDERS
+    match /traffic_orders/{orderId} {
+      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+    }
+
+    // COIN TRANSACTIONS
+    match /coin_transactions/{txId} {
+      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+    }
+
+    // TOPUP REQUESTS
+    match /topup_requests/{requestId} {
+      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+    }
+
+    // MATERIALS (Public read for all users)
+    match /materials/{materialId} {
+      allow read: if true;
+    }
+
+    // REFERRALS
+    match /referrals/{referralId} {
+      allow read: if request.auth != null && (resource.data.referrerId == request.auth.uid || resource.data.referredId == request.auth.uid);
+      allow create: if request.auth != null;
+    }
+
+    // MARKETPLACE
+    match /marketplace_products/{productId} {
+      allow read: if true;
+    }
+    match /marketplace_purchases/{purchaseId} {
+      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+    }
+
+    // ADMIN LOGS & ADMIN PROFILES (Internal Only)
+    match /admin_logs/{logId} {
+      allow read, write: if false;
+    }
+    match /admins/{adminId} {
+      allow read, write: if false;
+    }
+  }
+}

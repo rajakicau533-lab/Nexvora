@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label"
 import { UserPlus, Sparkles, AlertCircle, CheckCircle2, ChevronLeft } from "lucide-react"
 import { useAuth, useFirestore } from "@/firebase"
 import { createUserWithEmailAndPassword, sendEmailVerification, signOut } from "firebase/auth"
-import { doc, setDoc, serverTimestamp, getDocs, collection, query, where } from "firebase/firestore"
+import { doc, setDoc, serverTimestamp, getDocs, collection, query, where, limit } from "firebase/firestore"
 import { useToast } from "@/hooks/use-toast"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 
@@ -30,7 +30,7 @@ export default function RegisterPage() {
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!auth || !db) {
-      setError("Sistem sedang menghubungkan ke server. Mohon tunggu sebentar.")
+      setError("Sistem sedang menghubungkan ke server Firebase. Mohon tunggu...")
       return
     }
     
@@ -38,25 +38,27 @@ export default function RegisterPage() {
     setError(null)
 
     try {
-      // 1. Check Unique Username
+      // 1. Validasi Username Unik (Firestore Check)
+      const cleanUsername = username.toLowerCase().trim().replace(/\s/g, '')
       const usersRef = collection(db, "users")
-      const q = query(usersRef, where("username", "==", username.toLowerCase().trim()))
+      const q = query(usersRef, where("username", "==", cleanUsername), limit(1))
       const querySnapshot = await getDocs(q)
       
       if (!querySnapshot.empty) {
-        throw new Error("Username ini sudah digunakan. Pilih yang lain.")
+        throw new Error("Username '" + cleanUsername + "' sudah digunakan. Pilih yang lain.")
       }
 
-      // 2. Create Auth User
+      // 2. Buat User di Firebase Authentication
       const userCredential = await createUserWithEmailAndPassword(auth, email.trim(), password)
       const user = userCredential.user
 
-      // 3. Create Firestore Profile
+      // 3. Simpan Profil User ke Firestore (users/{uid})
+      // NXV + Random 4 digits
       const generatedReferral = "NXV" + Math.floor(1000 + Math.random() * 9000)
       
       await setDoc(doc(db, "users", user.uid), {
         uid: user.uid,
-        username: username.toLowerCase().trim(),
+        username: cleanUsername,
         email: email.toLowerCase().trim(),
         coins: 0,
         status: "active",
@@ -66,20 +68,27 @@ export default function RegisterPage() {
         createdAt: serverTimestamp(),
       })
 
-      // 4. Send Verification
+      // 4. Kirim Email Verifikasi
       await sendEmailVerification(user)
       
-      // 5. Sign out to force login after verification
+      // 5. Sign out untuk keamanan (User harus login ulang setelah verifikasi)
       await signOut(auth)
 
       setIsSuccess(true)
       toast({
-        title: "Pendaftaran Berhasil!",
-        description: "Cek email Anda untuk link verifikasi.",
+        title: "Registrasi Berhasil! 🎉",
+        description: "Silakan cek inbox email Anda untuk verifikasi.",
       })
     } catch (err: any) {
-      console.error(err)
-      setError(err.message || "Gagal mendaftar. Periksa koneksi internet Anda.")
+      console.error("Registration Error:", err)
+      let displayError = "Terjadi kesalahan pendaftaran."
+      
+      if (err.code === 'auth/email-already-in-use') displayError = "Email ini sudah terdaftar."
+      else if (err.code === 'auth/invalid-email') displayError = "Format email tidak valid."
+      else if (err.code === 'auth/weak-password') displayError = "Password terlalu lemah (min. 6 karakter)."
+      else if (err.message) displayError = err.message
+
+      setError(displayError)
     } finally {
       setIsLoading(false)
     }
@@ -96,7 +105,7 @@ export default function RegisterPage() {
             <h2 className="text-3xl font-headline font-bold text-white">Verifikasi Email</h2>
             <p className="text-muted-foreground leading-relaxed text-lg">
               Link aktivasi telah dikirim ke <span className="text-white font-bold">{email}</span>. 
-              Mohon verifikasi email Anda sebelum melakukan login.
+              Mohon verifikasi email Anda sebelum melakukan login ke dashboard.
             </p>
           </div>
           <Button asChild className="w-full h-14 rounded-2xl luxury-gradient font-bold text-lg shadow-xl shadow-primary/20">
@@ -122,7 +131,7 @@ export default function RegisterPage() {
           </Link>
           <div className="space-y-1">
             <h1 className="text-2xl font-headline font-bold text-white uppercase tracking-widest">Pendaftaran Akun</h1>
-            <p className="text-muted-foreground font-medium">Lengkapi data untuk bergabung dengan ekosistem kami.</p>
+            <p className="text-muted-foreground font-medium">Bergabunglah dengan ekosistem digital profesional kami.</p>
           </div>
         </div>
 
@@ -137,10 +146,10 @@ export default function RegisterPage() {
               )}
               
               <div className="space-y-2">
-                <Label htmlFor="username" className="text-white text-sm font-black ml-1 uppercase tracking-tight">Username Anda</Label>
+                <Label htmlFor="username" className="text-white text-sm font-black ml-1 uppercase tracking-tight">Username Pilihan</Label>
                 <Input 
                   id="username" 
-                  placeholder="Contoh: nexvora_pro" 
+                  placeholder="Contoh: nexvora_user" 
                   required
                   value={username}
                   onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/\s/g, ''))}
@@ -149,11 +158,11 @@ export default function RegisterPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="email" className="text-white text-sm font-black ml-1 uppercase tracking-tight">Email Aktif</Label>
+                <Label htmlFor="email" className="text-white text-sm font-black ml-1 uppercase tracking-tight">Alamat Email</Label>
                 <Input 
                   id="email" 
                   type="email" 
-                  placeholder="anda@email.com" 
+                  placeholder="email@anda.com" 
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -162,13 +171,13 @@ export default function RegisterPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="password" title="Minimal 8 karakter" className="text-white text-sm font-black ml-1 uppercase tracking-tight">Password</Label>
+                <Label htmlFor="password" title="Minimal 6 karakter" className="text-white text-sm font-black ml-1 uppercase tracking-tight">Password</Label>
                 <Input 
                   id="password" 
                   type="password" 
-                  placeholder="Min. 8 Karakter" 
+                  placeholder="Min. 6 Karakter" 
                   required
-                  minLength={8}
+                  minLength={6}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="bg-white/10 border-white/20 rounded-2xl h-14 text-white placeholder:text-white/40 focus:border-primary/50 text-lg px-6"
@@ -176,10 +185,10 @@ export default function RegisterPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="referral" className="text-white text-sm font-black ml-1 uppercase tracking-tight">Kode Referral (Jika Ada)</Label>
+                <Label htmlFor="referral" className="text-white text-sm font-black ml-1 uppercase tracking-tight">Kode Referral (Opsional)</Label>
                 <Input 
                   id="referral" 
-                  placeholder="Kode dari teman" 
+                  placeholder="Kode dari teman (jika ada)" 
                   value={referralCode}
                   onChange={(e) => setReferralCode(e.target.value)}
                   className="bg-white/10 border-white/20 rounded-2xl h-14 text-white placeholder:text-white/40 focus:border-primary/50 text-lg px-6"
@@ -194,20 +203,20 @@ export default function RegisterPage() {
                 {isLoading ? (
                   <div className="flex items-center gap-3">
                     <div className="w-5 h-5 border-3 border-white/30 border-t-white rounded-full animate-spin" />
-                    Menyiapkan Akun...
+                    Memproses...
                   </div>
                 ) : (
-                  <>Daftar Sekarang <UserPlus className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" /></>
+                  <>Daftar Akun <UserPlus className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" /></>
                 )}
               </Button>
             </form>
           </CardContent>
           <CardFooter className="flex flex-col gap-4 border-t border-white/5 pt-8 pb-10">
             <p className="text-sm text-muted-foreground font-medium">
-              Sudah memiliki akun? <Link href="/auth/login" className="text-primary font-black hover:underline hover:text-primary/80">Masuk Disini</Link>
+              Sudah punya akun? <Link href="/auth/login" className="text-primary font-black hover:underline hover:text-primary/80">Masuk Sekarang</Link>
             </p>
             <Link href="/" className="text-xs text-muted-foreground flex items-center gap-1 hover:text-white transition-colors font-bold uppercase tracking-widest">
-              <ChevronLeft className="h-3 w-3" /> Kembali ke Beranda
+              <ChevronLeft className="h-3 w-3" /> Kembali ke Home
             </Link>
           </CardFooter>
         </Card>
