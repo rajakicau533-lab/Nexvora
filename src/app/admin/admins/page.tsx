@@ -6,13 +6,14 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { UserCog, UserPlus, Trash2, ShieldCheck, ShieldAlert, Loader2 } from "lucide-react"
+import { UserPlus, Trash2, ShieldAlert, Loader2 } from "lucide-react"
 import { useFirestore, useCollection, useUser, useDoc } from "@/firebase"
 import { collection, doc, setDoc, deleteDoc, serverTimestamp, query, orderBy } from "firebase/firestore"
 import { useToast } from "@/hooks/use-toast"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { useRouter } from "next/navigation"
+import { cn } from "@/lib/utils"
 
 export default function AdminManagementPage() {
   const { user: currentUser } = useUser()
@@ -42,9 +43,12 @@ export default function AdminManagementPage() {
 
   if (adminCheckLoading) return <div className="flex justify-center py-20"><Loader2 className="animate-spin h-10 w-10 text-primary" /></div>
   
-  if (currentAdminData?.role !== 'super_admin') {
+  // Master email bypass check
+  const isSuper = currentAdminData?.role === 'super_admin' || currentUser?.email === 'adheprogramer@gmail.com';
+
+  if (!isSuper) {
     return (
-      <Card className="premium-card p-20 text-center border-red-500/20 bg-red-500/5">
+      <Card className="premium-card p-20 text-center border-red-500/20 bg-red-500/5 rounded-[2.5rem]">
         <ShieldAlert className="h-16 w-16 text-red-500 mx-auto mb-6" />
         <h3 className="text-2xl font-headline font-bold text-white mb-2">Akses Dibatasi</h3>
         <p className="text-muted-foreground">Hanya Super Admin yang dapat mengelola tim administrator.</p>

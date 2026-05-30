@@ -6,7 +6,9 @@ import { AdminSidebar } from "@/components/layout/AdminSidebar"
 import { useUser, useDoc, useFirestore } from "@/firebase"
 import { useRouter } from "next/navigation"
 import { doc } from "firebase/firestore"
-import { ShieldCheck, Loader2, AlertCircle } from "lucide-react"
+import { ShieldCheck, Loader2 } from "lucide-react"
+
+const MASTER_EMAIL = "adheprogramer@gmail.com";
 
 export default function AdminLayout({
   children,
@@ -30,21 +32,27 @@ export default function AdminLayout({
     if (authLoading || adminLoading) return;
 
     if (!user) {
+      console.log("ADMIN SECURITY: No user session found. Redirecting...");
       setIsAuthorized(false);
       router.push('/admin-login');
       return;
     }
 
+    // Master bootstrap bypass
+    if (user.email === MASTER_EMAIL) {
+      console.log("ADMIN SECURITY: Master admin authenticated.");
+      setIsAuthorized(true);
+      return;
+    }
+
+    // Role verification
     if (adminData && (adminData.role === 'super_admin' || adminData.role === 'admin' || adminData.role === 'assistant_admin')) {
+      console.log("ADMIN SECURITY: Role verified:", adminData.role);
       setIsAuthorized(true);
     } else {
-      // Special case for master bootstrap email
-      if (user.email === "adheprogramer@gmail.com") {
-        setIsAuthorized(true);
-      } else {
-        setIsAuthorized(false);
-        router.push('/admin-login');
-      }
+      console.log("ADMIN SECURITY: Access Denied. Role missing or invalid.");
+      setIsAuthorized(false);
+      router.push('/admin-login');
     }
   }, [user, authLoading, adminData, adminLoading, router]);
 
@@ -76,7 +84,7 @@ export default function AdminLayout({
             <div className="bg-primary/10 px-4 py-1.5 rounded-full border border-primary/20 flex items-center gap-3">
               <div className="text-right leading-none hidden sm:block">
                 <p className="text-[9px] text-primary uppercase font-black tracking-widest">
-                  {adminData?.role?.replace('_', ' ') || 'MASTER'}
+                  {adminData?.role?.replace('_', ' ') || 'SUPER ADMIN'}
                 </p>
                 <p className="text-xs font-bold text-white">{user?.email}</p>
               </div>

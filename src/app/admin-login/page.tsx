@@ -50,14 +50,20 @@ export default function AdminLoginPage() {
         console.log("Auth Success. UID:", user.uid);
       } catch (authError: any) {
         // Auto-register master admin if not exists
-        if ((authError.code === 'auth/user-not-found' || authError.code === 'auth/invalid-credential') && normalizedInputEmail === TARGET_ADMIN_EMAIL) {
-          console.log("Target admin not found. Auto-registering...");
-          const newCredential = await createUserWithEmailAndPassword(auth, normalizedInputEmail, password);
-          user = newCredential.user;
+        if ((authError.code === 'auth/user-not-found' || authError.code === 'auth/invalid-credential' || authError.code === 'auth/invalid-login-credentials') && normalizedInputEmail === TARGET_ADMIN_EMAIL) {
+          console.log("Target admin not found or invalid. Attempting bootstrap registration...");
+          try {
+            const newCredential = await createUserWithEmailAndPassword(auth, normalizedInputEmail, password);
+            user = newCredential.user;
+          } catch (regError: any) {
+             throw new Error("Gagal mendaftarkan admin master. " + regError.message);
+          }
         } else {
           throw new Error("Kredensial administrator tidak valid.");
         }
       }
+
+      if (!user) throw new Error("User session not found.");
 
       const adminRef = doc(db, "admins", user.uid);
       const adminDoc = await getDoc(adminRef);
@@ -67,13 +73,13 @@ export default function AdminLoginPage() {
         console.log("Ensuring admin record exists for master account...");
         await setDoc(adminRef, {
           email: normalizedInputEmail,
-          role: "admin",
+          role: "super_admin",
           status: "active",
           updatedAt: serverTimestamp(),
-          createdAt: adminDoc.exists() ? adminDoc.data().createdAt : serverTimestamp()
+          createdAt: adminDoc.exists() ? adminDoc.data()?.createdAt : serverTimestamp()
         }, { merge: true });
-      } else if (!adminDoc.exists() || adminDoc.data()?.role !== "admin") {
-        console.warn("Unauthorized access attempt.");
+      } else if (!adminDoc.exists()) {
+        console.warn("Unauthorized access attempt. Document not found in 'admins' collection.");
         await signOut(auth);
         throw new Error("Akses ditolak. Anda tidak memiliki izin administrator.");
       }
