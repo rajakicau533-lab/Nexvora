@@ -1,7 +1,7 @@
 
 "use client"
 
-import React from "react"
+import React, { useEffect } from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { 
@@ -15,11 +15,10 @@ import {
   TrendingUp,
   Cpu,
   ShoppingBag,
-  Users,
   CreditCard,
-  BookOpen,
   LogOut,
-  ChevronRight
+  ChevronRight,
+  Settings
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { APP_NAME, CONTACT_INFO } from "@/lib/constants"
@@ -33,11 +32,13 @@ import {
   SidebarMenuItem,
   SidebarGroup,
   SidebarGroupLabel,
-  SidebarSeparator
+  SidebarSeparator,
+  useSidebar
 } from "@/components/ui/sidebar"
-import { useAuth, useUser } from "@/firebase"
+import { useAuth, useUser, useFirestore, useDoc } from "@/firebase"
 import { signOut } from "firebase/auth"
 import { useToast } from "@/hooks/use-toast"
+import { doc } from "firebase/firestore"
 
 const menuItems = [
   { label: "Dashboard", icon: LayoutDashboard, href: "/dashboard" },
@@ -59,8 +60,23 @@ export function AppSidebar() {
   const auth = useAuth()
   const { user } = useUser()
   const { toast } = useToast()
+  const { setOpenMobile, isMobile } = useSidebar()
+  const db = useFirestore()
   
   const isDashboard = pathname.startsWith('/dashboard')
+
+  // Close sidebar on route change for mobile
+  useEffect(() => {
+    if (isMobile) {
+      setOpenMobile(false)
+    }
+  }, [pathname, isMobile, setOpenMobile])
+
+  const profileRef = React.useMemo(() => {
+    if (!db || !user?.uid) return null
+    return doc(db, "users", user.uid)
+  }, [db, user?.uid])
+  const { data: profile } = useDoc(profileRef)
 
   const handleLogout = async () => {
     if (!auth) return
@@ -76,10 +92,16 @@ export function AppSidebar() {
     }
   }
 
+  const handleLinkClick = () => {
+    if (isMobile) {
+      setOpenMobile(false)
+    }
+  }
+
   return (
     <Sidebar className="border-r border-border/50">
       <SidebarHeader className="py-6 px-6">
-        <Link href="/" className="flex items-center gap-2 group">
+        <Link href="/" onClick={handleLinkClick} className="flex items-center gap-2 group">
           <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center shadow-lg shadow-primary/20 group-hover:scale-105 transition-transform">
             <Sparkles className="text-primary-foreground h-6 w-6" />
           </div>
@@ -104,7 +126,7 @@ export function AppSidebar() {
                       pathname === item.href && "bg-primary/15 text-primary"
                     )}
                   >
-                    <Link href={item.href} className="flex items-center gap-3">
+                    <Link href={item.href} onClick={handleLinkClick} className="flex items-center gap-3">
                       <item.icon className="h-4 w-4" />
                       <span className="font-medium">{item.label}</span>
                     </Link>
@@ -115,7 +137,7 @@ export function AppSidebar() {
                 <>
                   <SidebarMenuItem>
                     <SidebarMenuButton asChild className="hover:bg-primary/10 transition-all">
-                      <Link href="/auth/register" className="flex items-center gap-3">
+                      <Link href="/auth/register" onClick={handleLinkClick} className="flex items-center gap-3">
                         <UserPlus className="h-4 w-4" />
                         <span className="font-medium">Daftar</span>
                       </Link>
@@ -123,7 +145,7 @@ export function AppSidebar() {
                   </SidebarMenuItem>
                   <SidebarMenuItem>
                     <SidebarMenuButton asChild className="hover:bg-primary/10 transition-all">
-                      <Link href="/auth/login" className="flex items-center gap-3">
+                      <Link href="/auth/login" onClick={handleLinkClick} className="flex items-center gap-3">
                         <LogIn className="h-4 w-4" />
                         <span className="font-medium">Login</span>
                       </Link>
@@ -148,7 +170,7 @@ export function AppSidebar() {
                         pathname === item.href && "bg-primary/15 text-primary"
                       )}
                     >
-                      <Link href={item.href} className="flex items-center gap-3">
+                      <Link href={item.href} onClick={handleLinkClick} className="flex items-center gap-3">
                         <item.icon className="h-4 w-4" />
                         <span className="font-medium">{item.label}</span>
                       </Link>
@@ -163,9 +185,29 @@ export function AppSidebar() {
             <SidebarGroup>
               <SidebarGroupLabel className="text-muted-foreground/50 px-3 uppercase text-[10px] tracking-widest font-bold">System</SidebarGroupLabel>
               <SidebarMenu>
+                {profile?.role === 'admin' && (
+                  <SidebarMenuItem>
+                    <SidebarMenuButton 
+                      asChild 
+                      isActive={pathname === "/dashboard/admin/settings"}
+                      className={cn(
+                        "hover:bg-primary/10 hover:text-primary transition-all duration-200",
+                        pathname === "/dashboard/admin/settings" && "bg-primary/15 text-primary"
+                      )}
+                    >
+                      <Link href="/dashboard/admin/settings" onClick={handleLinkClick} className="flex items-center gap-3">
+                        <Settings className="h-4 w-4" />
+                        <span className="font-medium">Admin Settings</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                )}
                 <SidebarMenuItem>
                   <SidebarMenuButton 
-                    onClick={handleLogout}
+                    onClick={() => {
+                      handleLogout()
+                      handleLinkClick()
+                    }}
                     className="hover:text-destructive hover:bg-destructive/10 transition-colors w-full"
                   >
                     <LogOut className="h-4 w-4" />

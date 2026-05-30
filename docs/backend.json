@@ -57,72 +57,15 @@
         "createdAt": { "type": "string", "format": "date-time" }
       }
     },
-    "Material": {
-      "title": "Learning Material",
-      "description": "Digital learning content for users.",
+    "ApiSettings": {
+      "title": "API Configuration",
+      "description": "Settings for external booster API services.",
       "type": "object",
       "properties": {
-        "title": { "type": "string" },
-        "description": { "type": "string" },
-        "contentUrl": { "type": "string" },
-        "thumbnailUrl": { "type": "string" },
-        "createdAt": { "type": "string", "format": "date-time" }
-      }
-    },
-    "Referral": {
-      "title": "Referral Record",
-      "description": "Tracking user referrals.",
-      "type": "object",
-      "properties": {
-        "referrerId": { "type": "string" },
-        "referredId": { "type": "string" },
-        "bonusPaid": { "type": "boolean" },
-        "createdAt": { "type": "string", "format": "date-time" }
-      }
-    },
-    "MarketplaceProduct": {
-      "title": "Marketplace Product",
-      "description": "Digital products available for purchase with coins.",
-      "type": "object",
-      "properties": {
-        "name": { "type": "string" },
-        "description": { "type": "string" },
-        "priceCoins": { "type": "number" },
-        "downloadUrl": { "type": "string" },
-        "imageUrl": { "type": "string" }
-      }
-    },
-    "MarketplacePurchase": {
-      "title": "Marketplace Purchase",
-      "description": "Record of a product purchase.",
-      "type": "object",
-      "properties": {
-        "userId": { "type": "string" },
-        "productId": { "type": "string" },
-        "amountCoins": { "type": "number" },
-        "createdAt": { "type": "string", "format": "date-time" }
-      }
-    },
-    "AdminLog": {
-      "title": "Admin Audit Log",
-      "description": "Records of admin actions for security.",
-      "type": "object",
-      "properties": {
-        "adminId": { "type": "string" },
-        "action": { "type": "string" },
-        "targetId": { "type": "string" },
-        "details": { "type": "string" },
-        "createdAt": { "type": "string", "format": "date-time" }
-      }
-    },
-    "Admin": {
-      "title": "Admin Profile",
-      "description": "Users with administrative privileges.",
-      "type": "object",
-      "properties": {
-        "uid": { "type": "string" },
-        "email": { "type": "string" },
-        "permissions": { "type": "array", "items": { "type": "string" } }
+        "apiUrl": { "type": "string" },
+        "apiKey": { "type": "string" },
+        "serviceId": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" }
       }
     }
   },
@@ -146,29 +89,9 @@
       "schema": "#/entities/TopUpRequest",
       "description": "Manual coin top-up requests"
     },
-    "/materials/{materialId}": {
-      "schema": "#/entities/Material",
-      "description": "Digital learning materials"
-    },
-    "/referrals/{referralId}": {
-      "schema": "#/entities/Referral",
-      "description": "Referral tracking"
-    },
-    "/marketplace_products/{productId}": {
-      "schema": "#/entities/MarketplaceProduct",
-      "description": "Available digital products"
-    },
-    "/marketplace_purchases/{purchaseId}": {
-      "schema": "#/entities/MarketplacePurchase",
-      "description": "User purchase history"
-    },
-    "/admin_logs/{logId}": {
-      "schema": "#/entities/AdminLog",
-      "description": "Admin activity logs"
-    },
-    "/admins/{adminId}": {
-      "schema": "#/entities/Admin",
-      "description": "Administrative users"
+    "/settings/api": {
+      "schema": "#/entities/ApiSettings",
+      "description": "System API configuration"
     }
   }
 }
