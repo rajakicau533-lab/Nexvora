@@ -1,22 +1,24 @@
 "use client"
 
-import React, { useEffect } from "react"
+import React, { useEffect, useState } from "react"
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar"
 import { AdminSidebar } from "@/components/layout/AdminSidebar"
-import { useUser, useDoc, useFirestore, useAuth } from "@/firebase"
+import { useUser, useDoc, useFirestore } from "@/firebase"
 import { useRouter } from "next/navigation"
 import { doc } from "firebase/firestore"
-import { ShieldCheck } from "lucide-react"
+import { ShieldCheck, Loader2 } from "lucide-react"
 
 export default function AdminLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
-  const { user, loading } = useUser()
-  const auth = useAuth()
+  const { user, loading: authLoading } = useUser()
   const router = useRouter()
   const db = useFirestore()
+  
+  // State to prevent flicker before redirect
+  const [isAuthorized, setIsAuthorized] = useState<boolean | null>(null)
 
   const adminProfileRef = React.useMemo(() => {
     if (!db || !user?.uid) return null;
@@ -26,44 +28,49 @@ export default function AdminLayout({
   const { data: adminData, loading: adminLoading } = useDoc(adminProfileRef);
 
   useEffect(() => {
-    // Debug Logging
-    console.log("Admin Security Audit:", {
-      authLoading: loading,
-      adminLoading,
-      currentUser: auth?.currentUser?.email,
+    // 1. Wait for everything to finish loading
+    if (authLoading || adminLoading) return;
+
+    console.log("ADMIN SECURITY AUDIT:", {
       uid: user?.uid,
-      hasAdminData: !!adminData,
-      adminRole: adminData?.role
+      email: user?.email,
+      hasAdminDoc: !!adminData,
+      role: adminData?.role
     });
 
-    if (loading || adminLoading) return;
-
+    // 2. Check Authentication
     if (!user) {
-      console.warn("Access Denied: No active session. Redirecting to login.");
+      console.warn("Audit: No user session. Redirecting to login.");
+      setIsAuthorized(false);
       router.push('/admin-login');
       return;
     }
 
+    // 3. Check Authorization (Firestore record)
     if (!adminData || adminData.role !== 'admin') {
-      console.warn("Access Denied: UID not found in admins collection or invalid role.", user.uid);
+      console.error("Audit: User is logged in but NOT found in 'admins' collection with 'admin' role.");
+      setIsAuthorized(false);
       router.push('/admin-login');
       return;
     }
 
-    console.log("Admin Authenticated Successfully.");
-  }, [user, loading, adminData, adminLoading, router, auth]);
+    // 4. Access Granted
+    console.log("Audit: Access Granted.");
+    setIsAuthorized(true);
+  }, [user, authLoading, adminData, adminLoading, router]);
 
-  if (loading || adminLoading) {
+  // Loading Screen
+  if (authLoading || adminLoading || isAuthorized === null) {
     return (
       <div className="min-h-screen bg-[#0F0F0F] flex flex-col items-center justify-center space-y-4">
-        <div className="w-12 h-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
-        <p className="text-muted-foreground font-headline animate-pulse">Verifying Admin Access...</p>
+        <Loader2 className="w-12 h-12 text-primary animate-spin" />
+        <p className="text-muted-foreground font-headline animate-pulse tracking-widest uppercase text-xs">Verifying Admin Otorisasi...</p>
       </div>
     )
   }
 
-  // Final gate to prevent flash of content
-  if (!user || !adminData || adminData.role !== 'admin') return null;
+  // Final Gate
+  if (!isAuthorized) return null;
 
   return (
     <SidebarProvider defaultOpen={true}>

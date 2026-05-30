@@ -1,9 +1,8 @@
-
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
   
-    // Check if user is an admin
+    // Check if user is an admin by looking at the admins collection
     function isAdmin() {
       return request.auth != null && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
     }
@@ -11,16 +10,17 @@ service cloud.firestore {
     // PROFILE USER
     match /users/{userId} {
       allow get: if request.auth != null;
-      allow list: if true; 
+      allow list: if request.auth != null; // Allow listing for admin checks/search
       allow write: if (request.auth != null && request.auth.uid == userId) || isAdmin();
     }
 
     // ADMINS COLLECTION
     match /admins/{adminId} {
-      // CRITICAL: Allow a user to read or create their own admin record
-      // This breaks the circular dependency and allows auto-registration for the master admin
-      allow get, create: if request.auth != null && request.auth.uid == adminId;
-      // Other operations (list, delete, update others) require verified admin status
+      // Crucial: Allow a user to READ their own admin document to verify their role
+      allow get: if request.auth != null && request.auth.uid == adminId;
+      // Allow the master admin to create their own record during setup/login
+      allow create: if request.auth != null && request.auth.uid == adminId;
+      // All other operations require existing admin status
       allow read, write: if isAdmin();
     }
 

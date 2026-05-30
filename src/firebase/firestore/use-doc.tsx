@@ -9,19 +9,20 @@ export function useDoc<T = any>(ref: DocumentReference | null) {
   const [error, setError] = useState<Error | null>(null);
   
   const lastPathRef = useRef<string | null>(null);
-
-  const path = ref?.path;
+  const path = ref?.path || null;
 
   useEffect(() => {
+    // If ref is null, we aren't loading anything, but we should reset state
     if (!ref) {
       setData(null);
       setLoading(false);
       return;
     }
 
+    // If path changed, we are now loading a new document
     if (lastPathRef.current !== path) {
       setLoading(true);
-      lastPathRef.current = path || null;
+      lastPathRef.current = path;
     }
 
     const unsubscribe = onSnapshot(
