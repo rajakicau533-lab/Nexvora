@@ -64,7 +64,7 @@ export default function AdminDashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-headline font-black text-white">
-              {allOrders?.filter(o => o.status === 'pending' || o.status === 'processing').length || 0}
+              {allOrders?.filter(o => o.status === 'pending' || o.status === 'processing' || o.status === 'PENDING').length || 0}
             </div>
             <p className="text-[10px] text-amber-500 font-bold mt-2 uppercase">Requires Attention</p>
           </CardContent>
@@ -120,12 +120,13 @@ export default function AdminDashboardPage() {
                 ) : (
                   recentOrders.map((order) => (
                     <TableRow key={order.id} className="border-white/5 hover:bg-white/5">
-                      <TableCell className="max-w-[150px] truncate text-xs font-mono">{order.url}</TableCell>
-                      <TableCell className="text-white font-bold">{order.views.toLocaleString()}</TableCell>
+                      <TableCell className="max-w-[150px] truncate text-xs font-mono">{order.targetLink || order.url}</TableCell>
+                      <TableCell className="text-white font-bold">{(order.views || order.quantity || 0).toLocaleString()}</TableCell>
                       <TableCell>
                         <Badge className={cn(
                           "text-[9px] font-black uppercase",
-                          order.status === 'completed' ? 'bg-green-500' : 'bg-primary'
+                          order.status === 'completed' || order.status === 'SELESAI' ? 'bg-green-500' : 
+                          order.status === 'failed' || order.status === 'GAGAL' ? 'bg-red-500' : 'bg-primary'
                         )}>
                           {order.status}
                         </Badge>

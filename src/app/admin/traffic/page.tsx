@@ -47,8 +47,8 @@ export default function AdminTrafficMonitoringPage() {
     if (!orders) return { total: 0, pending: 0, completed: 0, coins: 0 }
     return {
       total: orders.length,
-      pending: orders.filter((o: any) => o.status === 'pending' || o.status === 'processing').length,
-      completed: orders.filter((o: any) => o.status === 'completed').length,
+      pending: orders.filter((o: any) => o.status === 'pending' || o.status === 'processing' || o.status === 'PENDING').length,
+      completed: orders.filter((o: any) => o.status === 'completed' || o.status === 'SELESAI').length,
       coins: orders.reduce((acc: number, o: any) => acc + (o.coinCost || 0), 0)
     }
   }, [orders])
@@ -112,14 +112,14 @@ export default function AdminTrafficMonitoringPage() {
                 <TableCell>
                   <div className="flex flex-col">
                     <span className="text-[10px] font-black text-primary uppercase">{order.platform}</span>
-                    <a href={order.url} target="_blank" rel="noopener noreferrer" className="text-xs text-muted-foreground hover:text-white flex items-center gap-1 max-w-[200px] truncate">
-                      {order.url} <ExternalLink className="h-2 w-2" />
+                    <a href={order.targetLink || order.url} target="_blank" rel="noopener noreferrer" className="text-xs text-muted-foreground hover:text-white flex items-center gap-1 max-w-[200px] truncate">
+                      {order.targetLink || order.url} <ExternalLink className="h-2 w-2" />
                     </a>
                   </div>
                 </TableCell>
                 <TableCell>
                   <div className="flex flex-col">
-                    <span className="font-bold text-white">{order.views.toLocaleString()} Views</span>
+                    <span className="font-bold text-white">{(order.views || order.quantity || 0).toLocaleString()} Views</span>
                     <span className="text-[10px] text-muted-foreground">{order.coinCost} 🪙 Nexus Coins</span>
                   </div>
                 </TableCell>
@@ -129,23 +129,23 @@ export default function AdminTrafficMonitoringPage() {
                 <TableCell>
                    <Badge className={cn(
                      "text-[9px] font-black uppercase",
-                     order.status === 'completed' ? 'bg-green-500' : 
-                     order.status === 'processing' ? 'bg-blue-600 animate-pulse' : 
-                     order.status === 'failed' ? 'bg-red-500' : 'bg-amber-500'
+                     order.status === 'completed' || order.status === 'SELESAI' ? 'bg-green-500' : 
+                     order.status === 'processing' || order.status === 'PROCESSING' ? 'bg-blue-600 animate-pulse' : 
+                     order.status === 'failed' || order.status === 'GAGAL' ? 'bg-red-500' : 'bg-amber-500'
                    )}>
                      {order.status}
                    </Badge>
                 </TableCell>
                 <TableCell className="text-right">
-                  {!isAssistant && order.status !== 'completed' && order.status !== 'failed' && (
+                  {!isAssistant && order.status !== 'completed' && order.status !== 'SELESAI' && order.status !== 'failed' && order.status !== 'GAGAL' && (
                     <div className="flex items-center justify-end gap-2">
-                       <Button size="icon" variant="ghost" onClick={() => handleUpdateStatus(order.id, "processing")} className="h-8 w-8 text-blue-500 hover:bg-blue-500/10">
+                       <Button size="icon" variant="ghost" onClick={() => handleUpdateStatus(order.id, "PROCESSING")} title="Mark as Processing" className="h-8 w-8 text-blue-500 hover:bg-blue-500/10">
                          <Clock className="h-4 w-4" />
                        </Button>
-                       <Button size="icon" variant="ghost" onClick={() => handleUpdateStatus(order.id, "completed")} className="h-8 w-8 text-green-500 hover:bg-green-500/10">
+                       <Button size="icon" variant="ghost" onClick={() => handleUpdateStatus(order.id, "SELESAI")} title="Mark as Completed" className="h-8 w-8 text-green-500 hover:bg-green-500/10">
                          <CheckCircle2 className="h-4 w-4" />
                        </Button>
-                       <Button size="icon" variant="ghost" onClick={() => handleUpdateStatus(order.id, "failed")} className="h-8 w-8 text-red-500 hover:bg-red-500/10">
+                       <Button size="icon" variant="ghost" onClick={() => handleUpdateStatus(order.id, "GAGAL")} title="Mark as Failed" className="h-8 w-8 text-red-500 hover:bg-red-500/10">
                          <AlertCircle className="h-4 w-4" />
                        </Button>
                     </div>
