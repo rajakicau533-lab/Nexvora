@@ -8,6 +8,7 @@ import { TrendingUp, CreditCard, UserCheck, MessageSquare, PlayCircle, ExternalL
 import { CONTACT_INFO } from "@/lib/constants"
 import { useUser, useDoc, useFirestore } from "@/firebase"
 import { doc } from "firebase/firestore"
+import { cn } from "@/lib/utils"
 
 export default function DashboardPage() {
   const { user } = useUser()
