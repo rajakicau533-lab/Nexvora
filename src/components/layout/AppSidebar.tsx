@@ -18,7 +18,8 @@ import {
   CreditCard,
   LogOut,
   ChevronRight,
-  Settings
+  Settings,
+  ShieldCheck
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { APP_NAME, CONTACT_INFO } from "@/lib/constants"
@@ -192,12 +193,12 @@ export function AppSidebar() {
                       isActive={pathname === "/dashboard/admin/settings"}
                       className={cn(
                         "hover:bg-primary/10 hover:text-primary transition-all duration-200",
-                        pathname === "/dashboard/admin/settings" && "bg-primary/15 text-primary"
+                        pathname === "/dashboard/admin/settings" && "bg-primary/15 text-primary border border-primary/20"
                       )}
                     >
                       <Link href="/dashboard/admin/settings" onClick={handleLinkClick} className="flex items-center gap-3">
-                        <Settings className="h-4 w-4" />
-                        <span className="font-medium">Admin Settings</span>
+                        <ShieldCheck className="h-4 w-4 text-primary" />
+                        <span className="font-bold">Admin Settings</span>
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
