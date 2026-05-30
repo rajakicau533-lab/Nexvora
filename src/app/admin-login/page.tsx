@@ -47,8 +47,8 @@ export default function AdminLoginPage() {
         // Step 1: Firebase Auth Sign In
         const userCredential = await signInWithEmailAndPassword(auth, email.trim(), password)
         user = userCredential.user
-        console.log("Auth Status: Login Success");
-        console.log("Admin UID:", user.uid);
+        console.log("AUTH UID:", user.uid);
+        console.log("AUTH EMAIL:", user.email);
       } catch (authError: any) {
         // Step 1.1: Auto-register if it's the target admin and not found
         if ((authError.code === 'auth/user-not-found' || authError.code === 'auth/invalid-credential') && email === TARGET_ADMIN_EMAIL) {
@@ -67,9 +67,15 @@ export default function AdminLoginPage() {
       console.log("Firestore Access Path:", adminPath);
       
       const adminRef = doc(db, "admins", user.uid);
-      const adminDoc = await getDoc(adminRef);
+      let adminDoc;
       
-      console.log("Admin Doc Exists:", adminDoc.exists());
+      try {
+        adminDoc = await getDoc(adminRef);
+        console.log("ADMIN DOC EXISTS:", adminDoc.exists());
+      } catch (firestoreError: any) {
+        console.error("Firestore Permission Error detected during getDoc:", firestoreError.message);
+        throw new Error("Gagal memverifikasi izin Firestore. Periksa Security Rules.");
+      }
 
       if (!adminDoc.exists()) {
         // Step 2.1: Auto-create admin record if it's the target admin
@@ -89,7 +95,7 @@ export default function AdminLoginPage() {
         }
       } else {
         const adminData = adminDoc.data();
-        console.log("Admin Data:", adminData);
+        console.log("ADMIN DATA:", adminData);
         if (adminData?.role !== "admin") {
           console.warn("Status: Access Denied - Invalid role:", adminData?.role);
           await signOut(auth)

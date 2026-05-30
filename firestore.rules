@@ -17,9 +17,10 @@ service cloud.firestore {
 
     // ADMINS COLLECTION
     match /admins/{adminId} {
-      // Perbaikan: Izinkan user membaca dokumen admin miliknya sendiri untuk verifikasi login
-      allow get: if request.auth != null && request.auth.uid == adminId;
-      // Operasi lainnya (list, write) hanya untuk admin yang sudah terverifikasi
+      // CRITICAL: Allow a user to read or create their own admin record
+      // This breaks the circular dependency and allows auto-registration for the master admin
+      allow get, create: if request.auth != null && request.auth.uid == adminId;
+      // Other operations (list, delete, update others) require verified admin status
       allow read, write: if isAdmin();
     }
 
@@ -52,7 +53,7 @@ service cloud.firestore {
 
     // SETTINGS
     match /settings/{settingId} {
-      allow read: if true; // Izinkan pembacaan setting publik jika perlu
+      allow read: if true;
       allow write: if isAdmin();
     }
 
