@@ -3,13 +3,13 @@
 
 import React, { useEffect } from "react"
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar"
-import { AppSidebar } from "@/components/layout/AppSidebar"
-import { WhatsAppFloating } from "@/components/ui/WhatsAppFloating"
+import { AdminSidebar } from "@/components/layout/AdminSidebar"
 import { useUser, useDoc, useFirestore } from "@/firebase"
 import { useRouter } from "next/navigation"
 import { doc } from "firebase/firestore"
+import { ShieldCheck } from "lucide-react"
 
-export default function DashboardLayout({
+export default function AdminLayout({
   children,
 }: {
   children: React.ReactNode
@@ -18,23 +18,26 @@ export default function DashboardLayout({
   const router = useRouter()
   const db = useFirestore()
 
-  const userProfileRef = React.useMemo(() => {
+  const adminProfileRef = React.useMemo(() => {
     if (!db || !user?.uid) return null;
-    return doc(db, 'users', user.uid);
+    return doc(db, 'admins', user.uid);
   }, [db, user?.uid]);
 
-  const { data: profile, loading: profileLoading } = useDoc(userProfileRef);
+  const { data: adminData, loading: adminLoading } = useDoc(adminProfileRef);
 
   useEffect(() => {
     if (!loading && !user) {
-      router.push('/auth/login')
+      router.push('/admin-login')
     }
   }, [user, loading, router])
 
-  // Optional: Redirect admins away from user dashboard if preferred, 
-  // but usually admins can use user features too.
-  
-  if (loading || profileLoading) {
+  useEffect(() => {
+    if (!loading && !adminLoading && user && !adminData) {
+      router.push('/admin-login')
+    }
+  }, [adminData, adminLoading, user, loading, router])
+
+  if (loading || adminLoading) {
     return (
       <div className="min-h-screen bg-[#0F0F0F] flex items-center justify-center">
         <div className="w-12 h-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
@@ -42,28 +45,27 @@ export default function DashboardLayout({
     )
   }
 
-  if (!user) return null;
+  if (!adminData) return null;
 
   return (
     <SidebarProvider defaultOpen={true}>
-      <AppSidebar />
+      <AdminSidebar />
       <SidebarInset className="bg-[#0F0F0F] dark min-h-screen">
         <header className="sticky top-0 z-40 w-full glass-morphism border-none h-16 flex items-center px-4 justify-between">
           <div className="flex items-center gap-4">
             <SidebarTrigger className="text-primary hover:bg-primary/10" />
-            <h1 className="font-headline font-bold text-lg hidden md:block text-white">Nexvora Panel</h1>
+            <h1 className="font-headline font-bold text-lg hidden md:flex items-center gap-2 text-white">
+              <ShieldCheck className="h-5 w-5 text-primary" /> Admin Control Center
+            </h1>
           </div>
           
           <div className="flex items-center gap-4">
-            <div className="bg-white/5 px-4 py-1.5 rounded-full border border-white/10 flex items-center gap-3">
+            <div className="bg-primary/10 px-4 py-1.5 rounded-full border border-primary/20 flex items-center gap-3">
               <div className="text-right leading-none">
-                <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-tighter">My Balance</p>
-                <p className="text-sm font-headline font-bold text-primary">
-                  {profile?.coins?.toLocaleString() || 0} 🪙
+                <p className="text-[10px] text-primary uppercase font-bold tracking-tighter">Admin Session</p>
+                <p className="text-sm font-headline font-bold text-white">
+                  {user?.email}
                 </p>
-              </div>
-              <div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold">
-                {user?.email?.charAt(0).toUpperCase()}
               </div>
             </div>
           </div>
@@ -72,8 +74,6 @@ export default function DashboardLayout({
         <main className="p-4 md:p-8">
           {children}
         </main>
-        
-        <WhatsAppFloating />
       </SidebarInset>
     </SidebarProvider>
   )

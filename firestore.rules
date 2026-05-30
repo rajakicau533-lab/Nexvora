@@ -1,61 +1,69 @@
+
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
   
+    // Check if user is an admin
+    function isAdmin() {
+      return request.auth != null && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
     // PROFILE USER
     match /users/{userId} {
-      // Izinkan baca profil individu jika login
       allow get: if request.auth != null;
-      // Izinkan list untuk pengecekan username unik saat registrasi (unauthenticated)
       allow list: if true; 
-      // Izinkan tulis hanya jika milik sendiri
-      allow write: if request.auth != null && request.auth.uid == userId;
+      allow write: if (request.auth != null && request.auth.uid == userId) || isAdmin();
+    }
+
+    // ADMINS COLLECTION
+    match /admins/{adminId} {
+      // Allow individual admins to read their own status
+      allow get: if request.auth != null && request.auth.uid == adminId;
+      // Writing to admins collection is restricted to existing admins
+      allow read, write: if isAdmin();
     }
 
     // TRAFFIC ORDERS
     match /traffic_orders/{orderId} {
-      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow read: if (request.auth != null && resource.data.userId == request.auth.uid) || isAdmin();
       allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isAdmin();
     }
 
     // COIN TRANSACTIONS
     match /coin_transactions/{txId} {
-      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow read: if (request.auth != null && resource.data.userId == request.auth.uid) || isAdmin();
       allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isAdmin();
     }
 
     // TOPUP REQUESTS
     match /topup_requests/{requestId} {
-      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow read: if (request.auth != null && resource.data.userId == request.auth.uid) || isAdmin();
       allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isAdmin();
     }
 
-    // MATERIALS (Public read for all users)
+    // MATERIALS
     match /materials/{materialId} {
       allow read: if true;
+      allow write: if isAdmin();
     }
 
-    // REFERRALS
-    match /referrals/{referralId} {
-      allow read: if request.auth != null && (resource.data.referrerId == request.auth.uid || resource.data.referredId == request.auth.uid);
-      allow create: if request.auth != null;
+    // SETTINGS
+    match /settings/{settingId} {
+      allow read, write: if isAdmin();
     }
 
     // MARKETPLACE
     match /marketplace_products/{productId} {
       allow read: if true;
+      allow write: if isAdmin();
     }
     match /marketplace_purchases/{purchaseId} {
-      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow read: if (request.auth != null && resource.data.userId == request.auth.uid) || isAdmin();
       allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
-    }
-
-    // ADMIN LOGS & ADMIN PROFILES (Internal Only)
-    match /admin_logs/{logId} {
-      allow read, write: if false;
-    }
-    match /admins/{adminId} {
-      allow read, write: if false;
+      allow update, delete: if isAdmin();
     }
   }
 }

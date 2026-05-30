@@ -18,6 +18,17 @@
       },
       "required": ["uid", "username", "email", "coins", "role"]
     },
+    "Admin": {
+      "title": "Admin Account",
+      "description": "Authorized administrator accounts.",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string", "format": "email" },
+        "role": { "type": "string", "enum": ["admin"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["email", "role"]
+    },
     "TrafficOrder": {
       "title": "Traffic Order",
       "description": "Order for Shopee or TikTok views.",
@@ -76,6 +87,10 @@
     "/users/{userId}": {
       "schema": "#/entities/User",
       "description": "User profile documents"
+    },
+    "/admins/{adminId}": {
+      "schema": "#/entities/Admin",
+      "description": "Administrator accounts with panel access"
     },
     "/traffic_orders/{orderId}": {
       "schema": "#/entities/TrafficOrder",
