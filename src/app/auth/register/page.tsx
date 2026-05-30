@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { UserPlus, Sparkles, AlertCircle, CheckCircle2 } from "lucide-react"
 import { useAuth, useFirestore } from "@/firebase"
-import { createUserWithEmailAndPassword, sendEmailVerification } from "firebase/auth"
+import { createUserWithEmailAndPassword, sendEmailVerification, signOut } from "firebase/auth"
 import { doc, setDoc, serverTimestamp, getDocs, collection, query, where } from "firebase/firestore"
 import { useToast } from "@/hooks/use-toast"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
@@ -27,38 +27,40 @@ export default function RegisterPage() {
   const auth = useAuth()
   const db = useFirestore()
   const { toast } = useToast()
+  const router = useRouter()
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!auth || !db) return
+    if (!auth || !db) {
+      setError("Firebase belum terkonfigurasi. Periksa halaman setup.")
+      return
+    }
     
     setIsLoading(true)
     setError(null)
 
     try {
-      // 1. Check if username is unique
+      // 1. Validasi Username Unik
       const usersRef = collection(db, "users")
-      const q = query(usersRef, where("username", "==", username))
+      const q = query(usersRef, where("username", "==", username.toLowerCase()))
       const querySnapshot = await getDocs(q)
       
       if (!querySnapshot.empty) {
         throw new Error("Username sudah digunakan. Silakan pilih username lain.")
       }
 
-      // 2. Create User in Auth
+      // 2. Buat User di Auth
       const userCredential = await createUserWithEmailAndPassword(auth, email, password)
       const user = userCredential.user
 
-      // 3. Send Verification Email
-      await sendEmailVerification(user)
-
-      // 4. Save User Profile in Firestore
-      const generatedReferral = username.toUpperCase().substring(0, 3) + Math.floor(100 + Math.random() * 900)
+      // 3. Simpan Profil User di Firestore
+      // Generate referral code: NXV + Random Number
+      const generatedReferral = "NXV" + Math.floor(1000 + Math.random() * 9000)
       
       await setDoc(doc(db, "users", user.uid), {
         uid: user.uid,
-        username,
-        email,
+        username: username.toLowerCase(),
+        email: email.toLowerCase(),
         coins: 0,
         status: "active",
         role: "user",
@@ -66,6 +68,12 @@ export default function RegisterPage() {
         referredBy: referralCode || null,
         createdAt: serverTimestamp(),
       })
+
+      // 4. Kirim Verifikasi Email
+      await sendEmailVerification(user)
+      
+      // 5. Logout paksa agar tidak masuk dashboard sebelum verifikasi
+      await signOut(auth)
 
       setIsSuccess(true)
       toast({
@@ -101,7 +109,7 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#1A1410] flex items-center justify-center p-4">
+    <div className="min-h-screen bg-[#1A1410] flex items-center justify-center p-4 text-white">
       <div className="w-full max-w-md space-y-8">
         <div className="text-center space-y-2">
           <Link href="/" className="inline-flex items-center gap-2 group">
@@ -112,7 +120,7 @@ export default function RegisterPage() {
           </Link>
         </div>
 
-        <Card className="premium-card rounded-3xl border-white/10">
+        <Card className="premium-card rounded-3xl border-white/10 bg-black/40">
           <CardHeader>
             <CardTitle className="text-2xl text-white">Daftar Akun</CardTitle>
             <CardDescription>Bergabung dengan komunitas Nexvora Studio.</CardDescription>
