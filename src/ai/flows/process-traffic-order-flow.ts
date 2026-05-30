@@ -39,12 +39,23 @@ const processTrafficOrderFlow = ai.defineFlow(
       orderId: z.string().optional(),
       error: z.string().optional(),
       rawResponse: z.any().optional(),
+      debugInfo: z.any().optional(),
     }),
   },
   async (input) => {
     const { apiUrl, apiKey, serviceId, link, quantity } = input;
+    const cleanUrl = apiUrl.trim();
+
+    console.log("--- TRAFFIC ORDER REQUEST ---");
+    console.log("Endpoint:", cleanUrl);
+    console.log("Service ID:", serviceId);
+    console.log("Link:", link);
 
     try {
+      if (!cleanUrl.startsWith('http')) {
+        throw new Error("API URL tidak valid. Harus dimulai dengan http:// atau https://");
+      }
+
       const params = new URLSearchParams();
       params.append('key', apiKey);
       params.append('action', 'add');
@@ -52,16 +63,32 @@ const processTrafficOrderFlow = ai.defineFlow(
       params.append('link', link);
       params.append('quantity', quantity.toString());
 
-      const response = await fetch(apiUrl, {
+      // Using a reasonable timeout and User-Agent to avoid fetch failed/blocked
+      const response = await fetch(cleanUrl, {
         method: 'POST',
         body: params,
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
+          'User-Agent': 'Nexvora-Booster/2.5 (NextJS; Node; +https://nexvora.com)',
         },
+        signal: AbortSignal.timeout(20000), // 20s timeout
       });
 
-      const data = await response.json();
-      console.log('API_RESPONSE:', data);
+      const responseText = await response.text();
+      console.log("Provider Status:", response.status);
+      
+      let data;
+      try {
+        data = JSON.parse(responseText);
+        console.log("Provider JSON:", data);
+      } catch (e) {
+        console.error("Provider Response is not JSON:", responseText);
+        return {
+          success: false,
+          error: `Provider mengirim respon non-JSON. Status: ${response.status}`,
+          debugInfo: { status: response.status, body: responseText }
+        };
+      }
 
       if (data.order) {
         return {
@@ -72,15 +99,16 @@ const processTrafficOrderFlow = ai.defineFlow(
       } else {
         return {
           success: false,
-          error: data.error || 'Provider returned an unknown error.',
+          error: data.error || 'Provider menolak pesanan tanpa alasan spesifik.',
           rawResponse: data,
         };
       }
     } catch (err: any) {
-      console.error('API_FETCH_ERROR:', err);
+      console.error('API_FETCH_CRITICAL_ERROR:', err);
       return {
         success: false,
-        error: err.message || 'Failed to connect to provider API.',
+        error: `Koneksi ke provider gagal: ${err.message || 'Network error'}`,
+        debugInfo: { error: err.message, stack: err.stack }
       };
     }
   }
@@ -95,23 +123,43 @@ const checkProviderBalanceFlow = ai.defineFlow(
       balance: z.string().optional(),
       currency: z.string().optional(),
       error: z.string().optional(),
+      debugInfo: z.any().optional(),
     }),
   },
   async (input) => {
+    const { apiUrl, apiKey } = input;
+    const cleanUrl = apiUrl.trim();
+
     try {
+      if (!cleanUrl.startsWith('http')) {
+        throw new Error("API URL harus dimulai dengan http:// atau https://");
+      }
+
       const params = new URLSearchParams();
-      params.append('key', input.apiKey);
+      params.append('key', apiKey);
       params.append('action', 'balance');
 
-      const response = await fetch(input.apiUrl, {
+      const response = await fetch(cleanUrl, {
         method: 'POST',
         body: params,
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
+          'User-Agent': 'Nexvora-Booster/2.5',
         },
+        signal: AbortSignal.timeout(15000),
       });
 
-      const data = await response.json();
+      const responseText = await response.text();
+      let data;
+      try {
+        data = JSON.parse(responseText);
+      } catch (e) {
+        return { 
+          success: false, 
+          error: `Respon provider bukan JSON. Pastikan URL API benar (akhiran /api/v2).` 
+        };
+      }
+
       if (data.balance) {
         return {
           success: true,
@@ -121,11 +169,13 @@ const checkProviderBalanceFlow = ai.defineFlow(
       } else {
         return {
           success: false,
-          error: data.error || 'Could not fetch balance.',
+          error: data.error || 'Gagal mengambil saldo dari provider.',
+          debugInfo: data
         };
       }
     } catch (err: any) {
-      return { success: false, error: err.message };
+      console.error("BALANCE_FETCH_ERROR:", err);
+      return { success: false, error: `fetch failed: ${err.message}` };
     }
   }
 );

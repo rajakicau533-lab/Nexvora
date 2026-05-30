@@ -30,6 +30,7 @@ export default function AdminSettingsPage() {
   const [isTesting, setIsTesting] = useState(false)
   const [testResult, setTestResult] = useState<"success" | "error" | null>(null)
   const [providerBalance, setProviderBalance] = useState<string | null>(null)
+  const [lastError, setLastError] = useState<string | null>(null)
 
   // Verify Super Admin status
   const adminProfileRef = React.useMemo(() => {
@@ -83,20 +84,20 @@ export default function AdminSettingsPage() {
   }
 
   const handleTest = async () => {
-    // We use the data from Firestore for testing as requested
-    if (!apiSettings?.apiUrl || !apiSettings?.apiKey) {
-      toast({ variant: "destructive", title: "Error", description: "Simpan konfigurasi ke Firestore terlebih dahulu sebelum testing." })
+    if (!formData.apiUrl || !formData.apiKey) {
+      toast({ variant: "destructive", title: "Error", description: "Lengkapi URL dan API Key sebelum testing." })
       return
     }
     
     setIsTesting(true)
     setTestResult(null)
     setProviderBalance(null)
+    setLastError(null)
     
     try {
       const result = await checkProviderBalance({
-        apiUrl: apiSettings.apiUrl,
-        apiKey: apiSettings.apiKey
+        apiUrl: formData.apiUrl,
+        apiKey: formData.apiKey
       })
       
       if (result.success) {
@@ -105,10 +106,12 @@ export default function AdminSettingsPage() {
         toast({ title: "Koneksi Berhasil", description: `Saldo Provider: ${result.balance} ${result.currency}` })
       } else {
         setTestResult("error")
+        setLastError(result.error || "Gagal menghubungi provider")
         toast({ variant: "destructive", title: "Koneksi Gagal", description: result.error })
       }
     } catch (err: any) {
       setTestResult("error")
+      setLastError(err.message || "Fetch failed")
       toast({ variant: "destructive", title: "Koneksi Gagal", description: err.message })
     } finally {
       setIsTesting(false)
@@ -213,7 +216,7 @@ export default function AdminSettingsPage() {
                   variant="outline"
                   className="h-14 rounded-2xl border-white/10 bg-white/5 px-8 hover:bg-white/10 text-white"
                 >
-                  {isTesting ? <RefreshCw className="h-5 w-5 animate-spin" /> : "Test Firestore Config"}
+                  {isTesting ? <RefreshCw className="h-5 w-5 animate-spin" /> : "Test Input Config"}
                 </Button>
               </div>
             </CardContent>
@@ -246,8 +249,8 @@ export default function AdminSettingsPage() {
                       <AlertCircle className="h-10 w-10" />
                     </div>
                     <div className="space-y-1">
-                      <p className="text-xl font-headline font-bold text-white uppercase">Connection Failed</p>
-                      <p className="text-[10px] text-muted-foreground uppercase font-black">Check your URL and Key in Firestore</p>
+                      <p className="text-xl font-headline font-bold text-white uppercase tracking-tighter">Connection Failed</p>
+                      <p className="text-[10px] text-red-400 font-bold uppercase mt-2 px-4 line-clamp-3">{lastError}</p>
                     </div>
                   </>
                 ) : (
@@ -257,7 +260,7 @@ export default function AdminSettingsPage() {
                     </div>
                     <div className="space-y-1">
                       <p className="text-xl font-headline font-bold text-muted-foreground uppercase tracking-widest">IDLE</p>
-                      <p className="text-[10px] text-muted-foreground font-black uppercase tracking-widest">Press Test to check Firestore config</p>
+                      <p className="text-[10px] text-muted-foreground font-black uppercase tracking-widest">Lakukan test untuk cek API</p>
                     </div>
                   </>
                 )}
@@ -266,9 +269,9 @@ export default function AdminSettingsPage() {
               <div className="p-4 rounded-2xl bg-black/40 border border-white/5 space-y-3">
                  <p className="text-[10px] text-primary uppercase font-bold tracking-widest">Integration Guide</p>
                  <ul className="space-y-2 text-xs text-white/60">
-                    <li className="flex items-start gap-2">• Key: Found in Provider Panel &gt; Settings.</li>
-                    <li className="flex items-start gap-2">• URL: Must end with /api/v2</li>
-                    <li className="flex items-start gap-2">• System uses system_settings/provider_config.</li>
+                    <li className="flex items-start gap-2">• Key: Ditemukan di Panel Provider &gt; Settings.</li>
+                    <li className="flex items-start gap-2">• URL: Harus berakhiran /api/v2</li>
+                    <li className="flex items-start gap-2">• Pastikan domain provider dapat diakses server.</li>
                  </ul>
               </div>
             </CardContent>

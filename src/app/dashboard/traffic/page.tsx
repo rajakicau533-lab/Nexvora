@@ -84,7 +84,7 @@ export default function TrafficServicePage() {
     
     // 1. Validate configuration exists and is active
     if (!apiSettings?.apiUrl || !apiSettings?.apiKey || !apiSettings?.serviceId) {
-      toast({ variant: "destructive", title: "Layanan Tidak Tersedia", description: "Konfigurasi provider belum lengkap. Hubungi Admin." })
+      toast({ variant: "destructive", title: "Layanan Tidak Tersedia", description: "Provider belum dikonfigurasi oleh admin." })
       return
     }
 
@@ -117,8 +117,6 @@ export default function TrafficServicePage() {
     setIsOrdering(true)
 
     try {
-      console.log("ORDER_REQUEST:", { platform, url, quantity: views });
-
       // 4. Call Provider API first via Genkit Flow
       const apiResult = await processTrafficOrder({
         apiUrl: apiSettings.apiUrl,
@@ -128,19 +126,22 @@ export default function TrafficServicePage() {
         quantity: views
       })
 
+      // Log to api_logs for audit (Requirement 11)
+      await setDoc(doc(collection(db, "api_logs")), {
+        timestamp: serverTimestamp(),
+        userId: user.uid,
+        userEmail: user.email,
+        link: url,
+        quantity: views,
+        provider: apiSettings.provider || 'IndoSMM',
+        requestPayload: { action: 'add', service: apiSettings.serviceId, link: url, quantity: views },
+        responseBody: apiResult.rawResponse || apiResult.debugInfo || null,
+        errorMessage: apiResult.success ? null : apiResult.error,
+        status: apiResult.success ? 'success' : 'failed'
+      })
+
       if (!apiResult.success) {
-        // Log failure to system activity for admin audit
-        await setDoc(doc(collection(db, "activity_logs")), {
-          type: "system_error",
-          action: "TRAFFIC_ORDER_FAILED",
-          userId: user.uid,
-          userEmail: user.email,
-          details: `Order Failed: ${apiResult.error}`,
-          platform,
-          url,
-          timestamp: serverTimestamp()
-        })
-        throw new Error(apiResult.error || "Provider rejected the request.")
+        throw new Error(apiResult.error || "Provider menolak request.");
       }
 
       // 5. Success Flow: Deduct coins and save order
@@ -172,7 +173,7 @@ export default function TrafficServicePage() {
         createdAt: serverTimestamp()
       })
 
-      toast({ title: "Pesanan Diterima! 🚀", description: `ID: ${apiResult.orderId}. Views sedang dalam antrean pengiriman.` })
+      toast({ title: "Pesanan Diterima! 🚀", description: `ID: ${apiResult.orderId}. Booster sedang bekerja.` })
       setUrl("")
       setViews(1000)
     } catch (err: any) {
@@ -205,7 +206,7 @@ export default function TrafficServicePage() {
             <Card className="premium-card col-span-3 rounded-3xl border-white/5 bg-black/40">
               <CardHeader>
                 <CardTitle className="text-white">Form Pemesanan Shopee</CardTitle>
-                <CardDescription>Mendukung URL panjang (shopee.co.id) dan shortlink (shp.ee).</CardDescription>
+                <CardDescription>Mendukung URL panjang (shopee.co.id) dan shortlink (shp.ee/id.shp.ee).</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="space-y-2">
