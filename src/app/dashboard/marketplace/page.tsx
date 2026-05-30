@@ -4,13 +4,20 @@ import React, { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { ShoppingBag, Download, CreditCard, Sparkles, CheckCircle2, AlertCircle } from "lucide-react"
+import { ShoppingBag, Download, CreditCard, Sparkles, CheckCircle2, AlertCircle, ChevronLeft, ChevronRight } from "lucide-react"
 import { useFirestore, useUser, useCollection, useDoc } from "@/firebase"
 import { collection, query, doc, setDoc, updateDoc, increment, serverTimestamp, where, orderBy } from "firebase/firestore"
 import { useToast } from "@/hooks/use-toast"
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselNext,
+  CarouselPrevious,
+} from "@/components/ui/carousel"
 
 export default function MarketplacePage() {
-  const { user } = useUser()
+  const { user } = userUser()
   const db = useFirestore()
   const { toast } = useToast()
   const [isBuying, setIsBuying] = useState<string | null>(null)
@@ -18,7 +25,7 @@ export default function MarketplacePage() {
   // Fetch products
   const productsQuery = React.useMemo(() => {
     if (!db) return null
-    return collection(db, "marketplace_products")
+    return query(collection(db, "marketplace_products"), orderBy("createdAt", "desc"))
   }, [db])
   const { data: products, loading: productsLoading } = useCollection<any>(productsQuery)
 
@@ -122,46 +129,66 @@ export default function MarketplacePage() {
         </Card>
       ) : (
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {products.map((product) => (
-            <Card key={product.id} className="premium-card flex flex-col overflow-hidden rounded-[2rem] bg-black/40 group">
-              <div className="relative h-56 bg-white/5 overflow-hidden">
-                <img 
-                  src={product.imageUrl || `https://picsum.photos/seed/${product.id}/600/400`} 
-                  alt={product.name}
-                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                />
-                <div className="absolute top-4 right-4">
-                  <Badge className="bg-primary text-white font-black px-4 py-1.5 text-sm rounded-xl shadow-xl">
-                    {product.priceCoins} 🪙
-                  </Badge>
+          {products.map((product) => {
+            const productImages = product.imageUrls && product.imageUrls.length > 0 
+              ? product.imageUrls 
+              : [product.imageUrl || "https://picsum.photos/seed/product/400/400"];
+
+            return (
+              <Card key={product.id} className="premium-card flex flex-col overflow-hidden rounded-[2rem] bg-black/40 group">
+                <div className="relative h-64 bg-white/5 overflow-hidden">
+                  {productImages.length > 1 ? (
+                    <Carousel className="w-full h-full">
+                      <CarouselContent className="h-64">
+                        {productImages.map((img: string, i: number) => (
+                          <CarouselItem key={i}>
+                            <img src={img} alt={product.name} className="w-full h-full object-cover" />
+                          </CarouselItem>
+                        ))}
+                      </CarouselContent>
+                      <CarouselPrevious className="left-2 bg-black/40 border-none hover:bg-primary/80 h-8 w-8" />
+                      <CarouselNext className="right-2 bg-black/40 border-none hover:bg-primary/80 h-8 w-8" />
+                    </Carousel>
+                  ) : (
+                    <img 
+                      src={productImages[0]} 
+                      alt={product.name}
+                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                    />
+                  )}
+                  <div className="absolute top-4 right-4 z-10">
+                    <Badge className="bg-primary text-white font-black px-4 py-1.5 text-sm rounded-xl shadow-xl">
+                      {product.priceCoins} 🪙
+                    </Badge>
+                  </div>
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent pointer-events-none" />
                 </div>
-                <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" />
-              </div>
-              <CardHeader className="relative -mt-8 pt-0 px-6">
-                <div className="bg-black/60 backdrop-blur-xl border border-white/5 rounded-2xl p-4 shadow-2xl">
-                  <CardTitle className="text-xl text-white">{product.name}</CardTitle>
-                  <CardDescription className="line-clamp-2 mt-2 text-muted-foreground">{product.description}</CardDescription>
-                </div>
-              </CardHeader>
-              <CardFooter className="mt-auto px-6 pb-6 pt-2">
-                {isOwned(product.id) ? (
-                  <Button asChild className="w-full h-14 rounded-2xl luxury-gradient font-black text-lg group">
-                    <a href={product.downloadUrl} target="_blank" rel="noopener noreferrer">
-                      Download Sekarang <Download className="ml-2 h-5 w-5 group-hover:translate-y-1 transition-transform" />
-                    </a>
-                  </Button>
-                ) : (
-                  <Button 
-                    onClick={() => handlePurchase(product)}
-                    disabled={isBuying === product.id}
-                    className="w-full h-14 rounded-2xl bg-white/5 border border-white/10 hover:bg-primary hover:text-white transition-all font-bold text-lg"
-                  >
-                    {isBuying === product.id ? "Memproses..." : <><CreditCard className="mr-2 h-5 w-5" /> Beli Dengan Koin</>}
-                  </Button>
-                )}
-              </CardFooter>
-            </Card>
-          ))}
+                <CardHeader className="relative -mt-8 pt-0 px-6 z-20">
+                  <div className="bg-black/60 backdrop-blur-xl border border-white/5 rounded-2xl p-4 shadow-2xl">
+                    <CardTitle className="text-xl text-white">{product.name}</CardTitle>
+                    <CardDescription className="line-clamp-2 mt-2 text-muted-foreground">{product.description}</CardDescription>
+                  </div>
+                </CardHeader>
+                <CardFooter className="mt-auto px-6 pb-6 pt-2">
+                  {isOwned(product.id) ? (
+                    <Button asChild className="w-full h-14 rounded-2xl luxury-gradient font-black text-lg group">
+                      <a href={product.downloadUrl} target="_blank" rel="noopener noreferrer">
+                        Download Sekarang <Download className="ml-2 h-5 w-5 group-hover:translate-y-1 transition-transform" />
+                      </a>
+                    </Button>
+                  ) : (
+                    <Button 
+                      onClick={() => handlePurchase(product)}
+                      disabled={isBuying === product.id}
+                      className="w-full h-14 rounded-2xl bg-white/5 border border-white/10 hover:bg-primary hover:text-white transition-all font-bold text-lg"
+                    >
+                      {isBuying === product.id ? "Memproses..." : <><CreditCard className="mr-2 h-5 w-5" /> Beli Dengan Koin</>}
+                    </Button>
+                  )}
+                </CardFooter>
+              </Card>
+            )
+          })}
         </div>
       )}
 
@@ -207,4 +234,8 @@ export default function MarketplacePage() {
       </div>
     </div>
   )
+}
+
+function userUser() {
+  return useUser();
 }
