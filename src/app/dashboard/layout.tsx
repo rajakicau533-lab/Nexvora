@@ -18,13 +18,13 @@ export default function DashboardLayout({
   const router = useRouter()
   const db = useFirestore()
 
-  // Fetch real-time user profile for coins and status
-  const userProfileQuery = React.useMemo(() => {
+  // Stabilize reference to avoid infinite loop
+  const userProfileRef = React.useMemo(() => {
     if (!db || !user?.uid) return null;
     return doc(db, 'users', user.uid);
   }, [db, user?.uid]);
 
-  const { data: profile } = useDoc(userProfileQuery);
+  const { data: profile, loading: profileLoading } = useDoc(userProfileRef);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -32,7 +32,7 @@ export default function DashboardLayout({
     }
   }, [user, loading, router])
 
-  if (loading) {
+  if (loading || profileLoading) {
     return (
       <div className="min-h-screen bg-[#1A1410] flex items-center justify-center">
         <div className="w-12 h-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
@@ -47,7 +47,7 @@ export default function DashboardLayout({
         <header className="sticky top-0 z-40 w-full glass-morphism border-none h-16 flex items-center px-4 justify-between">
           <div className="flex items-center gap-4">
             <SidebarTrigger className="text-primary hover:bg-primary/10" />
-            <h1 className="font-headline font-bold text-lg hidden md:block">Nexvora Panel</h1>
+            <h1 className="font-headline font-bold text-lg hidden md:block text-white">Nexvora Panel</h1>
           </div>
           
           <div className="flex items-center gap-4">

@@ -1,3 +1,4 @@
+
 "use client"
 
 import React, { useState } from "react"
@@ -86,7 +87,7 @@ export default function RegisterPage() {
           <div className="w-20 h-20 bg-green-500/20 rounded-full flex items-center justify-center mx-auto">
             <CheckCircle2 className="h-10 w-10 text-green-500" />
           </div>
-          <h2 className="text-3xl font-headline font-bold">Cek Email Anda!</h2>
+          <h2 className="text-3xl font-headline font-bold text-white">Cek Email Anda!</h2>
           <p className="text-muted-foreground leading-relaxed">
             Kami telah mengirimkan link verifikasi ke <b>{email}</b>. 
             Silakan verifikasi email Anda sebelum melakukan login.
@@ -113,7 +114,7 @@ export default function RegisterPage() {
 
         <Card className="premium-card rounded-3xl border-white/10">
           <CardHeader>
-            <CardTitle className="text-2xl">Daftar Akun</CardTitle>
+            <CardTitle className="text-2xl text-white">Daftar Akun</CardTitle>
             <CardDescription>Bergabung dengan komunitas Nexvora Studio.</CardDescription>
           </CardHeader>
           <CardContent>
@@ -127,18 +128,18 @@ export default function RegisterPage() {
               )}
               
               <div className="space-y-2">
-                <Label htmlFor="username">Username</Label>
+                <Label htmlFor="username" className="text-white">Username</Label>
                 <Input 
                   id="username" 
                   placeholder="Contoh: nexvora_user" 
                   required
                   value={username}
                   onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/\s/g, ''))}
-                  className="bg-white/5 border-white/10 rounded-xl h-12"
+                  className="bg-white/5 border-white/10 rounded-xl h-12 text-white"
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email" className="text-white">Email</Label>
                 <Input 
                   id="email" 
                   type="email" 
@@ -146,11 +147,11 @@ export default function RegisterPage() {
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="bg-white/5 border-white/10 rounded-xl h-12"
+                  className="bg-white/5 border-white/10 rounded-xl h-12 text-white"
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
+                <Label htmlFor="password" title="At least 8 characters" className="text-white">Password</Label>
                 <Input 
                   id="password" 
                   type="password" 
@@ -158,17 +159,17 @@ export default function RegisterPage() {
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="bg-white/5 border-white/10 rounded-xl h-12"
+                  className="bg-white/5 border-white/10 rounded-xl h-12 text-white"
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="referral">Kode Referral (Opsional)</Label>
+                <Label htmlFor="referral" className="text-white">Kode Referral (Opsional)</Label>
                 <Input 
                   id="referral" 
                   placeholder="Masukkan kode teman" 
                   value={referralCode}
                   onChange={(e) => setReferralCode(e.target.value)}
-                  className="bg-white/5 border-white/10 rounded-xl h-12"
+                  className="bg-white/5 border-white/10 rounded-xl h-12 text-white"
                 />
               </div>
               <Button 
