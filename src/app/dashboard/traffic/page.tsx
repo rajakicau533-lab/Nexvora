@@ -6,11 +6,11 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
-import { ShoppingBag, Music, Info, Clock, ExternalLink, Loader2 } from "lucide-react"
+import { ShoppingBag, Music, Info, Clock, ExternalLink, Loader2, AlertTriangle } from "lucide-react"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { useFirestore, useUser, useCollection, useDoc } from "@/firebase"
-import { collection, doc, setDoc, updateDoc, increment, serverTimestamp, query, where, orderBy, Timestamp } from "firebase/firestore"
+import { collection, doc, setDoc, updateDoc, increment, serverTimestamp, query, where, Timestamp } from "firebase/firestore"
 import { useToast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
 import { processTrafficOrder } from "@/ai/flows/process-traffic-order-flow"
@@ -38,36 +38,34 @@ export default function TrafficServicePage() {
   }, [db, user?.uid])
   const { data: profile } = useDoc(profileRef)
 
-  // Simplified Order history query to avoid index issues
+  // Simple query to avoid composite index requirement
   const historyQuery = React.useMemo(() => {
     if (!db || !user?.uid) return null
     return query(
       collection(db, "traffic_orders"), 
-      where("userId", "==", user.uid),
-      orderBy("createdAt", "desc")
+      where("userId", "==", user.uid)
     )
   }, [db, user?.uid])
 
-  const { data: allHistory } = useCollection<any>(historyQuery)
+  const { data: allHistory, loading: historyLoading, error: historyError } = useCollection<any>(historyQuery)
 
-  // Filter history in-memory for the 3-day reset requirement
+  // Filter 3 days & Sort DESC in memory to fix Index Error
   const history = React.useMemo(() => {
     if (!allHistory) return []
     const threeDaysAgo = new Date()
     threeDaysAgo.setDate(threeDaysAgo.getDate() - 3)
-    return allHistory.filter(order => {
-      const createdAt = order.createdAt?.toDate?.() || new Date()
-      return createdAt >= threeDaysAgo
-    })
+    
+    return [...allHistory]
+      .filter(order => {
+        const createdAt = order.createdAt?.toDate?.() || new Date()
+        return createdAt >= threeDaysAgo
+      })
+      .sort((a, b) => {
+        const timeA = a.createdAt?.toDate?.()?.getTime() || 0
+        const timeB = b.createdAt?.toDate?.()?.getTime() || 0
+        return timeB - timeA
+      })
   }, [allHistory])
-
-  // Debugging log to verify userId match
-  useEffect(() => {
-    if (user && history.length > 0) {
-      console.log("DEBUG - User UID:", user.uid);
-      console.log("DEBUG - First Order UserID:", history[0].userId);
-    }
-  }, [user, history]);
 
   // Auto-Complete Logic: Change PENDING to SELESAI after 50 seconds
   useEffect(() => {
@@ -328,6 +326,17 @@ export default function TrafficServicePage() {
         <h3 className="text-2xl font-headline font-bold flex items-center gap-2">
           <Clock className="h-6 w-6 text-primary" /> Riwayat Booster Saya
         </h3>
+
+        {historyError && historyError.message.includes('index') && (
+          <div className="p-6 rounded-3xl bg-amber-500/10 border border-amber-500/20 flex flex-col items-center text-center gap-4">
+            <AlertTriangle className="h-12 w-12 text-amber-500" />
+            <div className="space-y-1">
+               <p className="text-lg font-bold text-white">Indeks Database Diperlukan</p>
+               <p className="text-sm text-muted-foreground">Database sedang menyiapkan index, silakan coba beberapa menit lagi.</p>
+            </div>
+          </div>
+        )}
+
         <Card className="premium-card rounded-3xl border-white/5 overflow-hidden bg-black/40 shadow-2xl">
           <Table>
             <TableHeader className="bg-white/5">
@@ -341,7 +350,9 @@ export default function TrafficServicePage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {!history || history.length === 0 ? (
+              {historyLoading ? (
+                <TableRow><TableCell colSpan={6} className="text-center py-20"><Loader2 className="animate-spin mx-auto h-8 w-8 text-primary" /></TableCell></TableRow>
+              ) : history.length === 0 ? (
                 <TableRow><TableCell colSpan={6} className="text-center py-20 text-muted-foreground italic">Belum ada riwayat pesanan (Riwayat di-reset setiap 3 hari).</TableCell></TableRow>
               ) : (
                 history.map((row: any) => (
