@@ -28,7 +28,6 @@ export function initializeFirebase() {
     firestore = getFirestore(app);
     auth = getAuth(app);
   } catch (error) {
-    // Log error but don't crash the entire app tree
     console.error("Firebase initialization failed:", error);
     return { firebaseApp: null, firestore: null, auth: null };
   }
