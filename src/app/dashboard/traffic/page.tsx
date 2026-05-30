@@ -10,9 +10,10 @@ import { ShoppingBag, Music, ShieldCheck, Zap, Info, Clock, AlertCircle } from "
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { useFirestore, useUser, useCollection, useDoc } from "@/firebase"
-import { collection, query, doc, setDoc, updateDoc, increment, serverTimestamp, where, orderBy } from "firebase/firestore"
+import { collection, doc, setDoc, updateDoc, increment, serverTimestamp, query, where, orderBy } from "firebase/firestore"
 import { useToast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
+import { processTrafficOrder } from "@/ai/flows/process-traffic-order-flow"
 
 export default function TrafficServicePage() {
   const [url, setUrl] = useState("")
@@ -23,6 +24,10 @@ export default function TrafficServicePage() {
   const { toast } = useToast()
 
   const coinCost = Math.ceil(views / 1000)
+
+  // API Settings for provider
+  const apiSettingsRef = React.useMemo(() => (db ? doc(db, "settings", "api") : null), [db])
+  const { data: apiSettings } = useDoc(apiSettingsRef)
 
   // User Profile
   const profileRef = React.useMemo(() => {
@@ -46,37 +51,67 @@ export default function TrafficServicePage() {
   const handleOrder = async (platform: "shopee" | "tiktok") => {
     if (!db || !user?.uid || !profile) return
     
-    if (profile.coins < coinCost) {
-      toast({
-        variant: "destructive",
-        title: "Saldo Kurang",
-        description: `Anda butuh ${coinCost} koin, saldo Anda ${profile.coins} koin.`,
-      })
+    // 1. Validate configuration
+    if (!apiSettings?.apiUrl || !apiSettings?.apiKey) {
+      toast({ variant: "destructive", title: "Konfigurasi Belum Lengkap", description: "Sistem belum terhubung ke provider. Hubungi Admin." })
       return
     }
 
-    const activeOrders = history?.filter(o => o.status === "pending" || o.status === "processing")
-    if (activeOrders && activeOrders.length > 0) {
-      toast({
-        variant: "destructive",
-        title: "Order Aktif Ditemukan",
-        description: "Selesaikan order sebelumnya sebelum membuat yang baru.",
-      })
+    // 2. Validate balance
+    if (profile.coins < coinCost) {
+      toast({ variant: "destructive", title: "Saldo Kurang", description: `Anda butuh ${coinCost} koin, saldo Anda ${profile.coins} koin.` })
+      return
+    }
+
+    // 3. Simple URL validation
+    if (platform === "shopee" && !url.includes("shopee.co.id")) {
+      toast({ variant: "destructive", title: "Link Tidak Valid", description: "Masukkan URL video Shopee yang benar." })
       return
     }
 
     setIsOrdering(true)
 
     try {
-      const orderRef = doc(collection(db, "traffic_orders"))
+      console.log("LINK:", url)
+      console.log("SERVICE_ID:", apiSettings.serviceId)
+      console.log("QUANTITY:", views)
 
+      // 4. Call Provider API first
+      const apiResult = await processTrafficOrder({
+        apiUrl: apiSettings.apiUrl,
+        apiKey: apiSettings.apiKey,
+        serviceId: apiSettings.serviceId,
+        link: url,
+        quantity: views
+      })
+
+      if (!apiResult.success) {
+        // Log failure to admin traffic logs
+        await setDoc(doc(collection(db, "activity_logs")), {
+          type: "system_error",
+          action: "TRAFFIC_ORDER_FAILED",
+          userId: user.uid,
+          userEmail: user.email,
+          details: `Order Failed: ${apiResult.error}`,
+          platform,
+          url,
+          timestamp: serverTimestamp()
+        })
+        throw new Error(apiResult.error || "Provider rejected the request.")
+      }
+
+      // 5. If provider success, then deduct coins and save order
+      const orderRef = doc(collection(db, "traffic_orders"))
       await setDoc(orderRef, {
         userId: user.uid,
+        userEmail: user.email,
         platform,
         url,
         views,
         coinCost,
-        status: "pending",
+        status: "processing",
+        providerOrderId: apiResult.orderId,
+        providerResponse: apiResult.rawResponse,
         createdAt: serverTimestamp()
       })
 
@@ -88,20 +123,16 @@ export default function TrafficServicePage() {
         userId: user.uid,
         amount: -coinCost,
         type: "traffic_order",
-        description: `Order Trafik ${platform.toUpperCase()}: ${views} Views`,
+        description: `Order Trafik ${platform.toUpperCase()}: ${views} Views (Provider ID: ${apiResult.orderId})`,
         createdAt: serverTimestamp()
       })
 
-      toast({
-        title: "Pesanan Diterima! 🚀",
-        description: "Status akan diperbarui secara berkala oleh admin.",
-      })
-      
+      toast({ title: "Pesanan Diterima! 🚀", description: `Order ID: ${apiResult.orderId}. Views sedang dikirim.` })
       setUrl("")
       setViews(1000)
     } catch (err: any) {
       console.error(err)
-      toast({ variant: "destructive", title: "Error", description: err.message })
+      toast({ variant: "destructive", title: "Gagal Proses", description: err.message || "Terjadi kesalahan saat menghubungi provider." })
     } finally {
       setIsOrdering(false)
     }
@@ -180,7 +211,7 @@ export default function TrafficServicePage() {
                   {isOrdering ? (
                     <div className="flex items-center gap-2">
                       <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      Memproses Order...
+                      Menghubungkan API...
                     </div>
                   ) : (
                     <>Booster Video Sekarang <Zap className="ml-2 h-5 w-5 group-hover:scale-110 transition-transform" /></>
@@ -197,7 +228,7 @@ export default function TrafficServicePage() {
               </CardHeader>
               <CardContent className="text-sm space-y-4 text-muted-foreground font-medium">
                 <p>• Akun tidak boleh dalam mode <span className="text-white font-bold">PRIVATE</span>.</p>
-                <p>• Proses sinkronisasi server: <span className="text-white font-bold">1 - 24 Jam</span>.</p>
+                <p>• Koin hanya akan terpotong jika server berhasil memproses order.</p>
                 <p>• Masukkan URL lengkap video, bukan URL profil.</p>
                 <p>• <span className="text-primary font-bold">Dilarang</span> mengganti link saat proses berjalan.</p>
               </CardContent>
@@ -209,7 +240,7 @@ export default function TrafficServicePage() {
           <div className="p-12 text-center premium-card rounded-[2rem] border-dashed border-primary/20 bg-black/40">
             <Music className="h-16 w-16 text-primary mx-auto mb-6 opacity-50" />
             <h3 className="text-2xl font-headline font-bold text-white mb-2">TikTok Service Update</h3>
-            <p className="text-muted-foreground max-w-sm mx-auto">Kami sedang meningkatkan stabilitas server TikTok agar hasil booster lebih permanen.</p>
+            <p className="text-muted-foreground max-w-sm mx-auto">Sistem TikTok sedang dalam integrasi API V3 untuk kecepatan maksimal.</p>
             <Button disabled className="mt-8 rounded-xl bg-white/5 border border-white/10 text-muted-foreground">Tersedia Segera</Button>
           </div>
         </TabsContent>
@@ -224,7 +255,7 @@ export default function TrafficServicePage() {
             <TableRow className="border-white/5 hover:bg-transparent">
               <TableHead className="text-white font-bold">Platform</TableHead>
               <TableHead className="text-white font-bold">Target URL</TableHead>
-              <TableHead className="text-white font-bold">Views</TableHead>
+              <TableHead className="text-white font-bold">Provider ID</TableHead>
               <TableHead className="text-white font-bold">Koin</TableHead>
               <TableHead className="text-white font-bold">Status</TableHead>
             </TableRow>
@@ -241,7 +272,7 @@ export default function TrafficServicePage() {
                   <TableCell className="max-w-[200px] truncate text-muted-foreground text-xs font-mono">
                     <a href={row.url} target="_blank" rel="noopener noreferrer" className="hover:text-primary">{row.url}</a>
                   </TableCell>
-                  <TableCell className="text-white font-bold">{row.views.toLocaleString()}</TableCell>
+                  <TableCell className="text-white font-mono text-[10px]">{row.providerOrderId || '-'}</TableCell>
                   <TableCell className="text-primary font-bold">{row.coinCost} 🪙</TableCell>
                   <TableCell>
                     <Badge 

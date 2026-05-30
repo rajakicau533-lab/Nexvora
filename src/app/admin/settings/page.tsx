@@ -1,4 +1,3 @@
-
 "use client"
 
 import React, { useState, useEffect } from "react"
@@ -6,12 +5,12 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
-import { Settings, ShieldCheck, Activity, Save, RefreshCw, AlertCircle, CheckCircle2, Loader2 } from "lucide-react"
+import { Settings, ShieldCheck, Activity, Save, RefreshCw, AlertCircle, CheckCircle2, Loader2, Coins } from "lucide-react"
 import { useFirestore, useUser, useDoc } from "@/firebase"
 import { doc, setDoc, serverTimestamp } from "firebase/firestore"
 import { useToast } from "@/hooks/use-toast"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { useRouter } from "next/navigation"
+import { checkProviderBalance } from "@/ai/flows/process-traffic-order-flow"
 
 export default function AdminSettingsPage() {
   const { user } = useUser()
@@ -27,6 +26,7 @@ export default function AdminSettingsPage() {
   const [isSaving, setIsSaving] = useState(false)
   const [isTesting, setIsTesting] = useState(false)
   const [testResult, setTestResult] = useState<"success" | "error" | null>(null)
+  const [providerBalance, setProviderBalance] = useState<string | null>(null)
 
   // Verify Super Admin status for this specific page
   const adminProfileRef = React.useMemo(() => {
@@ -78,16 +78,32 @@ export default function AdminSettingsPage() {
   }
 
   const handleTest = async () => {
+    if (!formData.apiUrl || !formData.apiKey) {
+      toast({ variant: "destructive", title: "Error", description: "URL dan Key harus diisi." })
+      return
+    }
+    
     setIsTesting(true)
     setTestResult(null)
+    setProviderBalance(null)
+    
     try {
-      // Logic for testing API connection
-      await new Promise(resolve => setTimeout(resolve, 1500))
-      setTestResult("success")
-      toast({ title: "Koneksi Berhasil", description: "API Provider merespon dengan benar." })
-    } catch (err) {
+      const result = await checkProviderBalance({
+        apiUrl: formData.apiUrl,
+        apiKey: formData.apiKey
+      })
+      
+      if (result.success) {
+        setTestResult("success")
+        setProviderBalance(result.balance || "0")
+        toast({ title: "Koneksi Berhasil", description: `Saldo Provider: ${result.balance} ${result.currency}` })
+      } else {
+        setTestResult("error")
+        toast({ variant: "destructive", title: "Koneksi Gagal", description: result.error })
+      }
+    } catch (err: any) {
       setTestResult("error")
-      toast({ variant: "destructive", title: "Koneksi Gagal", description: "Pastikan URL dan Key API valid." })
+      toast({ variant: "destructive", title: "Koneksi Gagal", description: err.message })
     } finally {
       setIsTesting(false)
     }
@@ -121,13 +137,13 @@ export default function AdminSettingsPage() {
           <Card className="premium-card rounded-[2.5rem] border-white/5 bg-black/60 backdrop-blur-xl">
             <CardHeader>
               <CardTitle className="text-lg text-white font-bold">Provider Configuration</CardTitle>
-              <CardDescription>Enter the API details from your SMM provider panel.</CardDescription>
+              <CardDescription>Enter the API details from your SMM provider panel (IndoSMM).</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="space-y-2">
                 <Label className="text-white font-bold ml-1 uppercase text-xs tracking-widest">API Endpoint URL</Label>
                 <Input 
-                  placeholder="https://provider.com/api/v2" 
+                  placeholder="https://indosmm.com/api/v2" 
                   value={formData.apiUrl}
                   onChange={(e) => setFormData({...formData, apiUrl: e.target.value})}
                   className="bg-white/5 border-white/10 rounded-2xl h-14 text-white placeholder:text-white/20 px-6 focus:border-primary/50"
@@ -192,7 +208,8 @@ export default function AdminSettingsPage() {
                     </div>
                     <div className="space-y-1">
                       <p className="text-xl font-headline font-bold text-white uppercase">Connected</p>
-                      <p className="text-[10px] text-muted-foreground uppercase font-black">Provider responded OK</p>
+                      <p className="text-2xl font-black text-primary">Rp {providerBalance}</p>
+                      <p className="text-[10px] text-muted-foreground uppercase font-black">Provider Balance</p>
                     </div>
                   </>
                 ) : testResult === "error" ? (
@@ -219,11 +236,11 @@ export default function AdminSettingsPage() {
               </div>
 
               <div className="p-4 rounded-2xl bg-black/40 border border-white/5 space-y-3">
-                 <p className="text-[10px] text-primary uppercase font-bold tracking-widest">Integration Tips</p>
+                 <p className="text-[10px] text-primary uppercase font-bold tracking-widest">IndoSMM Integration</p>
                  <ul className="space-y-2 text-xs text-white/60">
-                    <li className="flex items-start gap-2">• Allow server IP in your provider panel.</li>
-                    <li className="flex items-start gap-2">• Use HTTPS for the endpoint URL.</li>
-                    <li className="flex items-start gap-2">• API Keys are usually found in Account Settings.</li>
+                    <li className="flex items-start gap-2">• Key: Found in Profile > Settings.</li>
+                    <li className="flex items-start gap-2">• URL: Must end with /api/v2</li>
+                    <li className="flex items-start gap-2">• Allow IP if required by panel.</li>
                  </ul>
               </div>
             </CardContent>

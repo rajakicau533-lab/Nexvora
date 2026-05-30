@@ -15,7 +15,7 @@ import {
   BookOpen,
   Activity,
   UserCog,
-  ChevronRight
+  FileText
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import {
@@ -38,7 +38,7 @@ import { doc } from "firebase/firestore"
 const adminItems = [
   { label: "Overview", icon: LayoutDashboard, href: "/admin" },
   { label: "Manage Users", icon: Users, href: "/admin/users" },
-  { label: "Traffic Orders", icon: TrendingUp, href: "/admin/traffic" },
+  { label: "Traffic Control", icon: TrendingUp, href: "/admin/traffic" },
   { label: "Marketplace", icon: ShoppingBag, href: "/admin/marketplace" },
   { label: "Learning Materials", icon: BookOpen, href: "/admin/materials" },
   { label: "System Activity", icon: Activity, href: "/admin/activity" },
@@ -108,6 +108,20 @@ export function AdminSidebar() {
                 </SidebarMenuButton>
               </SidebarMenuItem>
             ))}
+          </SidebarMenu>
+        </SidebarGroup>
+        
+        <SidebarGroup>
+          <SidebarGroupLabel className="text-primary/50 px-3 uppercase text-[9px] tracking-[0.2em] font-black">Logs & Reports</SidebarGroupLabel>
+          <SidebarMenu>
+             <SidebarMenuItem>
+                <SidebarMenuButton asChild isActive={pathname === "/admin/traffic/logs"} className="h-12 rounded-xl">
+                  <Link href="/admin/traffic/logs" className="flex items-center gap-4">
+                    <FileText className="h-4 w-4" />
+                    <span className="font-bold">Traffic API Logs</span>
+                  </Link>
+                </SidebarMenuButton>
+             </SidebarMenuItem>
           </SidebarMenu>
         </SidebarGroup>
         
