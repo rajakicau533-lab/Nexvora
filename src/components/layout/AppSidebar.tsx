@@ -49,6 +49,7 @@ const menuItems = [
 ]
 
 const serviceItems = [
+  { label: "Dashboard Overview", icon: LayoutDashboard, href: "/dashboard" },
   { label: "Trafik Service", icon: TrendingUp, href: "/dashboard/traffic" },
   { label: "Creator AI", icon: Cpu, href: "/dashboard/ai" },
   { label: "Marketplace", icon: ShoppingBag, href: "/dashboard/marketplace" },
