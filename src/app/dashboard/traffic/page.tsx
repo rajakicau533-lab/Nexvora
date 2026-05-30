@@ -48,6 +48,37 @@ export default function TrafficServicePage() {
 
   const { data: history } = useCollection<any>(historyQuery)
 
+  const validateUrl = (input: string, platform: "shopee" | "tiktok") => {
+    try {
+      const parsed = new URL(input.startsWith('http') ? input : `https://${input}`);
+      const hostname = parsed.hostname.toLowerCase();
+
+      if (platform === "shopee") {
+        const allowedShopeeDomains = [
+          'shopee.co.id',
+          'shp.ee',
+          'id.shp.ee',
+          's.shopee.co.id',
+          'vn.shp.ee',
+          'my.shp.ee',
+          'th.shp.ee',
+          'ph.shp.ee'
+        ];
+        return allowedShopeeDomains.some(domain => 
+          hostname === domain || hostname.endsWith('.' + domain)
+        );
+      }
+
+      if (platform === "tiktok") {
+        return hostname.includes('tiktok.com');
+      }
+
+      return false;
+    } catch (e) {
+      return false;
+    }
+  };
+
   const handleOrder = async (platform: "shopee" | "tiktok") => {
     if (!db || !user?.uid || !profile) return
     
@@ -68,9 +99,18 @@ export default function TrafficServicePage() {
       return
     }
 
-    // 3. Simple URL validation
-    if (platform === "shopee" && !url.includes("shopee.co.id")) {
-      toast({ variant: "destructive", title: "Link Tidak Valid", description: "Masukkan URL video Shopee yang benar." })
+    // 3. Enhanced URL validation
+    if (!url) {
+      toast({ variant: "destructive", title: "Link Kosong", description: "Silakan masukkan URL target." })
+      return
+    }
+
+    if (!validateUrl(url, platform)) {
+      const errorMsg = platform === "shopee" 
+        ? "Gunakan link shopee.co.id atau shortlink shp.ee yang valid."
+        : "Gunakan link TikTok yang valid.";
+      
+      toast({ variant: "destructive", title: "Link Tidak Valid", description: errorMsg })
       return
     }
 
@@ -80,7 +120,6 @@ export default function TrafficServicePage() {
       console.log("ORDER_REQUEST:", { platform, url, quantity: views });
 
       // 4. Call Provider API first via Genkit Flow
-      // This uses the apiUrl and apiKey already fetched from Firestore settings
       const apiResult = await processTrafficOrder({
         apiUrl: apiSettings.apiUrl,
         apiKey: apiSettings.apiKey,
@@ -105,7 +144,6 @@ export default function TrafficServicePage() {
       }
 
       // 5. Success Flow: Deduct coins and save order
-      // We ONLY do this if the API returned a success code and order ID
       const orderRef = doc(collection(db, "traffic_orders"))
       await setDoc(orderRef, {
         userId: user.uid,
@@ -167,14 +205,14 @@ export default function TrafficServicePage() {
             <Card className="premium-card col-span-3 rounded-3xl border-white/5 bg-black/40">
               <CardHeader>
                 <CardTitle className="text-white">Form Pemesanan Shopee</CardTitle>
-                <CardDescription>Masukkan data video Shopee yang ingin di-boost.</CardDescription>
+                <CardDescription>Mendukung URL panjang (shopee.co.id) dan shortlink (shp.ee).</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="space-y-2">
                   <Label htmlFor="url" className="text-white font-bold">Link Video Shopee</Label>
                   <Input 
                     id="url" 
-                    placeholder="https://shopee.co.id/video/..." 
+                    placeholder="https://id.shp.ee/xxxxxx atau https://shopee.co.id/video/..." 
                     value={url}
                     onChange={(e) => setUrl(e.target.value)}
                     className="bg-white/5 border-white/10 rounded-xl h-12 text-white focus:border-primary/50"
@@ -236,8 +274,8 @@ export default function TrafficServicePage() {
               <CardContent className="text-sm space-y-4 text-muted-foreground font-medium">
                 <p>• Akun tidak boleh dalam mode <span className="text-white font-bold">PRIVATE</span>.</p>
                 <p>• Koin hanya akan terpotong jika server berhasil memproses order.</p>
-                <p>• Masukkan URL lengkap video, bukan URL profil.</p>
-                <p>• <span className="text-primary font-bold">Dilarang</span> mengganti link saat proses berjalan.</p>
+                <p>• Masukkan URL lengkap video atau link share aplikasi.</p>
+                <p>• <span className="text-primary font-bold">Sistem otomatis</span> mendukung resolve shortlink Shopee Indonesia (id.shp.ee).</p>
               </CardContent>
             </Card>
           </div>
