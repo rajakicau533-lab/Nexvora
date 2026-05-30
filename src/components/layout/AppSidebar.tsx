@@ -1,4 +1,3 @@
-
 "use client"
 
 import React, { useEffect } from "react"
@@ -19,7 +18,8 @@ import {
   LogOut,
   ChevronRight,
   Settings,
-  ShieldCheck
+  ShieldCheck,
+  GraduationCap
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { APP_NAME, CONTACT_INFO } from "@/lib/constants"
@@ -53,6 +53,7 @@ const serviceItems = [
   { label: "Trafik Service", icon: TrendingUp, href: "/dashboard/traffic" },
   { label: "Creator AI", icon: Cpu, href: "/dashboard/ai" },
   { label: "Marketplace", icon: ShoppingBag, href: "/dashboard/marketplace" },
+  { label: "Free Materi", icon: GraduationCap, href: "/dashboard/materials" },
   { label: "Top Up Koin", icon: CreditCard, href: "/dashboard/topup" },
 ]
 
