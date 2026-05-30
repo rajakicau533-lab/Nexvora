@@ -1,4 +1,3 @@
-
 'use client';
 
 import './globals.css';
@@ -39,11 +38,11 @@ export default function RootLayout({
             <Toaster />
           </FirebaseClientProvider>
         ) : (
-          <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-[#1A1410]">
+          <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-[#0F0F0F]">
              {pathname === '/setup' ? children : (
                <div className="text-center space-y-6">
                  <div className="w-20 h-20 bg-primary/20 rounded-full flex items-center justify-center mx-auto animate-pulse">
-                   <span className="text-4xl">⚙️</span>
+                   <span className="text-4xl text-primary">⚙️</span>
                  </div>
                  <h1 className="text-2xl font-headline font-bold text-white">Konfigurasi Diperlukan</h1>
                  <p className="text-muted-foreground max-w-md mx-auto">
@@ -51,9 +50,9 @@ export default function RootLayout({
                  </p>
                  <button 
                    onClick={() => router.push('/setup')}
-                   className="px-8 py-3 bg-primary text-primary-foreground font-bold rounded-xl"
+                   className="px-8 py-3 bg-primary text-white font-bold rounded-xl hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20"
                  >
-                   Ke Halaman Setup
+                   Buka Panel Setup
                  </button>
                </div>
              )}
