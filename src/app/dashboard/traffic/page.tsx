@@ -10,10 +10,10 @@ import { ShoppingBag, Music, ShieldCheck, Zap, Info, Clock, AlertCircle, Externa
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { useFirestore, useUser, useCollection, useDoc } from "@/firebase"
-import { collection, doc, setDoc, updateDoc, increment, serverTimestamp, query, where, orderBy } from "firebase/firestore"
+import { collection, doc, setDoc, updateDoc, increment, serverTimestamp, query, where, orderBy, Timestamp } from "firebase/firestore"
 import { useToast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
-import { processTrafficOrder, checkOrderStatus } from "@/ai/flows/process-traffic-order-flow"
+import { processTrafficOrder } from "@/ai/flows/process-traffic-order-flow"
 
 export default function TrafficServicePage() {
   const [url, setUrl] = useState("")
@@ -27,7 +27,7 @@ export default function TrafficServicePage() {
 
   const coinCost = Math.ceil(views / 1000)
 
-  // API Settings for provider from central config
+  // API Settings for provider
   const apiSettingsRef = React.useMemo(() => (db ? doc(db, "system_settings", "provider_config") : null), [db])
   const { data: apiSettings, loading: settingsLoading } = useDoc(apiSettingsRef)
 
@@ -38,68 +38,56 @@ export default function TrafficServicePage() {
   }, [db, user?.uid])
   const { data: profile } = useDoc(profileRef)
 
-  // Order history - Realtime via useCollection (onSnapshot)
+  // Order history - Filter for last 3 days
   const historyQuery = React.useMemo(() => {
     if (!db || !user?.uid) return null
+    
+    // Calculate 3 days ago
+    const threeDaysAgo = new Date()
+    threeDaysAgo.setDate(threeDaysAgo.getDate() - 3)
+    const timestampThreshold = Timestamp.fromDate(threeDaysAgo)
+
     return query(
       collection(db, "traffic_orders"), 
       where("userId", "==", user.uid),
+      where("createdAt", ">=", timestampThreshold),
       orderBy("createdAt", "desc")
     )
   }, [db, user?.uid])
 
   const { data: history } = useCollection<any>(historyQuery)
 
-  // Status Auto-Update Logic (Every 60 seconds)
+  // Auto-Complete Logic: Change PENDING to SELESAI after 50 seconds
   useEffect(() => {
-    if (!db || !apiSettings || !history || history.length === 0) return;
+    if (!db || !history || history.length === 0) return;
 
     const interval = setInterval(async () => {
-      const pendingOrders = history.filter((order: any) => {
-        const currentStatus = order.status?.toUpperCase();
-        return currentStatus === "PENDING" || currentStatus === "PROCESSING";
-      });
-
-      if (pendingOrders.length === 0) return;
+      const now = new Date().getTime();
+      const pendingOrders = history.filter((order: any) => order.status === "PENDING");
 
       for (const order of pendingOrders) {
-        if (!order.providerOrderId) continue;
+        if (!order.createdAt) continue;
+        
+        const createdAt = order.createdAt?.toDate?.()?.getTime() || 0;
+        const diffInSeconds = (now - createdAt) / 1000;
 
-        try {
-          const result = await checkOrderStatus({
-            apiUrl: apiSettings.apiUrl,
-            apiKey: apiSettings.apiKey,
-            orderId: order.providerOrderId
-          });
-
-          if (result.success && result.status) {
-            const providerStatus = result.status.toLowerCase();
-            let newStatus = "PENDING";
-
-            if (["completed", "success", "partial"].includes(providerStatus)) {
-              newStatus = "SELESAI";
-            } else if (["canceled", "cancelled", "failed", "error"].includes(providerStatus)) {
-              newStatus = "GAGAL";
-            } else if (["processing", "in progress", "pending"].includes(providerStatus)) {
-              newStatus = "PENDING";
-            }
-
-            if (newStatus !== order.status) {
-              await updateDoc(doc(db, "traffic_orders", order.id), {
-                status: newStatus,
-                updatedAt: serverTimestamp(),
-                rawProviderStatus: result.status
-              });
-            }
+        // If order is older than 50 seconds, mark as SELESAI
+        if (diffInSeconds >= 50) {
+          try {
+            await updateDoc(doc(db, "traffic_orders", order.id), {
+              status: "SELESAI",
+              updatedAt: serverTimestamp()
+            });
+            console.log(`Order ${order.id} automatically completed after 50s.`);
+          } catch (err) {
+            console.error("Failed to auto-complete order:", order.id, err);
           }
-        } catch (err) {
-          console.error("Status check failed for order:", order.id, err);
         }
       }
-    }, 60000);
+    }, 5000); // Check every 5 seconds
 
     return () => clearInterval(interval);
-  }, [db, apiSettings, history]);
+  }, [db, history]);
 
   const validateUrl = (input: string, platform: "shopee" | "tiktok") => {
     try {
@@ -118,7 +106,7 @@ export default function TrafficServicePage() {
     if (!db || !user?.uid || !profile) return
     
     if (!apiSettings?.apiUrl || !apiSettings?.apiKey || !apiSettings?.serviceId) {
-      toast({ variant: "destructive", title: "Layanan Tidak Tersedia", description: "Admin belum mengonfigurasi API SMM.ID." })
+      toast({ variant: "destructive", title: "Layanan Tidak Tersedia", description: "Admin belum mengonfigurasi API Provider." })
       return
     }
 
@@ -141,7 +129,7 @@ export default function TrafficServicePage() {
     setOrderFeedback("processing")
 
     try {
-      // Step 1: Call SMM.ID API
+      // Step 1: Call Provider API
       const apiResult = await processTrafficOrder({
         apiUrl: apiSettings.apiUrl,
         apiKey: apiSettings.apiKey,
@@ -150,7 +138,7 @@ export default function TrafficServicePage() {
         quantity: views
       })
 
-      // Step 2: Log to API audit logs
+      // Log to API audit logs
       await setDoc(doc(collection(db, "api_logs")), {
         timestamp: serverTimestamp(),
         userId: user.uid,
@@ -165,10 +153,10 @@ export default function TrafficServicePage() {
       })
 
       if (!apiResult.success) {
-        throw new Error(apiResult.error || "Provider SMM.ID menolak pesanan.");
+        throw new Error(apiResult.error || "Provider menolak pesanan.");
       }
 
-      // Step 3: Success Flow - Store to traffic_orders IMMEDIATELY
+      // Step 2: Store to traffic_orders IMMEDIATELY
       const orderRef = doc(collection(db, "traffic_orders"))
       await setDoc(orderRef, {
         userId: user.uid,
@@ -185,10 +173,10 @@ export default function TrafficServicePage() {
         updatedAt: serverTimestamp()
       })
 
-      // Step 4: Deduct coins
+      // Step 3: Deduct coins
       await updateDoc(profileRef!, { coins: increment(-coinCost) })
 
-      // Step 5: Log transaction
+      // Step 4: Log transaction
       await setDoc(doc(collection(db, "coin_transactions")), {
         userId: user.uid,
         amount: -coinCost,
@@ -198,14 +186,13 @@ export default function TrafficServicePage() {
       })
 
       setOrderFeedback("success")
-      toast({ title: "Pesanan Diterima! 🚀", description: `Order ID #${apiResult.orderId} sedang diproses.` })
+      toast({ title: "Pesanan Diterima! 🚀", description: "Trafik Anda sedang disiapkan." })
       setUrl("")
       
-      // Reset feedback after 3 seconds
       setTimeout(() => setOrderFeedback("idle"), 3000)
     } catch (err: any) {
       setOrderFeedback("error")
-      toast({ variant: "destructive", title: "Gagal Proses", description: err.message || "Koneksi ke SMM.ID gagal." })
+      toast({ variant: "destructive", title: "Gagal Proses", description: err.message || "Koneksi ke server gagal." })
       setTimeout(() => setOrderFeedback("idle"), 3000)
     } finally {
       setIsOrdering(false)
@@ -225,7 +212,7 @@ export default function TrafficServicePage() {
     <div className="space-y-8 max-w-5xl mx-auto pb-20">
       <div className="space-y-2">
         <h2 className="text-3xl font-headline font-bold">Booster Trafik Otomatis 🚀</h2>
-        <p className="text-muted-foreground italic">Layanan premium untuk menaikkan engagement konten Anda secara instan.</p>
+        <p className="text-muted-foreground italic">Menaikkan engagement konten secara instan dengan sistem cerdas Nexvora.</p>
       </div>
 
       <Tabs defaultValue="shopee" className="w-full">
@@ -307,11 +294,11 @@ export default function TrafficServicePage() {
                 </div>
                 <div className="flex gap-3">
                   <Badge className="h-5 w-5 rounded-full p-0 flex items-center justify-center shrink-0">2</Badge>
-                  <p>Status akan dicek otomatis ke server provider setiap 60 detik.</p>
+                  <p>Pesanan akan diproses otomatis oleh sistem Nexvora.</p>
                 </div>
                 <div className="flex gap-3">
                   <Badge className="h-5 w-5 rounded-full p-0 flex items-center justify-center shrink-0">3</Badge>
-                  <p>Proses pengiriman biasanya memakan waktu 5-60 menit.</p>
+                  <p>Riwayat order akan di-reset otomatis setiap 3 hari.</p>
                 </div>
                 <div className="p-4 rounded-xl bg-white/5 border border-white/5 mt-4">
                   <p className="text-[10px] text-white font-bold uppercase mb-1">Status Legends:</p>
@@ -353,7 +340,7 @@ export default function TrafficServicePage() {
             </TableHeader>
             <TableBody>
               {!history || history.length === 0 ? (
-                <TableRow><TableCell colSpan={6} className="text-center py-20 text-muted-foreground italic">Belum ada riwayat pesanan.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={6} className="text-center py-20 text-muted-foreground italic">Belum ada riwayat pesanan (Riwayat di-reset setiap 3 hari).</TableCell></TableRow>
               ) : (
                 history.map((row: any) => (
                   <TableRow key={row.id} className="border-white/5 hover:bg-white/5 transition-colors h-16">
@@ -377,7 +364,7 @@ export default function TrafficServicePage() {
                     </TableCell>
                     <TableCell>
                       <Badge className={cn(
-                          "font-black text-[9px] px-3 py-1 uppercase rounded-lg",
+                          "font-black text-[9px] px-3 py-1 uppercase rounded-lg transition-colors duration-500",
                           row.status === "SELESAI" ? "bg-green-500" : 
                           row.status === "GAGAL" ? "bg-red-500" : 
                           "bg-amber-500 animate-pulse"
