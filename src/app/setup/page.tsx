@@ -3,7 +3,7 @@
 import React from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { AlertCircle, CheckCircle2, Terminal, ExternalLink, ShieldCheck } from "lucide-react"
+import { AlertCircle, CheckCircle2, Terminal, ExternalLink, ShieldCheck, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
 export default function SetupPage() {
@@ -16,7 +16,10 @@ export default function SetupPage() {
     { key: "NEXT_PUBLIC_FIREBASE_APP_ID", value: process.env.NEXT_PUBLIC_FIREBASE_APP_ID },
   ]
 
-  const isConfigured = envVars.every(v => v.value && v.value !== "YOUR_API_KEY" && v.value !== "undefined")
+  const isPlaceholder = (val: string | undefined) => 
+    !val || val === "YOUR_API_KEY" || val === "undefined" || val.includes("YOUR_");
+
+  const isConfigured = envVars.every(v => !isPlaceholder(v.value));
 
   return (
     <div className="max-w-3xl w-full mx-auto space-y-8 py-12 px-4 bg-[#0F0F0F] min-h-screen flex flex-col justify-center">
@@ -40,10 +43,10 @@ export default function SetupPage() {
                 <div className="space-y-1">
                   <p className="text-[10px] font-mono font-bold text-primary uppercase tracking-widest">{v.key.replace('NEXT_PUBLIC_FIREBASE_', '')}</p>
                   <p className="text-sm font-bold text-white truncate max-w-[250px] md:max-w-[400px]">
-                    {v.value && v.value !== "YOUR_API_KEY" && v.value !== "undefined" ? "AKTIF: " + v.value.slice(0, 20) + "..." : "TIDAK TERDETEKSI"}
+                    {!isPlaceholder(v.value) ? "AKTIF: " + v.value?.slice(0, 20) + "..." : "TIDAK TERDETEKSI / PLACEHOLDER"}
                   </p>
                 </div>
-                {v.value && v.value !== "YOUR_API_KEY" && v.value !== "undefined" ? (
+                {!isPlaceholder(v.value) ? (
                   <div className="h-8 w-8 rounded-full bg-green-500/10 flex items-center justify-center border border-green-500/20">
                     <CheckCircle2 className="text-green-500 h-5 w-5" />
                   </div>
@@ -60,8 +63,11 @@ export default function SetupPage() {
             <Alert variant="destructive" className="bg-destructive/5 border-destructive/20 text-white rounded-2xl p-6">
               <AlertCircle className="h-5 w-5 text-primary" />
               <AlertTitle className="font-bold text-lg mb-2">Konfigurasi Belum Lengkap</AlertTitle>
-              <AlertDescription className="text-sm text-muted-foreground leading-relaxed">
-                Silakan edit file <code className="bg-black/40 px-2 py-0.5 rounded text-primary">.env</code> di root folder aplikasi Anda dan isi dengan data dari Firebase Console. Setelah itu, simpan file dan jalankan ulang server development.
+              <AlertDescription className="text-sm text-muted-foreground leading-relaxed space-y-4">
+                <p>Silakan edit file <code className="bg-black/40 px-2 py-0.5 rounded text-primary">.env</code> di folder root aplikasi Anda dan isi dengan data dari Firebase Console.</p>
+                <Button variant="outline" className="w-full bg-white/5 border-white/10 hover:bg-white/10 text-white" onClick={() => window.location.reload()}>
+                  <RefreshCw className="mr-2 h-4 w-4" /> Cek Ulang Koneksi
+                </Button>
               </AlertDescription>
             </Alert>
           )}
@@ -92,10 +98,11 @@ export default function SetupPage() {
         <CardContent className="space-y-4 text-sm text-muted-foreground leading-relaxed">
           <ol className="list-decimal list-inside space-y-4">
             <li>Buka <a href="https://console.firebase.google.com/" target="_blank" className="text-primary font-bold hover:underline inline-flex items-center gap-1">Firebase Console <ExternalLink className="h-3 w-3" /></a></li>
-            <li>Pilih project Anda, lalu klik ikon <b>Settings (Gear)</b> > <b>Project Settings</b>.</li>
-            <li>Di tab <b>General</b>, scroll ke bawah ke bagian <b>Your apps</b>.</li>
-            <li>Pilih ikon <b>Web (&lt;/&gt;)</b> untuk membuat aplikasi web baru.</li>
-            <li>Salin nilai dari objek <code className="text-white">firebaseConfig</code> ke file <code className="text-white">.env</code> sesuai nama variabel di atas.</li>
+            <li>Buat project baru atau pilih project yang sudah ada.</li>
+            <li>Di Dashboard, klik ikon <b>Web (&lt;/&gt;)</b> untuk mendaftarkan aplikasi web baru.</li>
+            <li>Salin nilai dari objek <code className="text-white">firebaseConfig</code> yang muncul.</li>
+            <li>Tempelkan nilai tersebut ke file <code className="text-white">.env</code> sesuai nama variabelnya.</li>
+            <li><b>Simpan file .env</b> dan restart server (atau tekan tombol Refresh di atas).</li>
           </ol>
         </CardContent>
       </Card>

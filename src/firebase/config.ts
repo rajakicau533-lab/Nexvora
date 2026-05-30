@@ -9,8 +9,11 @@ export const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
+// Validasi apakah konfigurasi benar-benar valid dan bukan placeholder
 export const isFirebaseConfigured = Boolean(
   firebaseConfig.apiKey && 
   firebaseConfig.apiKey !== "YOUR_API_KEY" &&
-  firebaseConfig.projectId
+  firebaseConfig.apiKey.length > 10 &&
+  firebaseConfig.projectId &&
+  firebaseConfig.projectId !== "YOUR_PROJECT_ID"
 );

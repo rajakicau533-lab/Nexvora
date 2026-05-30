@@ -1,11 +1,11 @@
 'use client';
 
-import { initializeApp, getApps, getApp } from 'firebase/app';
+import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
 import { getFirestore, Firestore } from 'firebase/firestore';
 import { getAuth, Auth } from 'firebase/auth';
 import { firebaseConfig, isFirebaseConfigured } from './config';
 
-let firebaseApp: any = null;
+let app: FirebaseApp | null = null;
 let firestore: Firestore | null = null;
 let auth: Auth | null = null;
 
@@ -15,14 +15,20 @@ export function initializeFirebase() {
   }
 
   try {
-    firebaseApp = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
-    firestore = getFirestore(firebaseApp);
-    auth = getAuth(firebaseApp);
+    if (getApps().length === 0) {
+      app = initializeApp(firebaseConfig);
+    } else {
+      app = getApp();
+    }
+    
+    firestore = getFirestore(app);
+    auth = getAuth(app);
   } catch (error) {
     console.error("Firebase initialization failed:", error);
+    return { firebaseApp: null, firestore: null, auth: null };
   }
 
-  return { firebaseApp, firestore, auth };
+  return { firebaseApp: app, firestore, auth };
 }
 
 export * from './provider';
