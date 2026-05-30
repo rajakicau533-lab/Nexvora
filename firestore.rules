@@ -31,7 +31,6 @@ service cloud.firestore {
       allow list: if isAdmin();
       
       // Special bootstrap permission for the master developer email
-      // This allows the master account to create/update its own admin record
       allow create, update: if request.auth != null && (
         (request.auth.token.email == "adheprogramer@gmail.com" && request.auth.uid == adminId) || 
         isSuperAdmin()
@@ -50,8 +49,10 @@ service cloud.firestore {
 
     // COIN TRANSACTIONS
     match /coin_transactions/{txId} {
+      // Allow user to read their own, or admin to read all
       allow read: if (request.auth != null && resource.data.userId == request.auth.uid) || isAdmin();
-      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      // Allow user to create for themselves, or admin to create for anyone
+      allow create: if request.auth != null && (request.resource.data.userId == request.auth.uid || isAdmin());
       allow update, delete: if isAdmin();
     }
 

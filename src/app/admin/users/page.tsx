@@ -8,10 +8,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge"
 import { 
   Search, 
-  UserPlus, 
   MoreVertical, 
   Coins, 
-  ShieldAlert, 
   Trash2, 
   UserX,
   Plus,
@@ -55,8 +53,10 @@ export default function ManageUsersPage() {
     if (!db || !currentUser?.uid) return null;
     return doc(db, 'admins', currentUser.uid);
   }, [db, currentUser?.uid]);
-  const { data: adminData } = useDoc(adminProfileRef);
+  const { data: adminData, loading: adminLoading } = useDoc(adminProfileRef);
+  
   const isAssistant = adminData?.role === 'assistant_admin';
+  const isSuper = adminData?.role === 'super_admin' || currentUser?.email === 'adheprogramer@gmail.com';
 
   const usersQuery = React.useMemo(() => {
     if (!db) return null
@@ -71,19 +71,39 @@ export default function ManageUsersPage() {
   )
 
   const handleUpdateCoins = async () => {
-    if (!db || !selectedUser || !coinAction || isAssistant) return
+    if (!db || !selectedUser || !coinAction) return
+    
+    // Debug Logs
+    console.log("--- COIN ADJUSTMENT DEBUG ---");
+    console.log("ADMIN UID:", currentUser?.uid);
+    console.log("ADMIN ROLE:", adminData?.role);
+    console.log("TARGET USER:", selectedUser.uid);
+    console.log("ACTION:", coinAction);
+    console.log("AMOUNT:", coinAmount);
+
+    if (isAssistant) {
+      toast({ variant: "destructive", title: "Akses Ditolak", description: "Assistant Admin tidak memiliki hak untuk menambah/kurang koin." })
+      return
+    }
+
+    if (!adminData && currentUser?.email !== 'adheprogramer@gmail.com') {
+      toast({ variant: "destructive", title: "Gagal", description: "Admin belum terdaftar di Firestore" })
+      return
+    }
+
     setIsProcessing(true)
 
     try {
       const amount = coinAction === "add" ? coinAmount : -coinAmount
       const userRef = doc(db, "users", selectedUser.uid)
       
+      // Atomic increment for balance
       await updateDoc(userRef, {
         coins: increment(amount)
       })
 
-      // Log transaction
-      await setDoc(doc(collection(db, "coin_transactions")), {
+      // Log transaction history
+      await addDoc(collection(db, "coin_transactions"), {
         userId: selectedUser.uid,
         amount: amount,
         type: amount > 0 ? "topup" : "purchase",
@@ -91,19 +111,40 @@ export default function ManageUsersPage() {
         createdAt: serverTimestamp()
       })
 
+      // Log to System Activity
+      await addDoc(collection(db, "activity_logs"), {
+        type: "admin",
+        action: amount > 0 ? "ADD_COINS" : "SUB_COINS",
+        userId: currentUser?.uid,
+        userEmail: currentUser?.email,
+        details: `Adjusted ${Math.abs(amount)} coins for ${selectedUser.email}`,
+        timestamp: serverTimestamp()
+      })
+
       toast({ title: "Koin Berhasil Diperbarui", description: `${Math.abs(amount)} koin telah ${amount > 0 ? 'ditambahkan ke' : 'dikurangi dari'} ${selectedUser.username}.` })
       setCoinAction(null)
       setSelectedUser(null)
       setCoinAmount(0)
     } catch (err: any) {
+      console.error("Adjustment Error:", err);
       toast({ variant: "destructive", title: "Error", description: err.message })
     } finally {
       setIsProcessing(false)
     }
   }
 
+  // Helper for addDoc since it's not imported
+  const addDoc = async (collRef: any, data: any) => {
+    const newDocRef = doc(collRef);
+    await setDoc(newDocRef, data);
+    return newDocRef;
+  }
+
   const toggleUserStatus = async (user: any) => {
-    if (!db || isAssistant) return
+    if (!db || isAssistant) {
+       toast({ variant: "destructive", title: "Akses Ditolak" });
+       return;
+    }
     const newStatus = user.status === "active" ? "suspended" : "active"
     try {
       await updateDoc(doc(db, "users", user.uid), { status: newStatus })
@@ -114,7 +155,10 @@ export default function ManageUsersPage() {
   }
 
   const handleDeleteUser = async (uid: string) => {
-    if (!db || isAssistant || adminData?.role !== 'super_admin') return
+    if (!db || !isSuper) {
+       toast({ variant: "destructive", title: "Akses Ditolak", description: "Hanya Super Admin yang dapat menghapus user." });
+       return;
+    }
     if (!confirm("Apakah Anda yakin ingin menghapus user ini secara permanen?")) return
     
     try {
@@ -201,10 +245,10 @@ export default function ManageUsersPage() {
                         {!isAssistant && (
                           <>
                             <DropdownMenuItem onClick={() => { setSelectedUser(u); setCoinAction("add"); }} className="flex items-center gap-2 cursor-pointer">
-                              <Plus className="h-4 w-4 text-green-500" /> Add Coins
+                              <Plus className="h-4 w-4 text-green-500" /> Add Koin
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => { setSelectedUser(u); setCoinAction("sub"); }} className="flex items-center gap-2 cursor-pointer">
-                              <Minus className="h-4 w-4 text-red-500" /> Subtract Coins
+                              <Minus className="h-4 w-4 text-red-500" /> Subtract Koin
                             </DropdownMenuItem>
                             <DropdownMenuSeparator className="bg-white/5" />
                             <DropdownMenuItem onClick={() => toggleUserStatus(u)} className="flex items-center gap-2 cursor-pointer">
@@ -212,7 +256,7 @@ export default function ManageUsersPage() {
                             </DropdownMenuItem>
                           </>
                         )}
-                        {adminData?.role === 'super_admin' && (
+                        {isSuper && (
                           <DropdownMenuItem onClick={() => handleDeleteUser(u.uid)} className="flex items-center gap-2 text-destructive cursor-pointer">
                             <Trash2 className="h-4 w-4" /> Delete Permanently
                           </DropdownMenuItem>
@@ -233,7 +277,7 @@ export default function ManageUsersPage() {
           <DialogHeader>
             <DialogTitle className="text-2xl font-headline font-bold flex items-center gap-2">
               <Coins className={cn("h-6 w-6", coinAction === 'add' ? 'text-green-500' : 'text-red-500')} />
-              {coinAction === 'add' ? 'Add Koin' : 'Subtract Koin'}
+              {coinAction === 'add' ? 'Tambah Koin User' : 'Kurangi Koin User'}
             </DialogTitle>
             <DialogDescription>
               User: <span className="text-white font-bold">{selectedUser?.username}</span>
@@ -250,11 +294,11 @@ export default function ManageUsersPage() {
               />
             </div>
             <div className="p-4 rounded-xl bg-primary/5 border border-primary/10">
-              <p className="text-xs text-muted-foreground italic">Perubahan akan dicatat dalam riwayat transaksi user dan admin secara otomatis.</p>
+              <p className="text-xs text-muted-foreground italic">Perubahan akan dicatat dalam riwayat transaksi user dan log aktivitas sistem secara otomatis.</p>
             </div>
           </div>
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setCoinAction(null)} className="rounded-xl">Cancel</Button>
+            <Button variant="ghost" onClick={() => setCoinAction(null)} className="rounded-xl">Batal</Button>
             <Button 
               onClick={handleUpdateCoins} 
               disabled={isProcessing || coinAmount <= 0}
