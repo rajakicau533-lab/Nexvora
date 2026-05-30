@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
-import { ShoppingBag, Music, ShieldCheck, Zap, Info, Clock, AlertCircle, ExternalLink, Loader2 } from "lucide-react"
+import { ShoppingBag, Music, ShieldCheck, Zap, Info, Clock, AlertCircle, ExternalLink, Loader2, CheckCircle2 } from "lucide-react"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { useFirestore, useUser, useCollection, useDoc } from "@/firebase"
@@ -19,6 +19,8 @@ export default function TrafficServicePage() {
   const [url, setUrl] = useState("")
   const [views, setViews] = useState(1000)
   const [isOrdering, setIsOrdering] = useState(false)
+  const [orderFeedback, setOrderFeedback] = useState<"idle" | "processing" | "success" | "error">("idle")
+  
   const { user } = useUser()
   const db = useFirestore()
   const { toast } = useToast()
@@ -36,7 +38,7 @@ export default function TrafficServicePage() {
   }, [db, user?.uid])
   const { data: profile } = useDoc(profileRef)
 
-  // Order history
+  // Order history - Realtime via useCollection (onSnapshot)
   const historyQuery = React.useMemo(() => {
     if (!db || !user?.uid) return null
     return query(
@@ -48,23 +50,17 @@ export default function TrafficServicePage() {
 
   const { data: history } = useCollection<any>(historyQuery)
 
-  // Status Auto-Update Logic
+  // Status Auto-Update Logic (Every 60 seconds)
   useEffect(() => {
     if (!db || !apiSettings || !history || history.length === 0) return;
 
     const interval = setInterval(async () => {
-      // Find orders that are still pending and were created at least 1 minute ago
       const pendingOrders = history.filter((order: any) => {
-        if (order.status !== "PENDING" && order.status !== "processing") return false;
-        
-        const createdAt = order.createdAt?.toDate?.() || new Date();
-        const oneMinuteAgo = new Date(Date.now() - 60000);
-        return createdAt < oneMinuteAgo;
+        const currentStatus = order.status?.toUpperCase();
+        return currentStatus === "PENDING" || currentStatus === "PROCESSING";
       });
 
       if (pendingOrders.length === 0) return;
-
-      console.log(`[STATUS CHECK] Checking ${pendingOrders.length} pending orders...`);
 
       for (const order of pendingOrders) {
         if (!order.providerOrderId) continue;
@@ -88,21 +84,19 @@ export default function TrafficServicePage() {
               newStatus = "PENDING";
             }
 
-            // Update only if status changed
             if (newStatus !== order.status) {
               await updateDoc(doc(db, "traffic_orders", order.id), {
                 status: newStatus,
                 updatedAt: serverTimestamp(),
                 rawProviderStatus: result.status
               });
-              console.log(`[STATUS CHECK] Order #${order.providerOrderId} updated to ${newStatus}`);
             }
           }
         } catch (err) {
           console.error("Status check failed for order:", order.id, err);
         }
       }
-    }, 60000); // Every 60 seconds
+    }, 60000);
 
     return () => clearInterval(interval);
   }, [db, apiSettings, history]);
@@ -144,6 +138,7 @@ export default function TrafficServicePage() {
     }
 
     setIsOrdering(true)
+    setOrderFeedback("processing")
 
     try {
       // Step 1: Call SMM.ID API
@@ -173,7 +168,7 @@ export default function TrafficServicePage() {
         throw new Error(apiResult.error || "Provider SMM.ID menolak pesanan.");
       }
 
-      // Step 3: Success Flow - Store to traffic_orders and deduct coins
+      // Step 3: Success Flow - Store to traffic_orders IMMEDIATELY
       const orderRef = doc(collection(db, "traffic_orders"))
       await setDoc(orderRef, {
         userId: user.uid,
@@ -190,8 +185,10 @@ export default function TrafficServicePage() {
         updatedAt: serverTimestamp()
       })
 
+      // Step 4: Deduct coins
       await updateDoc(profileRef!, { coins: increment(-coinCost) })
 
+      // Step 5: Log transaction
       await setDoc(doc(collection(db, "coin_transactions")), {
         userId: user.uid,
         amount: -coinCost,
@@ -200,13 +197,27 @@ export default function TrafficServicePage() {
         createdAt: serverTimestamp()
       })
 
+      setOrderFeedback("success")
       toast({ title: "Pesanan Diterima! 🚀", description: `Order ID #${apiResult.orderId} sedang diproses.` })
       setUrl("")
+      
+      // Reset feedback after 3 seconds
+      setTimeout(() => setOrderFeedback("idle"), 3000)
     } catch (err: any) {
-      console.error("TRAFFIC_SUBMIT_ERROR:", err)
+      setOrderFeedback("error")
       toast({ variant: "destructive", title: "Gagal Proses", description: err.message || "Koneksi ke SMM.ID gagal." })
+      setTimeout(() => setOrderFeedback("idle"), 3000)
     } finally {
       setIsOrdering(false)
+    }
+  }
+
+  const getButtonText = () => {
+    switch (orderFeedback) {
+      case "processing": return "Menyebar Trafik...";
+      case "success": return "Trafik Berhasil Disebar";
+      case "error": return "Gagal Menyebar Trafik";
+      default: return "Booster Sekarang 🚀";
     }
   }
 
@@ -268,13 +279,17 @@ export default function TrafficServicePage() {
                 <Button 
                   onClick={() => handleOrder("shopee")}
                   disabled={isOrdering || !url || views < 1000 || settingsLoading}
-                  className="w-full h-14 rounded-xl luxury-gradient border-none text-lg font-bold shadow-xl shadow-primary/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
+                  className={cn(
+                    "w-full h-14 rounded-xl border-none text-lg font-bold shadow-xl transition-all hover:scale-[1.02] active:scale-[0.98]",
+                    orderFeedback === 'success' ? 'bg-green-600' : 
+                    orderFeedback === 'error' ? 'bg-red-600' : 'luxury-gradient shadow-primary/20'
+                  )}
                 >
                   {isOrdering ? (
                     <div className="flex items-center gap-2">
-                      <Loader2 className="h-5 w-5 animate-spin" /> Sedang Menghubungkan API...
+                      <Loader2 className="h-5 w-5 animate-spin" /> Menyebar Trafik...
                     </div>
-                  ) : "Booster Sekarang 🚀"}
+                  ) : getButtonText()}
                 </Button>
               </CardContent>
             </Card>
