@@ -26,7 +26,7 @@ export default function LoginPage() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!auth) {
-      setError("Firebase belum terhubung. Periksa halaman /setup.")
+      setError("Gagal menghubungkan ke server Firebase.")
       return
     }
     
@@ -34,10 +34,11 @@ export default function LoginPage() {
     setError(null)
 
     try {
-      const userCredential = await signInWithEmailAndPassword(auth, email, password)
+      const userCredential = await signInWithEmailAndPassword(auth, email.trim(), password)
       
+      // Check verification
       if (!userCredential.user.emailVerified) {
-        setError("Email belum diverifikasi. Silakan cek inbox Anda.")
+        setError("Email Anda belum diverifikasi. Cek inbox atau folder spam Anda.")
         await signOut(auth)
         setIsLoading(false)
         return
@@ -50,14 +51,13 @@ export default function LoginPage() {
       router.push("/dashboard")
     } catch (err: any) {
       console.error(err)
-      setError("Email atau password salah. Silakan coba lagi.")
+      setError("Email atau password tidak sesuai. Mohon periksa kembali.")
       setIsLoading(false)
     }
   }
 
   return (
     <div className="min-h-screen bg-[#0F0F0F] flex flex-col items-center justify-center p-4 relative overflow-hidden">
-      {/* Background Decor */}
       <div className="absolute top-0 left-0 w-[600px] h-[600px] bg-primary/5 blur-[120px] rounded-full -translate-y-1/2 -translate-x-1/2" />
       <div className="absolute bottom-0 right-0 w-[600px] h-[600px] bg-primary/5 blur-[120px] rounded-full translate-y-1/2 translate-x-1/2" />
 
@@ -70,12 +70,12 @@ export default function LoginPage() {
             <span className="text-4xl font-headline font-bold text-white tracking-tight">Nexvora</span>
           </Link>
           <div className="space-y-1">
-            <h1 className="text-2xl font-headline font-bold text-white">Selamat Datang Kembali</h1>
-            <p className="text-muted-foreground font-medium">Masuk untuk mengelola aset digital Anda.</p>
+            <h1 className="text-2xl font-headline font-bold text-white">Login Member</h1>
+            <p className="text-muted-foreground font-medium">Masuk untuk mengelola layanan digital Anda.</p>
           </div>
         </div>
 
-        <Card className="premium-card rounded-[2.5rem] border-white/10 bg-black/60 backdrop-blur-xl overflow-hidden">
+        <Card className="premium-card rounded-[2.5rem] border-white/10 bg-black/60 backdrop-blur-xl overflow-hidden shadow-2xl">
           <CardContent className="pt-10 space-y-6">
             <form onSubmit={handleLogin} className="space-y-6">
               {error && (
@@ -86,22 +86,22 @@ export default function LoginPage() {
               )}
               
               <div className="space-y-2">
-                <Label htmlFor="email" className="text-white text-sm font-bold ml-1">Alamat Email</Label>
+                <Label htmlFor="email" className="text-white text-sm font-black ml-1 uppercase">Email Pengguna</Label>
                 <Input 
                   id="email" 
                   type="email" 
-                  placeholder="nama@email.com" 
+                  placeholder="anda@email.com" 
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="bg-white/5 border-white/10 rounded-2xl h-14 text-white placeholder:text-muted-foreground/40 focus:border-primary/50 text-lg px-6"
+                  className="bg-white/10 border-white/20 rounded-2xl h-14 text-white placeholder:text-white/40 focus:border-primary/50 text-lg px-6"
                 />
               </div>
 
               <div className="space-y-2">
                 <div className="flex items-center justify-between ml-1">
-                  <Label htmlFor="password" title="password" className="text-white text-sm font-bold">Password</Label>
-                  <Link href="#" className="text-xs text-primary font-bold hover:text-primary/80 transition-colors uppercase tracking-wider">Lupa Password?</Link>
+                  <Label htmlFor="password" title="password" className="text-white text-sm font-black uppercase">Password</Label>
+                  <Link href="#" className="text-xs text-primary font-black hover:text-primary/80 transition-colors uppercase tracking-widest">Lupa?</Link>
                 </div>
                 <Input 
                   id="password" 
@@ -110,7 +110,7 @@ export default function LoginPage() {
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="bg-white/5 border-white/10 rounded-2xl h-14 text-white placeholder:text-muted-foreground/40 focus:border-primary/50 text-lg px-6"
+                  className="bg-white/10 border-white/20 rounded-2xl h-14 text-white placeholder:text-white/40 focus:border-primary/50 text-lg px-6"
                 />
               </div>
 
@@ -132,7 +132,7 @@ export default function LoginPage() {
           </CardContent>
           <CardFooter className="flex flex-col gap-4 border-t border-white/5 pt-8 pb-10">
             <p className="text-sm text-muted-foreground font-medium">
-              Belum punya akun? <Link href="/auth/register" className="text-primary font-bold hover:underline hover:text-primary/80">Daftar Gratis</Link>
+              Belum punya akun? <Link href="/auth/register" className="text-primary font-black hover:underline hover:text-primary/80">Daftar Sekarang</Link>
             </p>
             <Link href="/" className="text-xs text-muted-foreground flex items-center gap-1 hover:text-white transition-colors font-bold uppercase tracking-widest">
               <ChevronLeft className="h-3 w-3" /> Kembali ke Beranda

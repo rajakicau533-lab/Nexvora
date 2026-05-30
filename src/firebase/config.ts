@@ -1,19 +1,16 @@
 'use client';
 
 export const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+  apiKey: "AIzaSyDRg1vUAI6p7r1bpmsXa7NIW0Do12Q8j28",
+  authDomain: "studio-2270113515-d6b7c.firebaseapp.com",
+  projectId: "studio-2270113515-d6b7c",
+  storageBucket: "studio-2270113515-d6b7c.firebasestorage.app",
+  messagingSenderId: "746532588854",
+  appId: "1:746532588854:web:8da7fee7b9b88a00c6b797",
 };
 
-// Robust validation to check if keys are actually provided and not placeholders
 export const isFirebaseConfigured = Boolean(
   firebaseConfig.apiKey && 
   firebaseConfig.apiKey !== "YOUR_API_KEY" &&
-  firebaseConfig.apiKey.length > 10 &&
-  firebaseConfig.projectId &&
-  firebaseConfig.projectId !== "YOUR_PROJECT_ID"
+  firebaseConfig.apiKey.length > 10
 );
