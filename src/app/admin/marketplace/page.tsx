@@ -42,7 +42,48 @@ export default function AdminMarketplaceManagementPage() {
   }, [db])
   const { data: products, loading } = useCollection<any>(productsQuery)
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Helper to compress and resize images to stay within Firestore 1MB limit
+  const compressImage = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.readAsDataURL(file)
+      reader.onload = (event) => {
+        const img = new Image()
+        img.src = event.target?.result as string
+        img.onload = () => {
+          const canvas = document.createElement('canvas')
+          let width = img.width
+          let height = img.height
+          const MAX_SIZE = 800 // Moderate resolution for web
+
+          if (width > height) {
+            if (width > MAX_SIZE) {
+              height *= MAX_SIZE / width
+              width = MAX_SIZE
+            }
+          } else {
+            if (height > MAX_SIZE) {
+              width *= MAX_SIZE / height
+              height = MAX_SIZE
+            }
+          }
+
+          canvas.width = width
+          canvas.height = height
+          const ctx = canvas.getContext('2d')
+          ctx?.drawImage(img, 0, 0, width, height)
+          
+          // Use JPEG with 0.7 quality to significantly reduce byte size
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.7)
+          resolve(dataUrl)
+        }
+        img.onerror = reject
+      }
+      reader.onerror = reject
+    })
+  }
+
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || [])
     
     if (imagePreviews.length + files.length > 3) {
@@ -50,18 +91,21 @@ export default function AdminMarketplaceManagementPage() {
       return
     }
 
-    files.forEach(file => {
+    for (const file of files) {
       if (!file.type.match('image.*')) {
         toast({ variant: "destructive", title: "Format Salah", description: "Hanya file gambar (JPG, PNG, WEBP) yang diizinkan." })
-        return
+        continue
       }
 
-      const reader = new FileReader()
-      reader.onloadend = () => {
-        setImagePreviews(prev => [...prev, reader.result as string])
+      try {
+        const compressed = await compressImage(file)
+        setImagePreviews(prev => [...prev, compressed])
+      } catch (err) {
+        toast({ variant: "destructive", title: "Error", description: "Gagal memproses gambar." })
       }
-      reader.readAsDataURL(file)
-    })
+    }
+    
+    if (fileInputRef.current) fileInputRef.current.value = ""
   }
 
   const removePreview = (index: number) => {
@@ -81,16 +125,15 @@ export default function AdminMarketplaceManagementPage() {
     try {
       await addDoc(collection(db, "marketplace_products"), {
         ...formData,
-        imageUrls: imagePreviews, // Store array of base64 images
+        imageUrls: imagePreviews,
         createdAt: serverTimestamp(),
         createdBy: user?.email
       })
       toast({ title: "Produk Berhasil Ditambahkan", description: "Produk sekarang tersedia di Marketplace user." })
       setFormData({ name: "", description: "", priceCoins: 0, downloadUrl: "" })
       setImagePreviews([])
-      if (fileInputRef.current) fileInputRef.current.value = ""
     } catch (err: any) {
-      toast({ variant: "destructive", title: "Error", description: err.message })
+      toast({ variant: "destructive", title: "Gagal Simpan", description: err.message.includes('bytes') ? "Ukuran gambar terlalu besar. Coba gunakan gambar lain." : err.message })
     } finally {
       setIsAdding(false)
     }
@@ -108,10 +151,10 @@ export default function AdminMarketplaceManagementPage() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 max-w-[1400px] mx-auto">
       <div>
         <h2 className="text-3xl font-headline font-bold text-white">Marketplace Catalog 🛍️</h2>
-        <p className="text-muted-foreground">Manage digital products, pricing, and visual assets.</p>
+        <p className="text-muted-foreground text-sm">Manage digital products, pricing, and visual assets.</p>
       </div>
 
       <div className="grid lg:grid-cols-12 gap-8">
@@ -119,44 +162,44 @@ export default function AdminMarketplaceManagementPage() {
           <div className="lg:col-span-5">
             <Card className="premium-card rounded-[2.5rem] border-white/5 bg-black/40">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
+                <CardTitle className="text-lg flex items-center gap-2">
                   <Plus className="h-5 w-5 text-primary" /> Add Marketplace Product
                 </CardTitle>
-                <CardDescription>Fill in details and upload up to 3 images.</CardDescription>
+                <CardDescription className="text-xs">Fill in details and upload up to 3 images.</CardDescription>
               </CardHeader>
               <CardContent>
                 <form onSubmit={handleAddProduct} className="space-y-4">
                   <div className="space-y-2">
-                    <Label className="text-xs font-black uppercase text-muted-foreground">Nama Produk</Label>
+                    <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">Nama Produk</Label>
                     <Input 
                       required 
                       value={formData.name}
                       onChange={(e) => setFormData({...formData, name: e.target.value})}
-                      className="bg-white/5 border-white/10 rounded-xl"
+                      className="bg-white/5 border-white/10 rounded-xl h-11"
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-xs font-black uppercase text-muted-foreground">Harga (Koin)</Label>
+                    <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">Harga (Koin)</Label>
                     <Input 
                       required 
                       type="number"
                       value={formData.priceCoins}
                       onChange={(e) => setFormData({...formData, priceCoins: parseInt(e.target.value) || 0})}
-                      className="bg-white/5 border-white/10 rounded-xl"
+                      className="bg-white/5 border-white/10 rounded-xl h-11"
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-xs font-black uppercase text-muted-foreground">Deskripsi</Label>
+                    <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">Deskripsi</Label>
                     <Textarea 
                       required
                       value={formData.description}
                       onChange={(e) => setFormData({...formData, description: e.target.value})}
-                      className="bg-white/5 border-white/10 rounded-xl"
+                      className="bg-white/5 border-white/10 rounded-xl min-h-[100px]"
                     />
                   </div>
                   
                   <div className="space-y-3">
-                    <Label className="text-xs font-black uppercase text-muted-foreground">Gambar Produk (Max 3)</Label>
+                    <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">Gambar Produk (Max 3)</Label>
                     <div className="grid grid-cols-3 gap-3">
                       {imagePreviews.map((src, idx) => (
                         <div key={idx} className="relative aspect-square rounded-xl overflow-hidden border border-white/10 group">
@@ -192,17 +235,17 @@ export default function AdminMarketplaceManagementPage() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label className="text-xs font-black uppercase text-muted-foreground">Download/Access Link</Label>
+                    <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">Download/Access Link</Label>
                     <Input 
                       required 
                       placeholder="G-Drive / Mega Link" 
                       value={formData.downloadUrl}
                       onChange={(e) => setFormData({...formData, downloadUrl: e.target.value})}
-                      className="bg-white/5 border-white/10 rounded-xl"
+                      className="bg-white/5 border-white/10 rounded-xl h-11"
                     />
                   </div>
                   <Button type="submit" disabled={isAdding} className="w-full h-12 rounded-xl luxury-gradient font-bold mt-4 shadow-lg shadow-primary/20">
-                    {isAdding ? <Loader2 className="animate-spin" /> : "List Product Now"}
+                    {isAdding ? <Loader2 className="animate-spin h-5 w-5" /> : "List Product Now"}
                   </Button>
                 </form>
               </CardContent>
