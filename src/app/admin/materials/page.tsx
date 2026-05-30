@@ -11,6 +11,7 @@ import { useFirestore, useCollection, useUser, useDoc } from "@/firebase"
 import { collection, addDoc, serverTimestamp, deleteDoc, doc, orderBy, query } from "firebase/firestore"
 import { useToast } from "@/hooks/use-toast"
 import { Badge } from "@/components/ui/badge"
+import { cn } from "@/lib/utils"
 
 export default function AdminMaterialsPage() {
   const { user } = useUser()
