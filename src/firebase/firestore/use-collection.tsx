@@ -10,9 +10,13 @@ export function useCollection<T = DocumentData>(query: Query | null) {
 
   useEffect(() => {
     if (!query) {
+      setData([]);
       setLoading(false);
       return;
     }
+
+    // Reset loading state whenever the query changes
+    setLoading(true);
 
     const unsubscribe = onSnapshot(
       query,
@@ -25,6 +29,7 @@ export function useCollection<T = DocumentData>(query: Query | null) {
         setLoading(false);
       },
       (err) => {
+        console.error("useCollection Error:", err);
         setError(err);
         setLoading(false);
       }

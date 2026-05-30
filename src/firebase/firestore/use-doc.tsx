@@ -10,17 +10,22 @@ export function useDoc<T = any>(ref: DocumentReference | null) {
 
   useEffect(() => {
     if (!ref) {
+      setData(null);
       setLoading(false);
       return;
     }
 
+    // Reset loading state whenever the ref changes
+    setLoading(true);
+
     const unsubscribe = onSnapshot(
       ref,
       (doc) => {
-        setData(doc.exists() ? (doc.data() as T) : null);
+        setData(doc.exists() ? ({ ...doc.data(), id: doc.id } as T) : null);
         setLoading(false);
       },
       (err) => {
+        console.error("useDoc Error:", err);
         setError(err);
         setLoading(false);
       }

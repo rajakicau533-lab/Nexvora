@@ -1,4 +1,3 @@
-
 "use client"
 
 import React, { useState } from "react"
@@ -38,8 +37,8 @@ export default function AdminLoginPage() {
     setIsLoading(true)
     setError(null)
 
-    console.log("--- DEBUG ADMIN LOGIN START ---");
-    console.log("Target Email:", email);
+    console.log("--- ADMIN LOGIN DEBUG START ---");
+    console.log("Input Email:", email);
 
     try {
       let user;
@@ -47,15 +46,14 @@ export default function AdminLoginPage() {
         // Step 1: Firebase Auth Sign In
         const userCredential = await signInWithEmailAndPassword(auth, email.trim(), password)
         user = userCredential.user
-        console.log("AUTH UID:", user.uid);
-        console.log("AUTH EMAIL:", user.email);
+        console.log("Firebase Auth Success. UID:", user.uid);
       } catch (authError: any) {
-        // Step 1.1: Auto-register if it's the target admin and not found
+        // Auto-register if it's the target admin and not found
         if ((authError.code === 'auth/user-not-found' || authError.code === 'auth/invalid-credential') && email === TARGET_ADMIN_EMAIL) {
-          console.log("Status: Target admin not found in Auth. Attempting auto-registration...");
+          console.log("Target admin not found. Attempting auto-registration...");
           const newCredential = await createUserWithEmailAndPassword(auth, email.trim(), password);
           user = newCredential.user;
-          console.log("Status: Auto-registration success. UID:", user.uid);
+          console.log("Auto-registration success. UID:", user.uid);
         } else {
           console.error("Auth Error Code:", authError.code);
           throw new Error("Email atau password administrator salah.");
@@ -63,55 +61,56 @@ export default function AdminLoginPage() {
       }
 
       // Step 2: Firestore Authorization Check
-      const adminPath = `admins/${user.uid}`;
-      console.log("Firestore Access Path:", adminPath);
-      
+      console.log("Checking Firestore for UID:", user.uid);
       const adminRef = doc(db, "admins", user.uid);
       let adminDoc;
       
       try {
         adminDoc = await getDoc(adminRef);
-        console.log("ADMIN DOC EXISTS:", adminDoc.exists());
+        console.log("Admin Doc Snapshot - Exists:", adminDoc.exists());
+        if (adminDoc.exists()) {
+            console.log("Admin Data:", adminDoc.data());
+        }
       } catch (firestoreError: any) {
-        console.error("Firestore Permission Error detected during getDoc:", firestoreError.message);
-        throw new Error("Gagal memverifikasi izin Firestore. Periksa Security Rules.");
+        console.error("Firestore Permission Error:", firestoreError.message);
+        throw new Error("Gagal memverifikasi izin Firestore. Pastikan Security Rules sudah terpasang.");
       }
 
       if (!adminDoc.exists()) {
-        // Step 2.1: Auto-create admin record if it's the target admin
+        // Auto-create admin record if it's the target admin
         if (email === TARGET_ADMIN_EMAIL) {
-          console.log("Status: Creating missing admin record for target user...");
+          console.log("Creating missing admin record for target user...");
           await setDoc(adminRef, {
             email: email.toLowerCase().trim(),
             role: "admin",
             status: "active",
             createdAt: serverTimestamp()
           });
-          console.log("Status: Admin record created successfully.");
+          console.log("Admin record created successfully.");
         } else {
-          console.warn("Status: Access Denied - UID not in admins collection.");
+          console.warn("Access Denied: UID not found in admins collection.");
           await signOut(auth)
-          throw new Error("Akses administrator ditolak. Akun Anda tidak memiliki hak akses panel.");
+          throw new Error("Akses administrator ditolak. Akun Anda tidak terdaftar sebagai admin.");
         }
       } else {
         const adminData = adminDoc.data();
-        console.log("ADMIN DATA:", adminData);
         if (adminData?.role !== "admin") {
-          console.warn("Status: Access Denied - Invalid role:", adminData?.role);
+          console.warn("Access Denied: Invalid role:", adminData?.role);
           await signOut(auth)
-          throw new Error("Akses administrator ditolak. Role Anda bukan admin.");
+          throw new Error("Akses ditolak. Role Anda bukan admin.");
         }
       }
 
-      console.log("--- DEBUG ADMIN LOGIN SUCCESS ---");
+      console.log("--- ADMIN LOGIN DEBUG SUCCESS ---");
       toast({
         title: "Admin Authenticated",
-        description: "Selamat datang di Nexvora Admin Panel.",
+        description: "Redirecting to Control Center...",
       })
       
+      // Navigate to admin dashboard
       router.push("/admin")
     } catch (err: any) {
-      console.error("--- DEBUG ADMIN LOGIN ERROR ---");
+      console.error("--- ADMIN LOGIN DEBUG ERROR ---");
       console.error("Error Message:", err.message);
       setError(err.message || "Terjadi kesalahan saat otentikasi admin.");
     } finally {
