@@ -6,12 +6,12 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
-import { Settings, ShieldCheck, Activity, Save, RefreshCw, AlertCircle, CheckCircle2, Loader2, Info } from "lucide-react"
+import { Settings, ShieldCheck, Activity, Save, RefreshCw, AlertCircle, CheckCircle2, Loader2, Info, Terminal } from "lucide-react"
 import { useFirestore, useUser, useDoc } from "@/firebase"
 import { doc, setDoc, serverTimestamp } from "firebase/firestore"
 import { useToast } from "@/hooks/use-toast"
 import { useRouter } from "next/navigation"
-import { checkProviderBalance } from "@/ai/flows/process-traffic-order-flow"
+import { checkProviderBalance, getProviderServices } from "@/ai/flows/process-traffic-order-flow"
 
 export default function AdminSettingsPage() {
   const { user } = useUser()
@@ -20,20 +20,20 @@ export default function AdminSettingsPage() {
   const { toast } = useToast()
   
   const [formData, setFormData] = useState({
-    provider: "IndoSMM",
-    apiUrl: "",
+    provider: "SMM.ID",
+    apiUrl: "https://smm.id/api/v2",
     apiKey: "",
     serviceId: "",
     active: true
   })
+  
   const [isSaving, setIsSaving] = useState(false)
   const [isTesting, setIsTesting] = useState(false)
   const [testResult, setTestResult] = useState<"success" | "error" | null>(null)
   const [providerBalance, setProviderBalance] = useState<string | null>(null)
-  const [lastError, setLastError] = useState<string | null>(null)
   const [debugInfo, setDebugInfo] = useState<any>(null)
+  const [availableServices, setAvailableServices] = useState<any[] | null>(null)
 
-  // Verify Super Admin status
   const adminProfileRef = React.useMemo(() => {
     if (!db || !user?.uid) return null;
     return doc(db, 'admins', user.uid);
@@ -41,11 +41,7 @@ export default function AdminSettingsPage() {
   
   const { data: adminData, loading: adminLoading } = useDoc(adminProfileRef);
 
-  // Load from system_settings/provider_config
-  const settingsRef = React.useMemo(() => {
-    if (!db) return null
-    return doc(db, "system_settings", "provider_config")
-  }, [db])
+  const settingsRef = React.useMemo(() => (db ? doc(db, "system_settings", "provider_config") : null), [db])
   const { data: apiSettings, loading: settingsLoading } = useDoc(settingsRef)
 
   useEffect(() => {
@@ -58,8 +54,8 @@ export default function AdminSettingsPage() {
   useEffect(() => {
     if (apiSettings) {
       setFormData({
-        provider: apiSettings.provider || "IndoSMM",
-        apiUrl: apiSettings.apiUrl || "",
+        provider: apiSettings.provider || "SMM.ID",
+        apiUrl: apiSettings.apiUrl || "https://smm.id/api/v2",
         apiKey: apiSettings.apiKey || "",
         serviceId: apiSettings.serviceId || "",
         active: apiSettings.active ?? true
@@ -75,8 +71,7 @@ export default function AdminSettingsPage() {
         ...formData,
         updatedAt: serverTimestamp()
       }, { merge: true })
-      
-      toast({ title: "Pengaturan Tersimpan", description: "Konfigurasi provider telah diperbarui di Firestore." })
+      toast({ title: "Pengaturan Tersimpan", description: "Konfigurasi provider SMM.ID diperbarui." })
     } catch (err: any) {
       toast({ variant: "destructive", title: "Gagal Menyimpan", description: err.message })
     } finally {
@@ -86,14 +81,12 @@ export default function AdminSettingsPage() {
 
   const handleTest = async () => {
     if (!formData.apiUrl || !formData.apiKey) {
-      toast({ variant: "destructive", title: "Error", description: "Lengkapi URL dan API Key sebelum testing." })
+      toast({ variant: "destructive", title: "Error", description: "Lengkapi URL dan API Key." })
       return
     }
     
     setIsTesting(true)
     setTestResult(null)
-    setProviderBalance(null)
-    setLastError(null)
     setDebugInfo(null)
     
     try {
@@ -105,43 +98,49 @@ export default function AdminSettingsPage() {
       if (result.success) {
         setTestResult("success")
         setProviderBalance(result.balance || "0")
-        toast({ title: "Koneksi Berhasil", description: `Saldo Provider: ${result.balance} ${result.currency}` })
+        setDebugInfo(result.debugInfo)
+        toast({ title: "Koneksi Berhasil", description: `Saldo: ${result.balance} ${result.currency}` })
       } else {
         setTestResult("error")
-        setLastError(result.error || "Gagal menghubungi provider")
-        setDebugInfo(result.debugInfo)
+        setDebugInfo(result.debugInfo || result.error)
         toast({ variant: "destructive", title: "Koneksi Gagal", description: result.error })
       }
     } catch (err: any) {
       setTestResult("error")
-      setLastError(err.message || "Fetch failed")
-      setDebugInfo(err.stack)
-      toast({ variant: "destructive", title: "Koneksi Gagal", description: err.message })
+      setDebugInfo(err.message)
     } finally {
       setIsTesting(false)
     }
   }
 
+  const handleFetchServices = async () => {
+    if (!formData.apiUrl || !formData.apiKey) return;
+    setIsTesting(true);
+    try {
+      const result = await getProviderServices({ apiUrl: formData.apiUrl, apiKey: formData.apiKey });
+      if (result.success) {
+        setAvailableServices(result.services);
+        toast({ title: "Data Services Ditarik", description: `Berhasil mendapatkan ${result.services?.length || 0} layanan.` });
+      }
+    } catch (err: any) {
+      toast({ variant: "destructive", title: "Gagal ambil services", description: err.message });
+    } finally {
+      setIsTesting(false);
+    }
+  }
+
   if (adminLoading || settingsLoading) {
-    return (
-      <div className="min-h-[400px] flex items-center justify-center">
-        <Loader2 className="w-12 h-12 text-primary animate-spin" />
-      </div>
-    )
+    return <div className="min-h-[400px] flex items-center justify-center"><Loader2 className="w-12 h-12 text-primary animate-spin" /></div>
   }
 
   return (
-    <div className="space-y-8 max-w-4xl mx-auto">
+    <div className="space-y-8 max-w-5xl mx-auto">
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div className="space-y-2">
           <h2 className="text-3xl font-headline font-bold flex items-center gap-3 text-white">
             System Settings <Settings className="text-primary h-7 w-7" />
           </h2>
-          <p className="text-muted-foreground">Configure global endpoints for traffic booster services.</p>
-        </div>
-        <div className="flex items-center gap-2 bg-primary/10 border border-primary/20 px-4 py-2 rounded-xl">
-           <ShieldCheck className="h-4 w-4 text-primary" />
-           <span className="text-[10px] font-black uppercase tracking-widest text-white">Super Admin Access</span>
+          <p className="text-muted-foreground">Manage API communication with SMM.ID provider.</p>
         </div>
       </div>
 
@@ -149,92 +148,72 @@ export default function AdminSettingsPage() {
         <div className="lg:col-span-8 space-y-6">
           <Card className="premium-card rounded-[2.5rem] border-white/5 bg-black/60 backdrop-blur-xl">
             <CardHeader>
-              <CardTitle className="text-lg text-white font-bold">Provider Configuration</CardTitle>
-              <CardDescription>Enter the API details from your SMM provider panel.</CardDescription>
+              <CardTitle className="text-lg text-white font-bold">API Configuration (SMM.ID)</CardTitle>
+              <CardDescription>Enter credentials exactly as they appear in your SMM.ID panel.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="space-y-2">
-                <Label className="text-white font-bold ml-1 uppercase text-xs tracking-widest">Provider Name</Label>
+                <Label className="text-white font-bold uppercase text-[10px] tracking-widest ml-1">Provider URL</Label>
                 <Input 
-                  placeholder="IndoSMM" 
-                  value={formData.provider}
-                  onChange={(e) => setFormData({...formData, provider: e.target.value})}
-                  className="bg-white/5 border-white/10 rounded-2xl h-14 text-white px-6 focus:border-primary/50"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label className="text-white font-bold ml-1 uppercase text-xs tracking-widest">API Endpoint URL</Label>
-                <Input 
-                  placeholder="https://indosmm.com/api/v2" 
                   value={formData.apiUrl}
                   onChange={(e) => setFormData({...formData, apiUrl: e.target.value})}
-                  className="bg-white/5 border-white/10 rounded-2xl h-14 text-white px-6 focus:border-primary/50"
+                  className="bg-white/5 border-white/10 rounded-2xl h-14"
                 />
               </div>
 
               <div className="space-y-2">
-                <Label className="text-white font-bold ml-1 uppercase text-xs tracking-widest">API Secret Key</Label>
+                <Label className="text-white font-bold uppercase text-[10px] tracking-widest ml-1">API Key</Label>
                 <Input 
                   type="password"
-                  placeholder="••••••••••••••••" 
                   value={formData.apiKey}
                   onChange={(e) => setFormData({...formData, apiKey: e.target.value})}
-                  className="bg-white/5 border-white/10 rounded-2xl h-14 text-white px-6 focus:border-primary/50"
+                  className="bg-white/5 border-white/10 rounded-2xl h-14"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label className="text-white font-bold ml-1 uppercase text-xs tracking-widest">Default Service ID</Label>
+                  <Label className="text-white font-bold uppercase text-[10px] tracking-widest ml-1">Shopee Service ID</Label>
                   <Input 
-                    placeholder="8402" 
+                    placeholder="e.g. 3262" 
                     value={formData.serviceId}
                     onChange={(e) => setFormData({...formData, serviceId: e.target.value})}
-                    className="bg-white/5 border-white/10 rounded-2xl h-14 text-white px-6 focus:border-primary/50"
+                    className="bg-white/5 border-white/10 rounded-2xl h-14"
                   />
                 </div>
-                <div className="space-y-2 flex flex-col justify-center">
-                  <Label className="text-white font-bold ml-1 uppercase text-xs tracking-widest mb-2">Service Status</Label>
-                  <div className="flex items-center gap-3">
-                    <Switch 
-                      checked={formData.active} 
-                      onCheckedChange={(v) => setFormData({...formData, active: v})} 
-                    />
-                    <span className="text-xs text-muted-foreground">{formData.active ? 'Active' : 'Disabled'}</span>
-                  </div>
+                <div className="flex flex-col justify-center gap-2">
+                   <Label className="text-white font-bold uppercase text-[10px] ml-1">Status</Label>
+                   <div className="flex items-center gap-3">
+                     <Switch checked={formData.active} onCheckedChange={(v) => setFormData({...formData, active: v})} />
+                     <span className="text-xs text-muted-foreground">{formData.active ? 'ACTIVE' : 'OFFLINE'}</span>
+                   </div>
                 </div>
               </div>
 
-              <div className="pt-4 flex gap-4">
-                <Button 
-                  onClick={handleSave} 
-                  disabled={isSaving}
-                  className="flex-1 h-14 rounded-2xl luxury-gradient border-none font-bold text-lg shadow-xl shadow-primary/20"
-                >
-                  {isSaving ? "Saving..." : <><Save className="mr-2 h-5 w-5" /> Save Changes</>}
+              <div className="pt-4 flex flex-wrap gap-4">
+                <Button onClick={handleSave} disabled={isSaving} className="flex-1 h-14 rounded-2xl luxury-gradient font-bold shadow-xl shadow-primary/20">
+                  {isSaving ? "Saving..." : <><Save className="mr-2 h-5 w-5" /> Save Configuration</>}
                 </Button>
-                <Button 
-                  onClick={handleTest} 
-                  disabled={isTesting}
-                  variant="outline"
-                  className="h-14 rounded-2xl border-white/10 bg-white/5 px-8 hover:bg-white/10 text-white"
-                >
-                  {isTesting ? <RefreshCw className="h-5 w-5 animate-spin" /> : "Test Input Config"}
+                <Button onClick={handleTest} disabled={isTesting} variant="outline" className="h-14 rounded-2xl border-white/10 bg-white/5 px-8">
+                  {isTesting ? <RefreshCw className="h-5 w-5 animate-spin" /> : "Test Balance"}
+                </Button>
+                <Button onClick={handleFetchServices} disabled={isTesting} variant="ghost" className="h-14 rounded-2xl border border-dashed border-white/10 px-6">
+                  <Terminal className="mr-2 h-4 w-4" /> Fetch Services
                 </Button>
               </div>
             </CardContent>
           </Card>
 
           {debugInfo && (
-            <Card className="border-red-500/20 bg-red-500/5 rounded-2xl">
-               <CardHeader className="py-4">
-                  <CardTitle className="text-xs font-black uppercase text-red-400 flex items-center gap-2">
-                    <Info className="h-3 w-3" /> Technical Debug Output
+            <Card className="border-primary/20 bg-primary/5 rounded-2xl overflow-hidden">
+               <CardHeader className="py-3 bg-primary/10 flex flex-row items-center justify-between">
+                  <CardTitle className="text-[10px] font-black uppercase text-white flex items-center gap-2">
+                    <Info className="h-3 w-3" /> Raw Provider Response
                   </CardTitle>
+                  <Button variant="ghost" size="sm" onClick={() => setDebugInfo(null)} className="h-6 text-[9px]">Clear</Button>
                </CardHeader>
-               <CardContent>
-                  <pre className="text-[10px] font-mono text-red-300/80 overflow-auto max-h-[150px] whitespace-pre-wrap">
+               <CardContent className="p-4">
+                  <pre className="text-[10px] font-mono text-primary-foreground/80 overflow-auto max-h-[300px] whitespace-pre-wrap">
                     {typeof debugInfo === 'object' ? JSON.stringify(debugInfo, null, 2) : debugInfo}
                   </pre>
                </CardContent>
@@ -243,10 +222,10 @@ export default function AdminSettingsPage() {
         </div>
 
         <div className="lg:col-span-4 space-y-6">
-          <Card className="premium-card rounded-[2.5rem] border-white/5 bg-gradient-to-br from-primary/10 to-transparent overflow-hidden">
+          <Card className="premium-card rounded-[2.5rem] border-white/5 bg-gradient-to-br from-primary/10 to-transparent">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-md text-white font-bold">
-                <Activity className="h-5 w-5 text-primary" /> API Status
+                <Activity className="h-5 w-5 text-primary" /> API Connectivity
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -257,9 +236,9 @@ export default function AdminSettingsPage() {
                       <CheckCircle2 className="h-10 w-10" />
                     </div>
                     <div className="space-y-1">
-                      <p className="text-xl font-headline font-bold text-white uppercase">Connected</p>
+                      <p className="text-xl font-headline font-bold text-white">CONNECTED</p>
                       <p className="text-2xl font-black text-primary">Rp {providerBalance}</p>
-                      <p className="text-[10px] text-muted-foreground uppercase font-black">Provider Balance</p>
+                      <p className="text-[10px] text-muted-foreground uppercase font-black">Account Balance</p>
                     </div>
                   </>
                 ) : testResult === "error" ? (
@@ -268,8 +247,8 @@ export default function AdminSettingsPage() {
                       <AlertCircle className="h-10 w-10" />
                     </div>
                     <div className="space-y-1">
-                      <p className="text-xl font-headline font-bold text-white uppercase tracking-tighter">Connection Failed</p>
-                      <p className="text-[10px] text-red-400 font-bold uppercase mt-2 px-4 line-clamp-3">{lastError}</p>
+                      <p className="text-xl font-headline font-bold text-white uppercase">FAILED</p>
+                      <p className="text-[10px] text-red-400 font-bold uppercase mt-2 px-4 line-clamp-3 italic">Check Debug Output below</p>
                     </div>
                   </>
                 ) : (
@@ -279,22 +258,38 @@ export default function AdminSettingsPage() {
                     </div>
                     <div className="space-y-1">
                       <p className="text-xl font-headline font-bold text-muted-foreground uppercase tracking-widest">IDLE</p>
-                      <p className="text-[10px] text-muted-foreground font-black uppercase tracking-widest">Lakukan test untuk cek API</p>
+                      <p className="text-[10px] text-muted-foreground font-black uppercase tracking-widest">Press Test to verify API</p>
                     </div>
                   </>
                 )}
               </div>
 
               <div className="p-4 rounded-2xl bg-black/40 border border-white/5 space-y-3">
-                 <p className="text-[10px] text-primary uppercase font-bold tracking-widest">Integration Guide</p>
+                 <p className="text-[10px] text-primary uppercase font-bold tracking-widest">SMM.ID Requirements</p>
                  <ul className="space-y-2 text-xs text-white/60">
-                    <li className="flex items-start gap-2">• Key: Ditemukan di Panel Provider &gt; Settings.</li>
-                    <li className="flex items-start gap-2">• URL: Harus berakhiran /api/v2</li>
-                    <li className="flex items-start gap-2">• Pastikan domain provider dapat diakses server.</li>
+                    <li className="flex items-start gap-2">• End-point must be: https://smm.id/api/v2</li>
+                    <li className="flex items-start gap-2">• API Key: From Profile &gt; Settings in SMM.ID</li>
+                    <li className="flex items-start gap-2">• Method: POST with form-urlencoded</li>
                  </ul>
               </div>
             </CardContent>
           </Card>
+          
+          {availableServices && (
+            <Card className="premium-card rounded-[2rem] bg-black/40 border-white/5 max-h-[300px] overflow-hidden">
+               <CardHeader className="py-4 px-6 border-b border-white/5">
+                 <CardTitle className="text-xs uppercase font-black text-white">Active Services List</CardTitle>
+               </CardHeader>
+               <div className="overflow-auto max-h-[240px] px-6 py-4 divide-y divide-white/5">
+                 {availableServices.slice(0, 20).map((s, i) => (
+                   <div key={i} className="py-2 flex justify-between gap-2">
+                     <span className="text-[10px] text-muted-foreground">ID: {s.service}</span>
+                     <span className="text-[10px] text-white font-bold truncate text-right">{s.name}</span>
+                   </div>
+                 ))}
+               </div>
+            </Card>
+          )}
         </div>
       </div>
     </div>

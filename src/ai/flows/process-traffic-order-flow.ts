@@ -1,9 +1,10 @@
 'use server';
 /**
- * @fileOverview Genkit flow for communicating with IndoSMM API.
+ * @fileOverview Genkit flow for communicating with SMM.ID API.
  * 
  * - processTrafficOrder: Sends a traffic order to the provider.
- * - checkProviderBalance: Checks the current balance of the SMM account.
+ * - checkProviderBalance: Checks the current balance or tests connectivity.
+ * - getProviderServices: Lists available services from provider.
  */
 
 import { ai } from '@/ai/genkit';
@@ -17,7 +18,7 @@ const OrderInputSchema = z.object({
   quantity: z.number(),
 });
 
-const BalanceInputSchema = z.object({
+const ConnectionInputSchema = z.object({
   apiUrl: z.string(),
   apiKey: z.string(),
 });
@@ -26,8 +27,12 @@ export async function processTrafficOrder(input: z.infer<typeof OrderInputSchema
   return processTrafficOrderFlow(input);
 }
 
-export async function checkProviderBalance(input: z.infer<typeof BalanceInputSchema>) {
+export async function checkProviderBalance(input: z.infer<typeof ConnectionInputSchema>) {
   return checkProviderBalanceFlow(input);
+}
+
+export async function getProviderServices(input: z.infer<typeof ConnectionInputSchema>) {
+  return getProviderServicesFlow(input);
 }
 
 const processTrafficOrderFlow = ai.defineFlow(
@@ -44,13 +49,11 @@ const processTrafficOrderFlow = ai.defineFlow(
   },
   async (input) => {
     const { apiUrl, apiKey, serviceId, link, quantity } = input;
-    const cleanUrl = apiUrl.trim();
+    const endpoint = apiUrl.trim();
 
     try {
-      if (!cleanUrl.startsWith('http')) {
-        throw new Error("API URL tidak valid. Harus dimulai dengan http:// atau https://");
-      }
-
+      console.log(`[SMM.ID] Attempting order: Service ${serviceId}, Qty ${quantity}`);
+      
       const params = new URLSearchParams();
       params.append('key', apiKey);
       params.append('action', 'add');
@@ -58,18 +61,19 @@ const processTrafficOrderFlow = ai.defineFlow(
       params.append('link', link);
       params.append('quantity', quantity.toString());
 
-      const response = await fetch(cleanUrl, {
+      const response = await fetch(endpoint, {
         method: 'POST',
         body: params,
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
           'Accept': 'application/json',
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Nexvora/2.5',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         },
-        signal: AbortSignal.timeout(30000), // 30s timeout for better reliability
+        signal: AbortSignal.timeout(30000), 
       });
 
       const responseText = await response.text();
+      console.log(`[SMM.ID] RAW Response:`, responseText);
       
       let data;
       try {
@@ -77,8 +81,8 @@ const processTrafficOrderFlow = ai.defineFlow(
       } catch (e) {
         return {
           success: false,
-          error: `Provider mengirim respon non-JSON (HTML/Text). Status: ${response.status}`,
-          debugInfo: { status: response.status, body: responseText.slice(0, 500) }
+          error: `Provider Response non-JSON. Status: ${response.status}`,
+          debugInfo: { body: responseText.slice(0, 500) }
         };
       }
 
@@ -91,16 +95,16 @@ const processTrafficOrderFlow = ai.defineFlow(
       } else {
         return {
           success: false,
-          error: data.error || 'Provider menolak pesanan tanpa alasan spesifik.',
+          error: data.error || 'Provider rejected the request.',
           rawResponse: data,
         };
       }
     } catch (err: any) {
-      console.error('API_FETCH_CRITICAL_ERROR:', err);
+      console.error('[SMM.ID] CRITICAL ERROR:', err);
       return {
         success: false,
-        error: `Koneksi gagal (Network Error): ${err.message || 'fetch failed'}`,
-        debugInfo: { cause: err.cause, stack: err.stack }
+        error: `Network Error: ${err.message || 'connection failed'}`,
+        debugInfo: { stack: err.stack }
       };
     }
   }
@@ -109,7 +113,7 @@ const processTrafficOrderFlow = ai.defineFlow(
 const checkProviderBalanceFlow = ai.defineFlow(
   {
     name: 'checkProviderBalanceFlow',
-    inputSchema: BalanceInputSchema,
+    inputSchema: ConnectionInputSchema,
     outputSchema: z.object({
       success: z.boolean(),
       balance: z.string().optional(),
@@ -120,26 +124,20 @@ const checkProviderBalanceFlow = ai.defineFlow(
   },
   async (input) => {
     const { apiUrl, apiKey } = input;
-    const cleanUrl = apiUrl.trim();
-
+    
     try {
-      if (!cleanUrl.startsWith('http')) {
-        throw new Error("API URL harus dimulai dengan http:// atau https://");
-      }
-
       const params = new URLSearchParams();
       params.append('key', apiKey);
       params.append('action', 'balance');
 
-      const response = await fetch(cleanUrl, {
+      const response = await fetch(apiUrl.trim(), {
         method: 'POST',
         body: params,
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
-          'Accept': 'application/json',
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Nexvora/2.5',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         },
-        signal: AbortSignal.timeout(20000), // 20s timeout
+        signal: AbortSignal.timeout(20000),
       });
 
       const responseText = await response.text();
@@ -149,8 +147,8 @@ const checkProviderBalanceFlow = ai.defineFlow(
       } catch (e) {
         return { 
           success: false, 
-          error: `Respon provider bukan JSON. Status: ${response.status}. Pastikan URL API benar (akhiran /api/v2).`,
-          debugInfo: responseText.slice(0, 500)
+          error: `Not a JSON response. Body starts with: ${responseText.slice(0, 100)}`,
+          debugInfo: responseText 
         };
       }
 
@@ -159,21 +157,51 @@ const checkProviderBalanceFlow = ai.defineFlow(
           success: true,
           balance: data.balance,
           currency: data.currency || 'IDR',
+          debugInfo: data
         };
       } else {
         return {
           success: false,
-          error: data.error || 'Gagal mengambil saldo dari provider.',
+          error: data.error || 'API Key valid but balance field missing.',
           debugInfo: data
         };
       }
     } catch (err: any) {
-      console.error("BALANCE_FETCH_ERROR:", err);
       return { 
         success: false, 
-        error: `Fetch gagal: ${err.message || 'Koneksi ke host ditolak'}`,
+        error: `Fetch Error: ${err.message}`,
         debugInfo: err.stack
       };
+    }
+  }
+);
+
+const getProviderServicesFlow = ai.defineFlow(
+  {
+    name: 'getProviderServicesFlow',
+    inputSchema: ConnectionInputSchema,
+    outputSchema: z.object({
+      success: z.boolean(),
+      services: z.any().optional(),
+      error: z.string().optional(),
+    }),
+  },
+  async (input) => {
+    try {
+      const params = new URLSearchParams();
+      params.append('key', input.apiKey);
+      params.append('action', 'services');
+
+      const response = await fetch(input.apiUrl.trim(), {
+        method: 'POST',
+        body: params,
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+      });
+
+      const data = await response.json();
+      return { success: true, services: data };
+    } catch (err: any) {
+      return { success: false, error: err.message };
     }
   }
 );

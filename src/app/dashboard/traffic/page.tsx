@@ -54,70 +54,40 @@ export default function TrafficServicePage() {
       const hostname = parsed.hostname.toLowerCase();
 
       if (platform === "shopee") {
-        const allowedShopeeDomains = [
-          'shopee.co.id',
-          'shp.ee',
-          'id.shp.ee',
-          's.shopee.co.id',
-          'vn.shp.ee',
-          'my.shp.ee',
-          'th.shp.ee',
-          'ph.shp.ee'
-        ];
-        return allowedShopeeDomains.some(domain => 
-          hostname === domain || hostname.endsWith('.' + domain)
-        );
+        const allowedShopeeDomains = ['shopee.co.id', 'shp.ee', 'id.shp.ee', 's.shopee.co.id', 'vn.shp.ee', 'my.shp.ee', 'th.shp.ee', 'ph.shp.ee'];
+        return allowedShopeeDomains.some(domain => hostname === domain || hostname.endsWith('.' + domain));
       }
-
-      if (platform === "tiktok") {
-        return hostname.includes('tiktok.com');
-      }
-
-      return false;
-    } catch (e) {
-      return false;
-    }
+      return platform === "tiktok" ? hostname.includes('tiktok.com') : false;
+    } catch (e) { return false; }
   };
 
   const handleOrder = async (platform: "shopee" | "tiktok") => {
     if (!db || !user?.uid || !profile) return
     
-    // 1. Validate configuration exists and is active
     if (!apiSettings?.apiUrl || !apiSettings?.apiKey || !apiSettings?.serviceId) {
-      toast({ variant: "destructive", title: "Layanan Tidak Tersedia", description: "Provider belum dikonfigurasi oleh admin." })
+      toast({ variant: "destructive", title: "Layanan Tidak Tersedia", description: "Admin belum mengonfigurasi API SMM.ID." })
       return
     }
 
     if (apiSettings.active === false) {
-      toast({ variant: "destructive", title: "Layanan Dimatikan", description: "Layanan booster sedang dalam pemeliharaan rutin." })
+      toast({ variant: "destructive", title: "Layanan Maintenance", description: "Layanan booster sedang dalam pemeliharaan rutin." })
       return
     }
 
-    // 2. Validate balance
     if (profile.coins < coinCost) {
-      toast({ variant: "destructive", title: "Saldo Kurang", description: `Anda butuh ${coinCost} koin, saldo Anda ${profile.coins} koin.` })
+      toast({ variant: "destructive", title: "Saldo Koin Kurang", description: `Dibutuhkan ${coinCost} koin, saldo Anda ${profile.coins} koin.` })
       return
     }
 
-    // 3. Enhanced URL validation
-    if (!url) {
-      toast({ variant: "destructive", title: "Link Kosong", description: "Silakan masukkan URL target." })
-      return
-    }
-
-    if (!validateUrl(url, platform)) {
-      const errorMsg = platform === "shopee" 
-        ? "Gunakan link shopee.co.id atau shortlink shp.ee yang valid."
-        : "Gunakan link TikTok yang valid.";
-      
-      toast({ variant: "destructive", title: "Link Tidak Valid", description: errorMsg })
+    if (!url || !validateUrl(url, platform)) {
+      toast({ variant: "destructive", title: "Link Tidak Valid", description: "Pastikan URL Shopee yang Anda masukkan benar." })
       return
     }
 
     setIsOrdering(true)
 
     try {
-      // 4. Call Provider API first via Genkit Flow
+      // Step 1: Call SMM.ID API first
       const apiResult = await processTrafficOrder({
         apiUrl: apiSettings.apiUrl,
         apiKey: apiSettings.apiKey,
@@ -126,14 +96,14 @@ export default function TrafficServicePage() {
         quantity: views
       })
 
-      // Log to api_logs for audit (Requirement 11)
+      // Step 2: Always Log to API audit logs for transparency
       await setDoc(doc(collection(db, "api_logs")), {
         timestamp: serverTimestamp(),
         userId: user.uid,
         userEmail: user.email,
         link: url,
         quantity: views,
-        provider: apiSettings.provider || 'IndoSMM',
+        provider: apiSettings.provider || 'SMM.ID',
         requestPayload: { action: 'add', service: apiSettings.serviceId, link: url, quantity: views },
         responseBody: apiResult.rawResponse || apiResult.debugInfo || null,
         errorMessage: apiResult.success ? null : apiResult.error,
@@ -141,10 +111,10 @@ export default function TrafficServicePage() {
       })
 
       if (!apiResult.success) {
-        throw new Error(apiResult.error || "Provider menolak request.");
+        throw new Error(apiResult.error || "Provider SMM.ID menolak pesanan.");
       }
 
-      // 5. Success Flow: Deduct coins and save order
+      // Step 3: SUCCESS FLOW - Deduct coins only if provider confirmed
       const orderRef = doc(collection(db, "traffic_orders"))
       await setDoc(orderRef, {
         userId: user.uid,
@@ -155,30 +125,24 @@ export default function TrafficServicePage() {
         coinCost,
         status: "processing",
         providerOrderId: apiResult.orderId,
-        providerResponse: apiResult.rawResponse,
         createdAt: serverTimestamp()
       })
 
-      // Atomic coin deduction
-      await updateDoc(profileRef!, {
-        coins: increment(-coinCost)
-      })
+      await updateDoc(profileRef!, { coins: increment(-coinCost) })
 
-      // Log transaction
       await setDoc(doc(collection(db, "coin_transactions")), {
         userId: user.uid,
         amount: -coinCost,
         type: "traffic_order",
-        description: `Order Trafik ${platform.toUpperCase()}: ${views} Views (ID: ${apiResult.orderId})`,
+        description: `Shopee Video Booster: ${views} Views (ID: ${apiResult.orderId})`,
         createdAt: serverTimestamp()
       })
 
-      toast({ title: "Pesanan Diterima! 🚀", description: `ID: ${apiResult.orderId}. Booster sedang bekerja.` })
+      toast({ title: "Booster Aktif! 🚀", description: `Pesanan #${apiResult.orderId} sedang dikerjakan server.` })
       setUrl("")
-      setViews(1000)
     } catch (err: any) {
-      console.error("TRAFFIC_ERROR:", err)
-      toast({ variant: "destructive", title: "Gagal Proses", description: err.message || "Terjadi kesalahan saat menghubungi provider." })
+      console.error("TRAFFIC_SUBMIT_ERROR:", err)
+      toast({ variant: "destructive", title: "Gagal Proses", description: err.message || "Koneksi ke SMM.ID gagal." })
     } finally {
       setIsOrdering(false)
     }
@@ -187,8 +151,8 @@ export default function TrafficServicePage() {
   return (
     <div className="space-y-8 max-w-5xl mx-auto">
       <div className="space-y-2">
-        <h2 className="text-3xl font-headline font-bold">Booster Trafik Service 🚀</h2>
-        <p className="text-muted-foreground">Meningkatkan interaksi video Shopee & TikTok secara instan menggunakan provider {apiSettings?.provider || 'IndoSMM'}.</p>
+        <h2 className="text-3xl font-headline font-bold">Booster Trafik SMM.ID 🚀</h2>
+        <p className="text-muted-foreground italic">Layanan premium untuk menaikkan view video secara instan dan aman.</p>
       </div>
 
       <Tabs defaultValue="shopee" className="w-full">
@@ -206,14 +170,14 @@ export default function TrafficServicePage() {
             <Card className="premium-card col-span-3 rounded-3xl border-white/5 bg-black/40">
               <CardHeader>
                 <CardTitle className="text-white">Form Pemesanan Shopee</CardTitle>
-                <CardDescription>Mendukung URL panjang (shopee.co.id) dan shortlink (shp.ee/id.shp.ee).</CardDescription>
+                <CardDescription>Target: Link Video atau Shortlink (id.shp.ee).</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="space-y-2">
                   <Label htmlFor="url" className="text-white font-bold">Link Video Shopee</Label>
                   <Input 
                     id="url" 
-                    placeholder="https://id.shp.ee/xxxxxx atau https://shopee.co.id/video/..." 
+                    placeholder="https://id.shp.ee/xxxxxx" 
                     value={url}
                     onChange={(e) => setUrl(e.target.value)}
                     className="bg-white/5 border-white/10 rounded-xl h-12 text-white focus:border-primary/50"
@@ -229,109 +193,81 @@ export default function TrafficServicePage() {
                     min="1000"
                     value={views}
                     onChange={(e) => setViews(parseInt(e.target.value) || 0)}
-                    className="bg-white/5 border-white/10 rounded-xl h-12 text-white focus:border-primary/50"
+                    className="bg-white/5 border-white/10 rounded-xl h-12 text-white"
                   />
-                  <p className="text-[10px] text-primary font-bold uppercase tracking-widest">Rate: 1.000 Views = 1 Koin Nexvora</p>
+                  <p className="text-[10px] text-primary font-bold uppercase">Biaya: 1.000 Views = 1 Koin</p>
                 </div>
 
-                <div className="p-5 rounded-2xl bg-primary/10 border border-primary/20 space-y-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-bold text-white">Biaya Estimasi:</span>
+                <div className="p-5 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-between">
+                    <span className="text-sm font-bold text-white">Total Biaya:</span>
                     <span className="text-2xl font-headline font-bold text-primary">{coinCost} Koin 🪙</span>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="flex items-center gap-2 text-[10px] font-bold text-muted-foreground">
-                      <ShieldCheck className="h-3 w-3 text-green-500" /> SERVER HIGH SPEED
-                    </div>
-                    <div className="flex items-center gap-2 text-[10px] font-bold text-muted-foreground">
-                      <Zap className="h-3 w-3 text-primary" /> REAL ENGAGEMENT
-                    </div>
-                  </div>
                 </div>
 
                 <Button 
                   onClick={() => handleOrder("shopee")}
                   disabled={isOrdering || !url || views < 1000 || settingsLoading}
-                  className="w-full h-14 rounded-xl luxury-gradient border-none text-lg font-bold shadow-xl shadow-primary/20 group"
+                  className="w-full h-14 rounded-xl luxury-gradient border-none text-lg font-bold shadow-xl shadow-primary/20"
                 >
                   {isOrdering ? (
                     <div className="flex items-center gap-2">
-                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      Menghubungkan API...
+                      <Loader2 className="h-5 w-5 animate-spin" /> Menghubungkan API...
                     </div>
-                  ) : (
-                    <>Booster Video Sekarang <Zap className="ml-2 h-5 w-5 group-hover:scale-110 transition-transform" /></>
-                  )}
+                  ) : "Booster Sekarang 🚀"}
                 </Button>
               </CardContent>
             </Card>
 
-            <Card className="premium-card col-span-2 rounded-3xl border-white/5 h-fit bg-black/40">
+            <Card className="premium-card col-span-2 rounded-3xl border-white/5 bg-black/40 h-fit">
               <CardHeader>
                 <CardTitle className="text-sm font-bold flex items-center gap-2 text-primary">
-                  <Info className="h-4 w-4" /> Ketentuan Layanan
+                  <Info className="h-4 w-4" /> Panduan Order
                 </CardTitle>
               </CardHeader>
-              <CardContent className="text-sm space-y-4 text-muted-foreground font-medium">
-                <p>• Akun tidak boleh dalam mode <span className="text-white font-bold">PRIVATE</span>.</p>
-                <p>• Koin hanya akan terpotong jika server berhasil memproses order.</p>
-                <p>• Masukkan URL lengkap video atau link share aplikasi.</p>
-                <p>• <span className="text-primary font-bold">Sistem otomatis</span> mendukung resolve shortlink Shopee Indonesia (id.shp.ee).</p>
+              <CardContent className="text-sm space-y-4 text-muted-foreground">
+                <p>• Akun tidak boleh diprivat.</p>
+                <p>• Koin dipotong <strong>hanya jika</strong> server SMM.ID memvalidasi pesanan.</p>
+                <p>• Proses pengiriman view 5-60 menit tergantung beban antrean server.</p>
               </CardContent>
             </Card>
           </div>
         </TabsContent>
 
         <TabsContent value="tiktok">
-          <div className="p-12 text-center premium-card rounded-[2rem] border-dashed border-primary/20 bg-black/40">
-            <Music className="h-16 w-16 text-primary mx-auto mb-6 opacity-50" />
-            <h3 className="text-2xl font-headline font-bold text-white mb-2">TikTok Service Update</h3>
-            <p className="text-muted-foreground max-w-sm mx-auto">Sistem TikTok sedang dalam integrasi API V3 untuk kecepatan maksimal.</p>
-            <Button disabled className="mt-8 rounded-xl bg-white/5 border border-white/10 text-muted-foreground">Tersedia Segera</Button>
+          <div className="p-12 text-center premium-card rounded-[2rem] border-dashed border-primary/20 bg-black/40 opacity-60">
+            <Music className="h-16 w-16 text-primary mx-auto mb-6" />
+            <h3 className="text-2xl font-headline font-bold text-white mb-2">Segera Hadir</h3>
+            <p className="text-muted-foreground">Layanan TikTok sedang dalam optimasi kestabilan.</p>
           </div>
         </TabsContent>
       </Tabs>
 
       <Card className="premium-card rounded-3xl border-white/5 overflow-hidden bg-black/40">
         <CardHeader className="bg-white/5">
-          <CardTitle className="flex items-center gap-2 text-lg"><Clock className="h-5 w-5 text-primary" /> Riwayat Order Kustom</CardTitle>
+          <CardTitle className="flex items-center gap-2 text-lg"><Clock className="h-5 w-5 text-primary" /> Riwayat Booster Saya</CardTitle>
         </CardHeader>
         <Table>
           <TableHeader className="bg-white/5">
-            <TableRow className="border-white/5 hover:bg-transparent">
+            <TableRow className="border-white/5">
               <TableHead className="text-white font-bold">Platform</TableHead>
-              <TableHead className="text-white font-bold">Target URL</TableHead>
-              <TableHead className="text-white font-bold">Provider ID</TableHead>
-              <TableHead className="text-white font-bold">Koin</TableHead>
+              <TableHead className="text-white font-bold">Order ID</TableHead>
+              <TableHead className="text-white font-bold">Views</TableHead>
               <TableHead className="text-white font-bold">Status</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {!history || history.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={5} className="text-center py-12 text-muted-foreground italic">Belum ada riwayat booster.</TableCell>
-              </TableRow>
+              <TableRow><TableCell colSpan={4} className="text-center py-12 text-muted-foreground italic">Belum ada riwayat pesanan.</TableCell></TableRow>
             ) : (
               history.map((row: any) => (
-                <TableRow key={row.id} className="border-white/5 hover:bg-white/5 transition-colors">
-                  <TableCell className="font-black uppercase text-[10px] text-primary tracking-widest">{row.platform}</TableCell>
-                  <TableCell className="max-w-[200px] truncate text-muted-foreground text-xs font-mono">
-                    <a href={row.url} target="_blank" rel="noopener noreferrer" className="hover:text-primary">{row.url}</a>
-                  </TableCell>
-                  <TableCell className="text-white font-mono text-[10px]">{row.providerOrderId || '-'}</TableCell>
-                  <TableCell className="text-primary font-bold">{row.coinCost} 🪙</TableCell>
+                <TableRow key={row.id} className="border-white/5 hover:bg-white/5">
+                  <TableCell className="font-black uppercase text-[10px] text-primary">{row.platform}</TableCell>
+                  <TableCell className="text-white font-mono text-[10px]">{row.providerOrderId || row.id.slice(0,8)}</TableCell>
+                  <TableCell className="text-white font-bold">{row.views?.toLocaleString()}</TableCell>
                   <TableCell>
-                    <Badge 
-                      className={cn(
-                        "font-black text-[9px] px-2 py-0.5 rounded-md border-none",
-                        row.status === "completed" && "bg-green-500 text-white",
-                        row.status === "processing" && "bg-blue-600 text-white animate-pulse",
-                        row.status === "pending" && "bg-amber-500 text-black",
-                        row.status === "failed" && "bg-red-600 text-white",
-                      )}
-                    >
-                      {row.status.toUpperCase()}
-                    </Badge>
+                    <Badge className={cn(
+                        "font-black text-[9px] px-2",
+                        row.status === "processing" ? "bg-blue-600 animate-pulse" : "bg-green-500"
+                    )}>{row.status.toUpperCase()}</Badge>
                   </TableCell>
                 </TableRow>
               ))
@@ -340,5 +276,13 @@ export default function TrafficServicePage() {
         </Table>
       </Card>
     </div>
+  )
+}
+
+function Loader2(props: any) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+    </svg>
   )
 }
