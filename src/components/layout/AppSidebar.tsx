@@ -1,8 +1,9 @@
+
 "use client"
 
 import React from "react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { 
   LayoutDashboard, 
   UserPlus, 
@@ -15,7 +16,6 @@ import {
   Cpu,
   ShoppingBag,
   Users,
-  Video,
   CreditCard,
   BookOpen,
   LogOut,
@@ -35,13 +35,13 @@ import {
   SidebarGroupLabel,
   SidebarSeparator
 } from "@/components/ui/sidebar"
+import { useAuth, useUser } from "@/firebase"
+import { signOut } from "firebase/auth"
+import { useToast } from "@/hooks/use-toast"
 
 const menuItems = [
   { label: "Dashboard", icon: LayoutDashboard, href: "/dashboard" },
-  { label: "Daftar", icon: UserPlus, href: "/auth/register" },
-  { label: "Login", icon: LogIn, href: "/auth/login" },
   { label: "Fitur", icon: Sparkles, href: "/#features" },
-  { label: "Keunggulan", icon: Zap, href: "/#benefits" },
   { label: "Testimoni", icon: MessageSquare, href: "/#testimonials" },
   { label: "Tentang Kami", icon: Info, href: "/#about" },
 ]
@@ -50,14 +50,31 @@ const serviceItems = [
   { label: "Trafik Service", icon: TrendingUp, href: "/dashboard/traffic" },
   { label: "Creator AI", icon: Cpu, href: "/dashboard/ai" },
   { label: "Marketplace", icon: ShoppingBag, href: "/dashboard/marketplace" },
-  { label: "Referral", icon: Users, href: "/dashboard/referral" },
-  { label: "Materi Belajar", icon: BookOpen, href: "/dashboard/education" },
   { label: "Top Up Koin", icon: CreditCard, href: "/dashboard/topup" },
 ]
 
 export function AppSidebar() {
   const pathname = usePathname()
+  const router = useRouter()
+  const auth = useAuth()
+  const { user } = useUser()
+  const { toast } = useToast()
+  
   const isDashboard = pathname.startsWith('/dashboard')
+
+  const handleLogout = async () => {
+    if (!auth) return
+    try {
+      await signOut(auth)
+      toast({
+        title: "Signed Out",
+        description: "Sampai jumpa kembali!",
+      })
+      router.push("/")
+    } catch (err) {
+      console.error(err)
+    }
+  }
 
   return (
     <Sidebar className="border-r border-border/50">
@@ -75,7 +92,7 @@ export function AppSidebar() {
       <SidebarContent className="px-3">
         {!isDashboard ? (
           <SidebarGroup>
-            <SidebarGroupLabel className="text-muted-foreground/50 px-3 uppercase text-[10px] tracking-widest font-bold">Main Navigation</SidebarGroupLabel>
+            <SidebarGroupLabel className="text-muted-foreground/50 px-3 uppercase text-[10px] tracking-widest font-bold">Navigation</SidebarGroupLabel>
             <SidebarMenu>
               {menuItems.map((item) => (
                 <SidebarMenuItem key={item.label}>
@@ -94,6 +111,26 @@ export function AppSidebar() {
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
+              {!user && (
+                <>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild className="hover:bg-primary/10 transition-all">
+                      <Link href="/auth/register" className="flex items-center gap-3">
+                        <UserPlus className="h-4 w-4" />
+                        <span className="font-medium">Daftar</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild className="hover:bg-primary/10 transition-all">
+                      <Link href="/auth/login" className="flex items-center gap-3">
+                        <LogIn className="h-4 w-4" />
+                        <span className="font-medium">Login</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                </>
+              )}
             </SidebarMenu>
           </SidebarGroup>
         ) : (
@@ -127,7 +164,10 @@ export function AppSidebar() {
               <SidebarGroupLabel className="text-muted-foreground/50 px-3 uppercase text-[10px] tracking-widest font-bold">System</SidebarGroupLabel>
               <SidebarMenu>
                 <SidebarMenuItem>
-                  <SidebarMenuButton className="hover:text-destructive hover:bg-destructive/10 transition-colors">
+                  <SidebarMenuButton 
+                    onClick={handleLogout}
+                    className="hover:text-destructive hover:bg-destructive/10 transition-colors w-full"
+                  >
                     <LogOut className="h-4 w-4" />
                     <span className="font-medium">Sign Out</span>
                   </SidebarMenuButton>

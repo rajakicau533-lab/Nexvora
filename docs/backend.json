@@ -1,0 +1,173 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "Stored user profile information and balance.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "username": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "coins": { "type": "number" },
+        "status": { "type": "string", "enum": ["active", "suspended"] },
+        "role": { "type": "string", "enum": ["user", "admin"] },
+        "referralCode": { "type": "string" },
+        "referredBy": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "username", "email", "coins", "role"]
+    },
+    "TrafficOrder": {
+      "title": "Traffic Order",
+      "description": "Order for Shopee or TikTok views.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "platform": { "type": "string", "enum": ["shopee", "tiktok"] },
+        "url": { "type": "string" },
+        "views": { "type": "number" },
+        "coinCost": { "type": "number" },
+        "status": { "type": "string", "enum": ["pending", "processing", "completed", "failed"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "CoinTransaction": {
+      "title": "Coin Transaction",
+      "description": "History of coin usage or addition.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "amount": { "type": "number" },
+        "type": { "type": "string", "enum": ["topup", "purchase", "referral_bonus", "traffic_order"] },
+        "description": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "TopUpRequest": {
+      "title": "Top Up Request",
+      "description": "User request to add coins via manual transfer.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "amountCoins": { "type": "number" },
+        "idrAmount": { "type": "number" },
+        "proofUrl": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "Material": {
+      "title": "Learning Material",
+      "description": "Digital learning content for users.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "contentUrl": { "type": "string" },
+        "thumbnailUrl": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "Referral": {
+      "title": "Referral Record",
+      "description": "Tracking user referrals.",
+      "type": "object",
+      "properties": {
+        "referrerId": { "type": "string" },
+        "referredId": { "type": "string" },
+        "bonusPaid": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "MarketplaceProduct": {
+      "title": "Marketplace Product",
+      "description": "Digital products available for purchase with coins.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "priceCoins": { "type": "number" },
+        "downloadUrl": { "type": "string" },
+        "imageUrl": { "type": "string" }
+      }
+    },
+    "MarketplacePurchase": {
+      "title": "Marketplace Purchase",
+      "description": "Record of a product purchase.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "productId": { "type": "string" },
+        "amountCoins": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "AdminLog": {
+      "title": "Admin Audit Log",
+      "description": "Records of admin actions for security.",
+      "type": "object",
+      "properties": {
+        "adminId": { "type": "string" },
+        "action": { "type": "string" },
+        "targetId": { "type": "string" },
+        "details": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "Admin": {
+      "title": "Admin Profile",
+      "description": "Users with administrative privileges.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "permissions": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  },
+  "auth": {
+    "providers": ["password"]
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "#/entities/User",
+      "description": "User profile documents"
+    },
+    "/traffic_orders/{orderId}": {
+      "schema": "#/entities/TrafficOrder",
+      "description": "Traffic boosting orders"
+    },
+    "/coin_transactions/{txId}": {
+      "schema": "#/entities/CoinTransaction",
+      "description": "Transaction history"
+    },
+    "/topup_requests/{requestId}": {
+      "schema": "#/entities/TopUpRequest",
+      "description": "Manual coin top-up requests"
+    },
+    "/materials/{materialId}": {
+      "schema": "#/entities/Material",
+      "description": "Digital learning materials"
+    },
+    "/referrals/{referralId}": {
+      "schema": "#/entities/Referral",
+      "description": "Referral tracking"
+    },
+    "/marketplace_products/{productId}": {
+      "schema": "#/entities/MarketplaceProduct",
+      "description": "Available digital products"
+    },
+    "/marketplace_purchases/{purchaseId}": {
+      "schema": "#/entities/MarketplacePurchase",
+      "description": "User purchase history"
+    },
+    "/admin_logs/{logId}": {
+      "schema": "#/entities/AdminLog",
+      "description": "Admin activity logs"
+    },
+    "/admins/{adminId}": {
+      "schema": "#/entities/Admin",
+      "description": "Administrative users"
+    }
+  }
+}
