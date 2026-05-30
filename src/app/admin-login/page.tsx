@@ -39,7 +39,7 @@ export default function AdminLoginPage() {
     setError(null)
 
     console.log("--- DEBUG ADMIN LOGIN START ---");
-    console.log("Attempting login for:", email);
+    console.log("Target Email:", email);
 
     try {
       let user;
@@ -47,53 +47,57 @@ export default function AdminLoginPage() {
         // Step 1: Firebase Auth Sign In
         const userCredential = await signInWithEmailAndPassword(auth, email.trim(), password)
         user = userCredential.user
-        console.log("Auth Sign In Success. UID:", user.uid);
+        console.log("Auth Status: Login Success");
+        console.log("Admin UID:", user.uid);
       } catch (authError: any) {
         // Step 1.1: Auto-register if it's the target admin and not found
         if ((authError.code === 'auth/user-not-found' || authError.code === 'auth/invalid-credential') && email === TARGET_ADMIN_EMAIL) {
-          console.log("Target admin not found in Auth. Attempting auto-registration...");
+          console.log("Status: Target admin not found in Auth. Attempting auto-registration...");
           const newCredential = await createUserWithEmailAndPassword(auth, email.trim(), password);
           user = newCredential.user;
-          console.log("Auto-registration success. UID:", user.uid);
+          console.log("Status: Auto-registration success. UID:", user.uid);
         } else {
-          console.error("Auth Error:", authError.code);
+          console.error("Auth Error Code:", authError.code);
           throw new Error("Email atau password administrator salah.");
         }
       }
 
-      // Step 2: Otorisasi Firestore (Cek koleksi 'admins')
+      // Step 2: Firestore Authorization Check
+      const adminPath = `admins/${user.uid}`;
+      console.log("Firestore Access Path:", adminPath);
+      
       const adminRef = doc(db, "admins", user.uid);
       const adminDoc = await getDoc(adminRef);
       
-      console.log("Checking Firestore 'admins' collection for UID:", user.uid);
+      console.log("Admin Doc Exists:", adminDoc.exists());
 
       if (!adminDoc.exists()) {
         // Step 2.1: Auto-create admin record if it's the target admin
         if (email === TARGET_ADMIN_EMAIL) {
-          console.log("Admin record missing for target email. Creating record...");
+          console.log("Status: Creating missing admin record for target user...");
           await setDoc(adminRef, {
             email: email.toLowerCase().trim(),
             role: "admin",
             status: "active",
             createdAt: serverTimestamp()
           });
-          console.log("Admin record created successfully.");
+          console.log("Status: Admin record created successfully.");
         } else {
-          console.log("Access Denied: UID not found in admins collection.");
+          console.warn("Status: Access Denied - UID not in admins collection.");
           await signOut(auth)
-          throw new Error("Akses administrator ditolak. UID Anda tidak terdaftar.");
+          throw new Error("Akses administrator ditolak. Akun Anda tidak memiliki hak akses panel.");
         }
       } else {
         const adminData = adminDoc.data();
-        console.log("Admin Data found:", adminData);
+        console.log("Admin Data:", adminData);
         if (adminData?.role !== "admin") {
-          console.log("Access Denied: Role is not admin.");
+          console.warn("Status: Access Denied - Invalid role:", adminData?.role);
           await signOut(auth)
-          throw new Error("Akses administrator ditolak. Role tidak valid.");
+          throw new Error("Akses administrator ditolak. Role Anda bukan admin.");
         }
       }
 
-      console.log("Login authorized. Redirecting to /admin...");
+      console.log("--- DEBUG ADMIN LOGIN SUCCESS ---");
       toast({
         title: "Admin Authenticated",
         description: "Selamat datang di Nexvora Admin Panel.",
@@ -102,8 +106,8 @@ export default function AdminLoginPage() {
       router.push("/admin")
     } catch (err: any) {
       console.error("--- DEBUG ADMIN LOGIN ERROR ---");
-      console.error(err.message);
-      setError(err.message || "Email atau password administrator salah.");
+      console.error("Error Message:", err.message);
+      setError(err.message || "Terjadi kesalahan saat otentikasi admin.");
     } finally {
       setIsLoading(false)
     }

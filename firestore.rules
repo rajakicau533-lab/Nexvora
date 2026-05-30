@@ -17,9 +17,9 @@ service cloud.firestore {
 
     // ADMINS COLLECTION
     match /admins/{adminId} {
-      // Allow individual admins to read their own status
+      // Perbaikan: Izinkan user membaca dokumen admin miliknya sendiri untuk verifikasi login
       allow get: if request.auth != null && request.auth.uid == adminId;
-      // Writing to admins collection is restricted to existing admins
+      // Operasi lainnya (list, write) hanya untuk admin yang sudah terverifikasi
       allow read, write: if isAdmin();
     }
 
@@ -52,7 +52,8 @@ service cloud.firestore {
 
     // SETTINGS
     match /settings/{settingId} {
-      allow read, write: if isAdmin();
+      allow read: if true; // Izinkan pembacaan setting publik jika perlu
+      allow write: if isAdmin();
     }
 
     // MARKETPLACE
