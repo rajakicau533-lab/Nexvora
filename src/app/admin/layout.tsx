@@ -27,12 +27,14 @@ export default function AdminLayout({
 
   useEffect(() => {
     if (!loading && !user) {
+      console.log("Admin Layout: No user found, redirecting to /admin-login");
       router.push('/admin-login')
     }
   }, [user, loading, router])
 
   useEffect(() => {
     if (!loading && !adminLoading && user && !adminData) {
+      console.log("Admin Layout: User found but not in admins collection, redirecting to /admin-login");
       router.push('/admin-login')
     }
   }, [adminData, adminLoading, user, loading, router])

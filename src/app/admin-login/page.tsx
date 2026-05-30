@@ -10,15 +10,16 @@ import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { ShieldAlert, LogIn, ChevronLeft } from "lucide-react"
 import { useAuth, useFirestore } from "@/firebase"
-import { signInWithEmailAndPassword, signOut } from "firebase/auth"
-import { doc, getDoc } from "firebase/firestore"
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from "firebase/auth"
+import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore"
 import { useToast } from "@/hooks/use-toast"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 
+const TARGET_ADMIN_EMAIL = "adheprogramer@gmail.com";
+
 export default function AdminLoginPage() {
-  // Menggunakan kredensial yang diminta sebagai default
-  const [email, setEmail] = useState("idgamer48@gmail.com")
-  const [password, setPassword] = useState("Adhe191292")
+  const [email, setEmail] = useState(TARGET_ADMIN_EMAIL)
+  const [password, setPassword] = useState("Adhe@191292")
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   
@@ -27,11 +28,6 @@ export default function AdminLoginPage() {
   const router = useRouter()
   const { toast } = useToast()
 
-  /**
-   * Fungsi Login Admin Utama
-   * 1. Verifikasi Email & Password ke Firebase Auth
-   * 2. Periksa apakah UID user terdaftar di koleksi 'admins' Firestore
-   */
   const handleAdminLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!auth || !db) {
@@ -42,32 +38,73 @@ export default function AdminLoginPage() {
     setIsLoading(true)
     setError(null)
 
-    try {
-      // Step 1: Firebase Auth Sign In
-      const userCredential = await signInWithEmailAndPassword(auth, email.trim(), password)
-      const user = userCredential.user
+    console.log("--- DEBUG ADMIN LOGIN START ---");
+    console.log("Attempting login for:", email);
 
-      // Step 2: Otorisasi Firestore (Cek koleksi 'admins' berdasarkan UID)
-      const adminDoc = await getDoc(doc(db, "admins", user.uid))
-      
-      if (!adminDoc.exists()) {
-        setError("Akses Ditolak. UID Anda tidak terdaftar di database administrator.")
-        // Penting: Sign out jika bukan admin untuk keamanan
-        await signOut(auth)
-        setIsLoading(false)
-        return
+    try {
+      let user;
+      try {
+        // Step 1: Firebase Auth Sign In
+        const userCredential = await signInWithEmailAndPassword(auth, email.trim(), password)
+        user = userCredential.user
+        console.log("Auth Sign In Success. UID:", user.uid);
+      } catch (authError: any) {
+        // Step 1.1: Auto-register if it's the target admin and not found
+        if ((authError.code === 'auth/user-not-found' || authError.code === 'auth/invalid-credential') && email === TARGET_ADMIN_EMAIL) {
+          console.log("Target admin not found in Auth. Attempting auto-registration...");
+          const newCredential = await createUserWithEmailAndPassword(auth, email.trim(), password);
+          user = newCredential.user;
+          console.log("Auto-registration success. UID:", user.uid);
+        } else {
+          console.error("Auth Error:", authError.code);
+          throw new Error("Email atau password administrator salah.");
+        }
       }
 
+      // Step 2: Otorisasi Firestore (Cek koleksi 'admins')
+      const adminRef = doc(db, "admins", user.uid);
+      const adminDoc = await getDoc(adminRef);
+      
+      console.log("Checking Firestore 'admins' collection for UID:", user.uid);
+
+      if (!adminDoc.exists()) {
+        // Step 2.1: Auto-create admin record if it's the target admin
+        if (email === TARGET_ADMIN_EMAIL) {
+          console.log("Admin record missing for target email. Creating record...");
+          await setDoc(adminRef, {
+            email: email.toLowerCase().trim(),
+            role: "admin",
+            status: "active",
+            createdAt: serverTimestamp()
+          });
+          console.log("Admin record created successfully.");
+        } else {
+          console.log("Access Denied: UID not found in admins collection.");
+          await signOut(auth)
+          throw new Error("Akses administrator ditolak. UID Anda tidak terdaftar.");
+        }
+      } else {
+        const adminData = adminDoc.data();
+        console.log("Admin Data found:", adminData);
+        if (adminData?.role !== "admin") {
+          console.log("Access Denied: Role is not admin.");
+          await signOut(auth)
+          throw new Error("Akses administrator ditolak. Role tidak valid.");
+        }
+      }
+
+      console.log("Login authorized. Redirecting to /admin...");
       toast({
         title: "Admin Authenticated",
         description: "Selamat datang di Nexvora Admin Panel.",
       })
       
-      // Redirect ke dashboard admin terpisah
       router.push("/admin")
     } catch (err: any) {
-      console.error("Admin Login Error:", err)
-      setError("Email atau password administrator salah.")
+      console.error("--- DEBUG ADMIN LOGIN ERROR ---");
+      console.error(err.message);
+      setError(err.message || "Email atau password administrator salah.");
+    } finally {
       setIsLoading(false)
     }
   }
@@ -85,7 +122,7 @@ export default function AdminLoginPage() {
           </div>
           <div className="space-y-1">
             <h1 className="text-3xl font-headline font-bold text-white uppercase tracking-widest">Admin Central</h1>
-            <p className="text-muted-foreground font-medium">Akses Terbatas. Gunakan Kredensial Administrator.</p>
+            <p className="text-muted-foreground font-medium">Otorisasi Administrator Nexvora Studio</p>
           </div>
         </div>
 
