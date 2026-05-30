@@ -20,8 +20,6 @@ import { doc, updateDoc, increment, collection, setDoc, serverTimestamp } from "
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
-import { errorEmitter } from '@/firebase/error-emitter';
-import { FirestorePermissionError, type SecurityRuleContext } from '@/firebase/errors';
 
 const AI_COST = 1;
 
@@ -71,14 +69,7 @@ export default function CreatorAIPage() {
       errorMessage: error.message || "Unknown AI error",
       timestamp: serverTimestamp(),
       isQuotaExceeded: isQuotaError
-    }).catch(async (serverError) => {
-        const permissionError = new FirestorePermissionError({
-          path: 'ai_error_logs',
-          operation: 'create',
-          requestResourceData: { userId: user.uid, tab: activeTab },
-        } satisfies SecurityRuleContext);
-        errorEmitter.emit('permission-error', permissionError);
-    });
+    }).catch(() => {});
   }
 
   const handleGenerate = async () => {
@@ -126,9 +117,7 @@ export default function CreatorAIPage() {
       const costAmount = -AI_COST;
       updateDoc(profileRef!, { 
         coins: increment(costAmount) 
-      }).catch(async () => {
-         // Silently handle coin deduction error or emit if critical
-      });
+      }).catch(() => {});
 
       // 2. Log transaction
       const txRef = doc(collection(db, "coin_transactions"));
@@ -138,7 +127,7 @@ export default function CreatorAIPage() {
         type: "purchase",
         description: `AI Creation: ${activeTab}`,
         createdAt: serverTimestamp()
-      }).catch(async () => {});
+      }).catch(() => {});
 
       toast({ title: "Proses Berhasil! 🎉", description: `1 Koin telah digunakan.` })
       setSystemStatus("Online")
@@ -331,7 +320,7 @@ export default function CreatorAIPage() {
                   <Button 
                     onClick={handleGenerate}
                     disabled={isGenerating || systemStatus === 'Quota Habis'}
-                    className="w-full h-14 rounded-2xl luxury-gradient border-none font-bold text-lg shadow-xl shadow-primary/30 group active:scale-95 transition-all disabled:opacity-50 disabled:grayscale"
+                    className="w-full h-14 rounded-2xl luxury-gradient border-none font-bold text-lg shadow-xl shadow-primary/20"
                   >
                     {isGenerating ? (
                       <div className="flex items-center gap-3">
@@ -342,7 +331,7 @@ export default function CreatorAIPage() {
                       "Kuota Harian Habis"
                     ) : (
                       <>
-                        Proses Konten AI <Wand2 className="ml-2 h-5 w-5 group-hover:rotate-12 transition-transform" />
+                        Proses Konten AI <Wand2 className="ml-2 h-5 w-5" />
                       </>
                     )}
                   </Button>
@@ -368,7 +357,7 @@ export default function CreatorAIPage() {
               <CardContent className="flex-1 flex flex-col items-center justify-center p-8">
                 {isGenerating ? (
                   <div className="text-center space-y-8 animate-pulse">
-                    <div className="w-24 h-24 rounded-full border-4 border-primary/20 border-t-primary animate-spin mx-auto shadow-2xl shadow-primary/40" />
+                    <div className="w-24 h-24 rounded-full border-4 border-primary/20 border-t-primary animate-spin mx-auto" />
                     <div className="space-y-2">
                       <p className="text-2xl font-headline font-bold text-white">Menghitung Piksel...</p>
                       <p className="text-muted-foreground">Nexvora Engine V2.5 sedang bekerja.</p>
@@ -387,7 +376,7 @@ export default function CreatorAIPage() {
                                   <Download className="mr-2 h-4 w-4" /> Download
                                 </a>
                               </Button>
-                              <Button size="icon" variant="secondary" onClick={() => copyToClipboard(img.url)} className="rounded-xl bg-black/60 backdrop-blur-md hover:bg-primary transition-colors">
+                              <Button size="icon" variant="secondary" onClick={() => copyToClipboard(img.url)} className="rounded-xl bg-black/60 backdrop-blur-md">
                                 <Copy className="h-4 w-4 text-white" />
                               </Button>
                             </div>
@@ -406,7 +395,7 @@ export default function CreatorAIPage() {
                         <div className="flex justify-center">
                           <Button asChild className="luxury-gradient rounded-xl px-8 font-bold">
                             <a href={resultVideo} download="nexvora-ai-video.mp4">
-                              <Download className="mr-2 h-5 w-5" /> Download Video Original
+                              <Download className="mr-2 h-5 w-5" /> Download Video
                             </a>
                           </Button>
                         </div>
@@ -414,7 +403,7 @@ export default function CreatorAIPage() {
                     )}
 
                     {resultPrompt && (
-                      <div className="w-full max-w-xl p-10 rounded-[2.5rem] bg-white/5 border border-primary/20 text-center space-y-6 shadow-2xl backdrop-blur-xl">
+                      <div className="w-full max-w-xl p-10 rounded-[2.5rem] bg-white/5 border border-primary/20 text-center space-y-6 shadow-2xl">
                         <div className="w-16 h-16 bg-primary/20 rounded-2xl flex items-center justify-center mx-auto">
                           <FileText className="h-8 w-8 text-primary" />
                         </div>
@@ -426,7 +415,7 @@ export default function CreatorAIPage() {
                           <Button onClick={() => { setPrompt(resultPrompt); setActiveTab("text-to-image"); }} className="luxury-gradient rounded-xl font-bold h-12 px-8">
                             Gunakan di Text To Image
                           </Button>
-                          <Button onClick={() => copyToClipboard(resultPrompt)} variant="outline" className="rounded-xl border-white/10 hover:bg-white/5 h-12 px-8">
+                          <Button onClick={() => copyToClipboard(resultPrompt)} variant="outline" className="rounded-xl border-white/10 h-12 px-8">
                             <Copy className="mr-2 h-4 w-4" /> Salin Teks
                           </Button>
                         </div>
@@ -434,8 +423,8 @@ export default function CreatorAIPage() {
                     )}
 
                     {!resultImages.length && !resultVideo && !resultPrompt && (
-                      <div className="text-center space-y-8 opacity-40 group">
-                        <div className="w-32 h-32 rounded-[2rem] bg-white/5 border border-white/10 flex items-center justify-center mx-auto mb-6 group-hover:scale-110 group-hover:border-primary/50 transition-all duration-700 shadow-2xl">
+                      <div className="text-center space-y-8 opacity-40">
+                        <div className="w-32 h-32 rounded-[2rem] bg-white/5 border border-white/10 flex items-center justify-center mx-auto mb-6">
                           <Sparkles className="h-16 w-16 text-primary" />
                         </div>
                         <div className="space-y-2">
