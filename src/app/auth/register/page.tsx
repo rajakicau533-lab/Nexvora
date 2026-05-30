@@ -1,4 +1,3 @@
-
 "use client"
 
 import React, { useState } from "react"
@@ -11,7 +10,7 @@ import { Label } from "@/components/ui/label"
 import { UserPlus, Sparkles, AlertCircle, CheckCircle2 } from "lucide-react"
 import { useAuth, useFirestore } from "@/firebase"
 import { createUserWithEmailAndPassword, sendEmailVerification } from "firebase/auth"
-import { doc, setDoc, serverTimestamp } from "firebase/firestore"
+import { doc, setDoc, serverTimestamp, getDocs, collection, query, where } from "firebase/firestore"
 import { useToast } from "@/hooks/use-toast"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 
@@ -26,7 +25,6 @@ export default function RegisterPage() {
   
   const auth = useAuth()
   const db = useFirestore()
-  const router = useRouter()
   const { toast } = useToast()
 
   const handleRegister = async (e: React.FormEvent) => {
@@ -37,14 +35,23 @@ export default function RegisterPage() {
     setError(null)
 
     try {
-      // 1. Create User in Auth
+      // 1. Check if username is unique
+      const usersRef = collection(db, "users")
+      const q = query(usersRef, where("username", "==", username))
+      const querySnapshot = await getDocs(q)
+      
+      if (!querySnapshot.empty) {
+        throw new Error("Username sudah digunakan. Silakan pilih username lain.")
+      }
+
+      // 2. Create User in Auth
       const userCredential = await createUserWithEmailAndPassword(auth, email, password)
       const user = userCredential.user
 
-      // 2. Send Verification Email
+      // 3. Send Verification Email
       await sendEmailVerification(user)
 
-      // 3. Save User Profile in Firestore
+      // 4. Save User Profile in Firestore
       const generatedReferral = username.toUpperCase().substring(0, 3) + Math.floor(100 + Math.random() * 900)
       
       await setDoc(doc(db, "users", user.uid), {
