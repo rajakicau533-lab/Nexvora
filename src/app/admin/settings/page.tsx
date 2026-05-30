@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
-import { Settings, ShieldCheck, Activity, Save, RefreshCw, AlertCircle, CheckCircle2, Loader2 } from "lucide-react"
+import { Settings, ShieldCheck, Activity, Save, RefreshCw, AlertCircle, CheckCircle2, Loader2, Info } from "lucide-react"
 import { useFirestore, useUser, useDoc } from "@/firebase"
 import { doc, setDoc, serverTimestamp } from "firebase/firestore"
 import { useToast } from "@/hooks/use-toast"
@@ -31,6 +31,7 @@ export default function AdminSettingsPage() {
   const [testResult, setTestResult] = useState<"success" | "error" | null>(null)
   const [providerBalance, setProviderBalance] = useState<string | null>(null)
   const [lastError, setLastError] = useState<string | null>(null)
+  const [debugInfo, setDebugInfo] = useState<any>(null)
 
   // Verify Super Admin status
   const adminProfileRef = React.useMemo(() => {
@@ -93,6 +94,7 @@ export default function AdminSettingsPage() {
     setTestResult(null)
     setProviderBalance(null)
     setLastError(null)
+    setDebugInfo(null)
     
     try {
       const result = await checkProviderBalance({
@@ -107,11 +109,13 @@ export default function AdminSettingsPage() {
       } else {
         setTestResult("error")
         setLastError(result.error || "Gagal menghubungi provider")
+        setDebugInfo(result.debugInfo)
         toast({ variant: "destructive", title: "Koneksi Gagal", description: result.error })
       }
     } catch (err: any) {
       setTestResult("error")
       setLastError(err.message || "Fetch failed")
+      setDebugInfo(err.stack)
       toast({ variant: "destructive", title: "Koneksi Gagal", description: err.message })
     } finally {
       setIsTesting(false)
@@ -221,6 +225,21 @@ export default function AdminSettingsPage() {
               </div>
             </CardContent>
           </Card>
+
+          {debugInfo && (
+            <Card className="border-red-500/20 bg-red-500/5 rounded-2xl">
+               <CardHeader className="py-4">
+                  <CardTitle className="text-xs font-black uppercase text-red-400 flex items-center gap-2">
+                    <Info className="h-3 w-3" /> Technical Debug Output
+                  </CardTitle>
+               </CardHeader>
+               <CardContent>
+                  <pre className="text-[10px] font-mono text-red-300/80 overflow-auto max-h-[150px] whitespace-pre-wrap">
+                    {typeof debugInfo === 'object' ? JSON.stringify(debugInfo, null, 2) : debugInfo}
+                  </pre>
+               </CardContent>
+            </Card>
+          )}
         </div>
 
         <div className="lg:col-span-4 space-y-6">
