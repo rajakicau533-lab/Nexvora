@@ -5,6 +5,7 @@
  * - processTrafficOrder: Sends a traffic order to the provider.
  * - checkProviderBalance: Checks the current balance or tests connectivity.
  * - getProviderServices: Lists available services from provider.
+ * - checkOrderStatus: Verifies the status of a specific order.
  */
 
 import { ai } from '@/ai/genkit';
@@ -23,6 +24,12 @@ const ConnectionInputSchema = z.object({
   apiKey: z.string(),
 });
 
+const StatusInputSchema = z.object({
+  apiUrl: z.string(),
+  apiKey: z.string(),
+  orderId: z.string(),
+});
+
 export async function processTrafficOrder(input: z.infer<typeof OrderInputSchema>) {
   return processTrafficOrderFlow(input);
 }
@@ -33,6 +40,10 @@ export async function checkProviderBalance(input: z.infer<typeof ConnectionInput
 
 export async function getProviderServices(input: z.infer<typeof ConnectionInputSchema>) {
   return getProviderServicesFlow(input);
+}
+
+export async function checkOrderStatus(input: z.infer<typeof StatusInputSchema>) {
+  return checkOrderStatusFlow(input);
 }
 
 const processTrafficOrderFlow = ai.defineFlow(
@@ -52,8 +63,6 @@ const processTrafficOrderFlow = ai.defineFlow(
     const endpoint = apiUrl.trim();
 
     try {
-      console.log(`[SMM.ID] Attempting order: Service ${serviceId}, Qty ${quantity}`);
-      
       const params = new URLSearchParams();
       params.append('key', apiKey);
       params.append('action', 'add');
@@ -73,8 +82,6 @@ const processTrafficOrderFlow = ai.defineFlow(
       });
 
       const responseText = await response.text();
-      console.log(`[SMM.ID] RAW Response:`, responseText);
-      
       let data;
       try {
         data = JSON.parse(responseText);
@@ -100,11 +107,9 @@ const processTrafficOrderFlow = ai.defineFlow(
         };
       }
     } catch (err: any) {
-      console.error('[SMM.ID] CRITICAL ERROR:', err);
       return {
         success: false,
         error: `Network Error: ${err.message || 'connection failed'}`,
-        debugInfo: { stack: err.stack }
       };
     }
   }
@@ -147,7 +152,7 @@ const checkProviderBalanceFlow = ai.defineFlow(
       } catch (e) {
         return { 
           success: false, 
-          error: `Not a JSON response. Body starts with: ${responseText.slice(0, 100)}`,
+          error: `Not a JSON response.`,
           debugInfo: responseText 
         };
       }
@@ -170,7 +175,6 @@ const checkProviderBalanceFlow = ai.defineFlow(
       return { 
         success: false, 
         error: `Fetch Error: ${err.message}`,
-        debugInfo: err.stack
       };
     }
   }
@@ -195,11 +199,54 @@ const getProviderServicesFlow = ai.defineFlow(
       const response = await fetch(input.apiUrl.trim(), {
         method: 'POST',
         body: params,
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+        headers: { 
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        }
       });
 
       const data = await response.json();
       return { success: true, services: data };
+    } catch (err: any) {
+      return { success: false, error: err.message };
+    }
+  }
+);
+
+const checkOrderStatusFlow = ai.defineFlow(
+  {
+    name: 'checkOrderStatusFlow',
+    inputSchema: StatusInputSchema,
+    outputSchema: z.object({
+      success: z.boolean(),
+      status: z.string().optional(),
+      error: z.string().optional(),
+    }),
+  },
+  async (input) => {
+    try {
+      const params = new URLSearchParams();
+      params.append('key', input.apiKey);
+      params.append('action', 'status');
+      params.append('order', input.orderId);
+
+      const response = await fetch(input.apiUrl.trim(), {
+        method: 'POST',
+        body: params,
+        headers: { 
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        },
+        signal: AbortSignal.timeout(20000),
+      });
+
+      const data = await response.json();
+      
+      if (data.status) {
+        return { success: true, status: data.status };
+      } else {
+        return { success: false, error: data.error || 'Status not found' };
+      }
     } catch (err: any) {
       return { success: false, error: err.message };
     }

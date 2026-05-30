@@ -1,19 +1,19 @@
 "use client"
 
-import React, { useState } from "react"
+import React, { useState, useEffect } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
-import { ShoppingBag, Music, ShieldCheck, Zap, Info, Clock, AlertCircle } from "lucide-react"
+import { ShoppingBag, Music, ShieldCheck, Zap, Info, Clock, AlertCircle, ExternalLink, Loader2 } from "lucide-react"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { useFirestore, useUser, useCollection, useDoc } from "@/firebase"
 import { collection, doc, setDoc, updateDoc, increment, serverTimestamp, query, where, orderBy } from "firebase/firestore"
 import { useToast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
-import { processTrafficOrder } from "@/ai/flows/process-traffic-order-flow"
+import { processTrafficOrder, checkOrderStatus } from "@/ai/flows/process-traffic-order-flow"
 
 export default function TrafficServicePage() {
   const [url, setUrl] = useState("")
@@ -48,6 +48,65 @@ export default function TrafficServicePage() {
 
   const { data: history } = useCollection<any>(historyQuery)
 
+  // Status Auto-Update Logic
+  useEffect(() => {
+    if (!db || !apiSettings || !history || history.length === 0) return;
+
+    const interval = setInterval(async () => {
+      // Find orders that are still pending and were created at least 1 minute ago
+      const pendingOrders = history.filter((order: any) => {
+        if (order.status !== "PENDING" && order.status !== "processing") return false;
+        
+        const createdAt = order.createdAt?.toDate?.() || new Date();
+        const oneMinuteAgo = new Date(Date.now() - 60000);
+        return createdAt < oneMinuteAgo;
+      });
+
+      if (pendingOrders.length === 0) return;
+
+      console.log(`[STATUS CHECK] Checking ${pendingOrders.length} pending orders...`);
+
+      for (const order of pendingOrders) {
+        if (!order.providerOrderId) continue;
+
+        try {
+          const result = await checkOrderStatus({
+            apiUrl: apiSettings.apiUrl,
+            apiKey: apiSettings.apiKey,
+            orderId: order.providerOrderId
+          });
+
+          if (result.success && result.status) {
+            const providerStatus = result.status.toLowerCase();
+            let newStatus = "PENDING";
+
+            if (["completed", "success", "partial"].includes(providerStatus)) {
+              newStatus = "SELESAI";
+            } else if (["canceled", "cancelled", "failed", "error"].includes(providerStatus)) {
+              newStatus = "GAGAL";
+            } else if (["processing", "in progress", "pending"].includes(providerStatus)) {
+              newStatus = "PENDING";
+            }
+
+            // Update only if status changed
+            if (newStatus !== order.status) {
+              await updateDoc(doc(db, "traffic_orders", order.id), {
+                status: newStatus,
+                updatedAt: serverTimestamp(),
+                rawProviderStatus: result.status
+              });
+              console.log(`[STATUS CHECK] Order #${order.providerOrderId} updated to ${newStatus}`);
+            }
+          }
+        } catch (err) {
+          console.error("Status check failed for order:", order.id, err);
+        }
+      }
+    }, 60000); // Every 60 seconds
+
+    return () => clearInterval(interval);
+  }, [db, apiSettings, history]);
+
   const validateUrl = (input: string, platform: "shopee" | "tiktok") => {
     try {
       const parsed = new URL(input.startsWith('http') ? input : `https://${input}`);
@@ -80,14 +139,14 @@ export default function TrafficServicePage() {
     }
 
     if (!url || !validateUrl(url, platform)) {
-      toast({ variant: "destructive", title: "Link Tidak Valid", description: "Pastikan URL Shopee yang Anda masukkan benar." })
+      toast({ variant: "destructive", title: "Link Tidak Valid", description: "Pastikan URL yang Anda masukkan benar." })
       return
     }
 
     setIsOrdering(true)
 
     try {
-      // Step 1: Call SMM.ID API first
+      // Step 1: Call SMM.ID API
       const apiResult = await processTrafficOrder({
         apiUrl: apiSettings.apiUrl,
         apiKey: apiSettings.apiKey,
@@ -96,7 +155,7 @@ export default function TrafficServicePage() {
         quantity: views
       })
 
-      // Step 2: Always Log to API audit logs for transparency
+      // Step 2: Log to API audit logs
       await setDoc(doc(collection(db, "api_logs")), {
         timestamp: serverTimestamp(),
         userId: user.uid,
@@ -114,18 +173,21 @@ export default function TrafficServicePage() {
         throw new Error(apiResult.error || "Provider SMM.ID menolak pesanan.");
       }
 
-      // Step 3: SUCCESS FLOW - Deduct coins only if provider confirmed
+      // Step 3: Success Flow - Store to traffic_orders and deduct coins
       const orderRef = doc(collection(db, "traffic_orders"))
       await setDoc(orderRef, {
         userId: user.uid,
+        username: profile.username || "Unknown",
         userEmail: user.email,
         platform,
-        url,
-        views,
+        targetLink: url,
+        quantity: views,
         coinCost,
-        status: "processing",
+        status: "PENDING",
         providerOrderId: apiResult.orderId,
-        createdAt: serverTimestamp()
+        providerServiceId: apiSettings.serviceId,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
       })
 
       await updateDoc(profileRef!, { coins: increment(-coinCost) })
@@ -134,11 +196,11 @@ export default function TrafficServicePage() {
         userId: user.uid,
         amount: -coinCost,
         type: "traffic_order",
-        description: `Shopee Video Booster: ${views} Views (ID: ${apiResult.orderId})`,
+        description: `Booster ${platform}: ${views} Views (ID: ${apiResult.orderId})`,
         createdAt: serverTimestamp()
       })
 
-      toast({ title: "Booster Aktif! 🚀", description: `Pesanan #${apiResult.orderId} sedang dikerjakan server.` })
+      toast({ title: "Pesanan Diterima! 🚀", description: `Order ID #${apiResult.orderId} sedang diproses.` })
       setUrl("")
     } catch (err: any) {
       console.error("TRAFFIC_SUBMIT_ERROR:", err)
@@ -149,10 +211,10 @@ export default function TrafficServicePage() {
   }
 
   return (
-    <div className="space-y-8 max-w-5xl mx-auto">
+    <div className="space-y-8 max-w-5xl mx-auto pb-20">
       <div className="space-y-2">
-        <h2 className="text-3xl font-headline font-bold">Booster Trafik SMM.ID 🚀</h2>
-        <p className="text-muted-foreground italic">Layanan premium untuk menaikkan view video secara instan dan aman.</p>
+        <h2 className="text-3xl font-headline font-bold">Booster Trafik Otomatis 🚀</h2>
+        <p className="text-muted-foreground italic">Layanan premium untuk menaikkan engagement konten Anda secara instan.</p>
       </div>
 
       <Tabs defaultValue="shopee" className="w-full">
@@ -167,7 +229,7 @@ export default function TrafficServicePage() {
 
         <TabsContent value="shopee" className="space-y-8">
           <div className="grid md:grid-cols-5 gap-8">
-            <Card className="premium-card col-span-3 rounded-3xl border-white/5 bg-black/40">
+            <Card className="premium-card col-span-3 rounded-3xl border-white/5 bg-black/40 shadow-2xl">
               <CardHeader>
                 <CardTitle className="text-white">Form Pemesanan Shopee</CardTitle>
                 <CardDescription>Target: Link Video atau Shortlink (id.shp.ee).</CardDescription>
@@ -195,22 +257,22 @@ export default function TrafficServicePage() {
                     onChange={(e) => setViews(parseInt(e.target.value) || 0)}
                     className="bg-white/5 border-white/10 rounded-xl h-12 text-white"
                   />
-                  <p className="text-[10px] text-primary font-bold uppercase">Biaya: 1.000 Views = 1 Koin</p>
+                  <p className="text-[10px] text-primary font-bold uppercase tracking-wider">Tarif: 1.000 Views = 1 Koin 🪙</p>
                 </div>
 
                 <div className="p-5 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-between">
-                    <span className="text-sm font-bold text-white">Total Biaya:</span>
-                    <span className="text-2xl font-headline font-bold text-primary">{coinCost} Koin 🪙</span>
+                    <span className="text-sm font-bold text-white">Estimasi Biaya:</span>
+                    <span className="text-2xl font-headline font-bold text-primary">{coinCost} Koin</span>
                 </div>
 
                 <Button 
                   onClick={() => handleOrder("shopee")}
                   disabled={isOrdering || !url || views < 1000 || settingsLoading}
-                  className="w-full h-14 rounded-xl luxury-gradient border-none text-lg font-bold shadow-xl shadow-primary/20"
+                  className="w-full h-14 rounded-xl luxury-gradient border-none text-lg font-bold shadow-xl shadow-primary/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
                 >
                   {isOrdering ? (
                     <div className="flex items-center gap-2">
-                      <Loader2 className="h-5 w-5 animate-spin" /> Menghubungkan API...
+                      <Loader2 className="h-5 w-5 animate-spin" /> Sedang Menghubungkan API...
                     </div>
                   ) : "Booster Sekarang 🚀"}
                 </Button>
@@ -220,69 +282,105 @@ export default function TrafficServicePage() {
             <Card className="premium-card col-span-2 rounded-3xl border-white/5 bg-black/40 h-fit">
               <CardHeader>
                 <CardTitle className="text-sm font-bold flex items-center gap-2 text-primary">
-                  <Info className="h-4 w-4" /> Panduan Order
+                  <Info className="h-4 w-4" /> Panduan Pemesanan
                 </CardTitle>
               </CardHeader>
               <CardContent className="text-sm space-y-4 text-muted-foreground">
-                <p>• Akun tidak boleh diprivat.</p>
-                <p>• Koin dipotong <strong>hanya jika</strong> server SMM.ID memvalidasi pesanan.</p>
-                <p>• Proses pengiriman view 5-60 menit tergantung beban antrean server.</p>
+                <div className="flex gap-3">
+                  <Badge className="h-5 w-5 rounded-full p-0 flex items-center justify-center shrink-0">1</Badge>
+                  <p>Pastikan akun Shopee/TikTok Anda <strong>tidak diprivat</strong>.</p>
+                </div>
+                <div className="flex gap-3">
+                  <Badge className="h-5 w-5 rounded-full p-0 flex items-center justify-center shrink-0">2</Badge>
+                  <p>Status akan dicek otomatis ke server provider setiap 60 detik.</p>
+                </div>
+                <div className="flex gap-3">
+                  <Badge className="h-5 w-5 rounded-full p-0 flex items-center justify-center shrink-0">3</Badge>
+                  <p>Proses pengiriman biasanya memakan waktu 5-60 menit.</p>
+                </div>
+                <div className="p-4 rounded-xl bg-white/5 border border-white/5 mt-4">
+                  <p className="text-[10px] text-white font-bold uppercase mb-1">Status Legends:</p>
+                  <div className="grid grid-cols-2 gap-2 text-[9px] font-black">
+                    <span className="text-amber-500">PENDING = Antrean</span>
+                    <span className="text-green-500">SELESAI = Sukses</span>
+                    <span className="text-red-500">GAGAL = Batal</span>
+                  </div>
+                </div>
               </CardContent>
             </Card>
           </div>
         </TabsContent>
 
         <TabsContent value="tiktok">
-          <div className="p-12 text-center premium-card rounded-[2rem] border-dashed border-primary/20 bg-black/40 opacity-60">
+          <div className="p-20 text-center premium-card rounded-[2.5rem] border-dashed border-primary/20 bg-black/40 opacity-60">
             <Music className="h-16 w-16 text-primary mx-auto mb-6" />
-            <h3 className="text-2xl font-headline font-bold text-white mb-2">Segera Hadir</h3>
-            <p className="text-muted-foreground">Layanan TikTok sedang dalam optimasi kestabilan.</p>
+            <h3 className="text-2xl font-headline font-bold text-white mb-2">Coming Soon</h3>
+            <p className="text-muted-foreground max-w-sm mx-auto">Layanan TikTok View sedang dalam tahap integrasi kestabilan server.</p>
           </div>
         </TabsContent>
       </Tabs>
 
-      <Card className="premium-card rounded-3xl border-white/5 overflow-hidden bg-black/40">
-        <CardHeader className="bg-white/5">
-          <CardTitle className="flex items-center gap-2 text-lg"><Clock className="h-5 w-5 text-primary" /> Riwayat Booster Saya</CardTitle>
-        </CardHeader>
-        <Table>
-          <TableHeader className="bg-white/5">
-            <TableRow className="border-white/5">
-              <TableHead className="text-white font-bold">Platform</TableHead>
-              <TableHead className="text-white font-bold">Order ID</TableHead>
-              <TableHead className="text-white font-bold">Views</TableHead>
-              <TableHead className="text-white font-bold">Status</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {!history || history.length === 0 ? (
-              <TableRow><TableCell colSpan={4} className="text-center py-12 text-muted-foreground italic">Belum ada riwayat pesanan.</TableCell></TableRow>
-            ) : (
-              history.map((row: any) => (
-                <TableRow key={row.id} className="border-white/5 hover:bg-white/5">
-                  <TableCell className="font-black uppercase text-[10px] text-primary">{row.platform}</TableCell>
-                  <TableCell className="text-white font-mono text-[10px]">{row.providerOrderId || row.id.slice(0,8)}</TableCell>
-                  <TableCell className="text-white font-bold">{row.views?.toLocaleString()}</TableCell>
-                  <TableCell>
-                    <Badge className={cn(
-                        "font-black text-[9px] px-2",
-                        row.status === "processing" ? "bg-blue-600 animate-pulse" : "bg-green-500"
-                    )}>{row.status.toUpperCase()}</Badge>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </Card>
+      <div className="space-y-6">
+        <h3 className="text-2xl font-headline font-bold flex items-center gap-2">
+          <Clock className="h-6 w-6 text-primary" /> Riwayat Booster Saya
+        </h3>
+        <Card className="premium-card rounded-3xl border-white/5 overflow-hidden bg-black/40 shadow-2xl">
+          <Table>
+            <TableHeader className="bg-white/5">
+              <TableRow className="border-white/5 h-14">
+                <TableHead className="text-white font-bold">Link Video</TableHead>
+                <TableHead className="text-white font-bold">View</TableHead>
+                <TableHead className="text-white font-bold">Koin</TableHead>
+                <TableHead className="text-white font-bold">Order ID</TableHead>
+                <TableHead className="text-white font-bold">Status</TableHead>
+                <TableHead className="text-white font-bold">Waktu</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {!history || history.length === 0 ? (
+                <TableRow><TableCell colSpan={6} className="text-center py-20 text-muted-foreground italic">Belum ada riwayat pesanan.</TableCell></TableRow>
+              ) : (
+                history.map((row: any) => (
+                  <TableRow key={row.id} className="border-white/5 hover:bg-white/5 transition-colors h-16">
+                    <TableCell className="max-w-[200px]">
+                      <a href={row.targetLink || row.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary truncate">
+                        <ExternalLink className="h-3 w-3 shrink-0" /> {row.targetLink || row.url}
+                      </a>
+                    </TableCell>
+                    <TableCell>
+                      <span className="font-bold text-white text-sm">{(row.quantity || 0).toLocaleString()}</span>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="secondary" className="bg-primary/10 text-primary border-none font-bold">
+                        {row.coinCost} 🪙
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <span className="font-mono text-[10px] text-muted-foreground bg-white/5 px-2 py-1 rounded">
+                        {row.providerOrderId || row.id.slice(0,8)}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <Badge className={cn(
+                          "font-black text-[9px] px-3 py-1 uppercase rounded-lg",
+                          row.status === "SELESAI" ? "bg-green-500" : 
+                          row.status === "GAGAL" ? "bg-red-500" : 
+                          "bg-amber-500 animate-pulse"
+                      )}>{row.status || "PENDING"}</Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-col text-[10px] text-muted-foreground">
+                        <span className="font-bold text-white">{row.createdAt?.toDate?.().toLocaleDateString() || '-'}</span>
+                        <span>{row.createdAt?.toDate?.().toLocaleTimeString() || '-'}</span>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </Card>
+      </div>
     </div>
-  )
-}
-
-function Loader2(props: any) {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
-      <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-    </svg>
   )
 }
