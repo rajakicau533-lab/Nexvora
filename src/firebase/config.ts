@@ -3,7 +3,7 @@
 
 /**
  * Konfigurasi Firebase resmi Nexvora Studio.
- * Diperbarui sesuai permintaan untuk menghilangkan error auth/api-key-not-valid.
+ * Project ID: studio-2270113515-d6b7c
  */
 export const firebaseConfig = {
   apiKey: "AIzaSyDRg1vUAI6p7r1bpmsXa7NIW0Do12Q8j28",

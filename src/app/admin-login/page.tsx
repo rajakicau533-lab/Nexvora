@@ -27,6 +27,11 @@ export default function AdminLoginPage() {
   const router = useRouter()
   const { toast } = useToast()
 
+  /**
+   * Fungsi Login Admin Utama
+   * 1. Verifikasi Email & Password ke Firebase Auth
+   * 2. Periksa apakah UID user terdaftar di koleksi 'admins' Firestore
+   */
   const handleAdminLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!auth || !db) {
@@ -38,14 +43,16 @@ export default function AdminLoginPage() {
     setError(null)
 
     try {
+      // Step 1: Firebase Auth Sign In
       const userCredential = await signInWithEmailAndPassword(auth, email.trim(), password)
       const user = userCredential.user
 
-      // Memeriksa apakah UID ini ada di koleksi 'admins'
+      // Step 2: Otorisasi Firestore (Cek koleksi 'admins' berdasarkan UID)
       const adminDoc = await getDoc(doc(db, "admins", user.uid))
       
       if (!adminDoc.exists()) {
         setError("Akses Ditolak. UID Anda tidak terdaftar di database administrator.")
+        // Penting: Sign out jika bukan admin untuk keamanan
         await signOut(auth)
         setIsLoading(false)
         return
@@ -55,6 +62,8 @@ export default function AdminLoginPage() {
         title: "Admin Authenticated",
         description: "Selamat datang di Nexvora Admin Panel.",
       })
+      
+      // Redirect ke dashboard admin terpisah
       router.push("/admin")
     } catch (err: any) {
       console.error("Admin Login Error:", err)
