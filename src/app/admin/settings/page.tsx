@@ -238,7 +238,7 @@ export default function AdminSettingsPage() {
               <div className="p-4 rounded-2xl bg-black/40 border border-white/5 space-y-3">
                  <p className="text-[10px] text-primary uppercase font-bold tracking-widest">IndoSMM Integration</p>
                  <ul className="space-y-2 text-xs text-white/60">
-                    <li className="flex items-start gap-2">• Key: Found in Profile > Settings.</li>
+                    <li className="flex items-start gap-2">• Key: Found in Profile &gt; Settings.</li>
                     <li className="flex items-start gap-2">• URL: Must end with /api/v2</li>
                     <li className="flex items-start gap-2">• Allow IP if required by panel.</li>
                  </ul>
