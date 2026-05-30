@@ -1,15 +1,15 @@
-
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { DocumentReference, onSnapshot } from 'firebase/firestore';
 
 export function useDoc<T = any>(ref: DocumentReference | null) {
   const [data, setData] = useState<T | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
+  
+  const lastPathRef = useRef<string | null>(null);
 
-  // Using ref.path in the dependency array is more stable than the ref object itself
   const path = ref?.path;
 
   useEffect(() => {
@@ -19,7 +19,10 @@ export function useDoc<T = any>(ref: DocumentReference | null) {
       return;
     }
 
-    setLoading(true);
+    if (lastPathRef.current !== path) {
+      setLoading(true);
+      lastPathRef.current = path || null;
+    }
 
     const unsubscribe = onSnapshot(
       ref,
@@ -37,7 +40,7 @@ export function useDoc<T = any>(ref: DocumentReference | null) {
     );
 
     return () => unsubscribe();
-  }, [path]); // Dependency on the path string is more reliable
+  }, [path, ref]);
 
   return { data, loading, error };
 }

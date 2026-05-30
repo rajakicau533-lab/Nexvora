@@ -1,4 +1,3 @@
-
 "use client"
 
 import React from "react"
@@ -13,8 +12,14 @@ import { cn } from "@/lib/utils"
 export default function AdminDashboardPage() {
   const db = useFirestore()
 
+  // Use useMemo for all queries to prevent infinite render loops
   const statsQueries = React.useMemo(() => {
-    if (!db) return {}
+    if (!db) return {
+      users: null,
+      orders: null,
+      transactions: null,
+      topups: null
+    }
     return {
       users: collection(db, "users"),
       orders: collection(db, "traffic_orders"),
@@ -23,17 +28,15 @@ export default function AdminDashboardPage() {
     }
   }, [db])
 
-  // Fix: Memoize the specific query to prevent infinite re-renders
   const recentOrdersQuery = React.useMemo(() => {
     if (!statsQueries.orders) return null;
     return query(statsQueries.orders, orderBy("createdAt", "desc"), limit(5));
   }, [statsQueries.orders]);
 
   const { data: recentOrders } = useCollection<any>(recentOrdersQuery)
-  
-  const { data: allUsers } = useCollection<any>(statsQueries.users || null)
-  const { data: allOrders } = useCollection<any>(statsQueries.orders || null)
-  const { data: allTopups } = useCollection<any>(statsQueries.topups || null)
+  const { data: allUsers } = useCollection<any>(statsQueries.users)
+  const { data: allOrders } = useCollection<any>(statsQueries.orders)
+  const { data: allTopups } = useCollection<any>(statsQueries.topups)
 
   return (
     <div className="space-y-10 max-w-7xl mx-auto pb-10">
@@ -148,7 +151,7 @@ export default function AdminDashboardPage() {
              </div>
              <div className="p-4 rounded-2xl bg-white/5 border border-white/10 space-y-1">
                 <p className="text-xs font-black text-white uppercase">New Topup Request</p>
-                <p className="text-xs text-muted-foreground">User #8492 requested 5,000 Coins.</p>
+                <p className="text-xs text-muted-foreground">Sistem siap memproses pembayaran manual.</p>
              </div>
           </CardContent>
         </Card>

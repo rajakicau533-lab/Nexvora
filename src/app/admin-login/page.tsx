@@ -17,8 +17,8 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 const TARGET_ADMIN_EMAIL = "adheprogramer@gmail.com";
 
 export default function AdminLoginPage() {
-  const [email, setEmail] = useState(TARGET_ADMIN_EMAIL)
-  const [password, setPassword] = useState("Adhe@191292")
+  const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   
@@ -43,12 +43,10 @@ export default function AdminLoginPage() {
     try {
       let user;
       try {
-        // Step 1: Firebase Auth Sign In
         const userCredential = await signInWithEmailAndPassword(auth, email.trim(), password)
         user = userCredential.user
         console.log("Firebase Auth Success. UID:", user.uid);
       } catch (authError: any) {
-        // Auto-register if it's the target admin and not found
         if ((authError.code === 'auth/user-not-found' || authError.code === 'auth/invalid-credential') && email === TARGET_ADMIN_EMAIL) {
           console.log("Target admin not found. Attempting auto-registration...");
           const newCredential = await createUserWithEmailAndPassword(auth, email.trim(), password);
@@ -60,7 +58,6 @@ export default function AdminLoginPage() {
         }
       }
 
-      // Step 2: Firestore Authorization Check
       console.log("Checking Firestore for UID:", user.uid);
       const adminRef = doc(db, "admins", user.uid);
       let adminDoc;
@@ -68,16 +65,12 @@ export default function AdminLoginPage() {
       try {
         adminDoc = await getDoc(adminRef);
         console.log("Admin Doc Snapshot - Exists:", adminDoc.exists());
-        if (adminDoc.exists()) {
-            console.log("Admin Data:", adminDoc.data());
-        }
       } catch (firestoreError: any) {
         console.error("Firestore Permission Error:", firestoreError.message);
-        throw new Error("Gagal memverifikasi izin Firestore. Pastikan Security Rules sudah terpasang.");
+        throw new Error("Gagal memverifikasi izin Firestore.");
       }
 
       if (!adminDoc.exists()) {
-        // Auto-create admin record if it's the target admin
         if (email === TARGET_ADMIN_EMAIL) {
           console.log("Creating missing admin record for target user...");
           await setDoc(adminRef, {
@@ -90,7 +83,7 @@ export default function AdminLoginPage() {
         } else {
           console.warn("Access Denied: UID not found in admins collection.");
           await signOut(auth)
-          throw new Error("Akses administrator ditolak. Akun Anda tidak terdaftar sebagai admin.");
+          throw new Error("Akses administrator ditolak.");
         }
       } else {
         const adminData = adminDoc.data();
@@ -107,7 +100,6 @@ export default function AdminLoginPage() {
         description: "Redirecting to Control Center...",
       })
       
-      // Navigate to admin dashboard
       router.push("/admin")
     } catch (err: any) {
       console.error("--- ADMIN LOGIN DEBUG ERROR ---");
@@ -151,6 +143,7 @@ export default function AdminLoginPage() {
                   id="email" 
                   type="email" 
                   required
+                  placeholder="admin@nexvora.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="bg-white/5 border-white/10 rounded-2xl h-14 text-white focus:border-primary/50"
@@ -163,6 +156,7 @@ export default function AdminLoginPage() {
                   id="password" 
                   type="password" 
                   required
+                  placeholder="Password Admin"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="bg-white/5 border-white/10 rounded-2xl h-14 text-white focus:border-primary/50"
