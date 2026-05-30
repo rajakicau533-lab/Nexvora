@@ -12,7 +12,6 @@ import { cn } from "@/lib/utils"
 export default function AdminDashboardPage() {
   const db = useFirestore()
 
-  // Use useMemo for all queries to prevent infinite render loops
   const statsQueries = React.useMemo(() => {
     if (!db) return {
       users: null,
@@ -39,123 +38,125 @@ export default function AdminDashboardPage() {
   const { data: allTopups } = useCollection<any>(statsQueries.topups)
 
   return (
-    <div className="space-y-10 max-w-7xl mx-auto pb-10">
-      <div className="space-y-2">
-        <h2 className="text-4xl font-headline font-bold text-white">Executive Overview</h2>
-        <p className="text-muted-foreground text-lg">System-wide metrics and performance data.</p>
+    <div className="space-y-8 max-w-[1200px] mx-auto">
+      <div className="space-y-1">
+        <h2 className="text-3xl font-headline font-bold text-white">Executive Overview</h2>
+        <p className="text-muted-foreground text-sm">Metrik performa sistem Nexvora secara realtime.</p>
       </div>
 
-      <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card className="premium-card rounded-[2rem] bg-black/40">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <Card className="premium-card rounded-2xl bg-black/40">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-xs font-black text-muted-foreground uppercase tracking-widest">Total Users</CardTitle>
-            <Users className="h-5 w-5 text-primary" />
+            <CardTitle className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Total Users</CardTitle>
+            <Users className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-headline font-black text-white">{allUsers?.length || 0}</div>
-            <p className="text-[10px] text-green-500 font-bold mt-2 uppercase">Verified Members</p>
+            <p className="text-[9px] text-green-500 font-bold mt-2 uppercase">Verified Members</p>
           </CardContent>
         </Card>
 
-        <Card className="premium-card rounded-[2rem] bg-black/40">
+        <Card className="premium-card rounded-2xl bg-black/40">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-xs font-black text-muted-foreground uppercase tracking-widest">Active Orders</CardTitle>
-            <Activity className="h-5 w-5 text-primary" />
+            <CardTitle className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Order Aktif</CardTitle>
+            <Activity className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-headline font-black text-white">
-              {allOrders?.filter(o => o.status === 'pending' || o.status === 'processing' || o.status === 'PENDING').length || 0}
+              {allOrders?.filter(o => o.status === 'pending' || o.status === 'PROCESSING' || o.status === 'PENDING').length || 0}
             </div>
-            <p className="text-[10px] text-amber-500 font-bold mt-2 uppercase">Requires Attention</p>
+            <p className="text-[9px] text-amber-500 font-bold mt-2 uppercase">Requires Attention</p>
           </CardContent>
         </Card>
 
-        <Card className="premium-card rounded-[2rem] bg-black/40">
+        <Card className="premium-card rounded-2xl bg-black/40">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-xs font-black text-muted-foreground uppercase tracking-widest">Pending Topups</CardTitle>
-            <CreditCard className="h-5 w-5 text-primary" />
+            <CardTitle className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Topup Pending</CardTitle>
+            <CreditCard className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-headline font-black text-white">
               {allTopups?.filter(t => t.status === 'pending').length || 0}
             </div>
-            <p className="text-[10px] text-primary font-bold mt-2 uppercase">Manual Verification</p>
+            <p className="text-[9px] text-primary font-bold mt-2 uppercase">Verification Needed</p>
           </CardContent>
         </Card>
 
-        <Card className="premium-card rounded-[2rem] bg-black/40">
+        <Card className="premium-card rounded-2xl bg-black/40">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-xs font-black text-muted-foreground uppercase tracking-widest">Growth Rate</CardTitle>
-            <TrendingUp className="h-5 w-5 text-green-500" />
+            <CardTitle className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Growth</CardTitle>
+            <TrendingUp className="h-4 w-4 text-green-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-headline font-black text-white">+12.5%</div>
-            <p className="text-[10px] text-muted-foreground font-bold mt-2 uppercase">Last 30 Days</p>
+            <div className="text-3xl font-headline font-black text-white">+12%</div>
+            <p className="text-[9px] text-muted-foreground font-bold mt-2 uppercase">Last 30 Days</p>
           </CardContent>
         </Card>
       </div>
 
-      <div className="grid lg:grid-cols-3 gap-8">
-        <Card className="premium-card lg:col-span-2 rounded-[2.5rem] border-white/5 bg-black/40 overflow-hidden">
-          <CardHeader className="px-8 pt-8">
-            <CardTitle className="text-xl flex items-center gap-2">
-              <Activity className="h-5 w-5 text-primary" /> Recent System Activity
+      <div className="grid lg:grid-cols-12 gap-8">
+        <Card className="premium-card lg:col-span-8 rounded-3xl border-white/5 bg-black/40 overflow-hidden">
+          <CardHeader className="px-6 py-6 border-b border-white/5 bg-white/[0.01]">
+            <CardTitle className="text-lg flex items-center gap-2 text-white">
+              <Activity className="h-4 w-4 text-primary" /> Traffic Monitor
             </CardTitle>
-            <CardDescription>Live traffic orders and processing status.</CardDescription>
           </CardHeader>
           <CardContent className="p-0">
-            <Table>
-              <TableHeader className="bg-white/5">
-                <TableRow className="border-white/5">
-                  <TableHead className="text-white font-bold">Target</TableHead>
-                  <TableHead className="text-white font-bold">Views</TableHead>
-                  <TableHead className="text-white font-bold">Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {!recentOrders || recentOrders.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={3} className="text-center py-10 text-muted-foreground italic">No recent orders.</TableCell>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader className="bg-white/[0.01]">
+                  <TableRow className="border-white/5">
+                    <TableHead className="text-white text-xs font-bold py-4">Target</TableHead>
+                    <TableHead className="text-white text-xs font-bold">Views</TableHead>
+                    <TableHead className="text-white text-xs font-bold text-right">Status</TableHead>
                   </TableRow>
-                ) : (
-                  recentOrders.map((order) => (
-                    <TableRow key={order.id} className="border-white/5 hover:bg-white/5">
-                      <TableCell className="max-w-[150px] truncate text-xs font-mono">{order.targetLink || order.url}</TableCell>
-                      <TableCell className="text-white font-bold">{(order.views || order.quantity || 0).toLocaleString()}</TableCell>
-                      <TableCell>
-                        <Badge className={cn(
-                          "text-[9px] font-black uppercase",
-                          order.status === 'completed' || order.status === 'SELESAI' ? 'bg-green-500' : 
-                          order.status === 'failed' || order.status === 'GAGAL' ? 'bg-red-500' : 'bg-primary'
-                        )}>
-                          {order.status}
-                        </Badge>
-                      </TableCell>
+                </TableHeader>
+                <TableBody>
+                  {!recentOrders || recentOrders.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={3} className="text-center py-10 text-xs text-muted-foreground italic">No recent activity.</TableCell>
                     </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
+                  ) : (
+                    recentOrders.map((order) => (
+                      <TableRow key={order.id} className="border-white/5 hover:bg-white/[0.02]">
+                        <TableCell className="max-w-[200px] truncate text-[11px] font-mono text-muted-foreground">{order.targetLink || order.url}</TableCell>
+                        <TableCell className="text-white font-bold text-xs">{(order.views || order.quantity || 0).toLocaleString()}</TableCell>
+                        <TableCell className="text-right">
+                          <Badge className={cn(
+                            "text-[8px] font-black uppercase px-2 py-0.5",
+                            order.status === 'completed' || order.status === 'SELESAI' ? 'bg-green-500' : 'bg-primary'
+                          )}>
+                            {order.status}
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
           </CardContent>
         </Card>
 
-        <Card className="premium-card rounded-[2.5rem] border-white/5 bg-black/40">
-          <CardHeader className="px-8 pt-8">
-            <CardTitle className="text-xl flex items-center gap-2">
-              <AlertCircle className="h-5 w-5 text-amber-500" /> Admin Alerts
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="px-8 space-y-4">
-             <div className="p-4 rounded-2xl bg-primary/10 border border-primary/20 space-y-1">
-                <p className="text-xs font-black text-white uppercase">Critical API Alert</p>
-                <p className="text-xs text-muted-foreground">Check API settings if orders are failing.</p>
-             </div>
-             <div className="p-4 rounded-2xl bg-white/5 border border-white/10 space-y-1">
-                <p className="text-xs font-black text-white uppercase">New Topup Request</p>
-                <p className="text-xs text-muted-foreground">Sistem siap memproses pembayaran manual.</p>
-             </div>
-          </CardContent>
-        </Card>
+        <div className="lg:col-span-4 space-y-6">
+          <Card className="premium-card rounded-2xl border-white/5 bg-black/40">
+            <CardHeader className="px-6 py-6">
+              <CardTitle className="text-base flex items-center gap-2 text-white">
+                <AlertCircle className="h-4 w-4 text-amber-500" /> Admin Alerts
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="px-6 pb-6 space-y-4">
+               <div className="p-4 rounded-xl bg-primary/5 border border-primary/10 space-y-1">
+                  <p className="text-[10px] font-black text-white uppercase tracking-wider">SMM API Alert</p>
+                  <p className="text-[11px] text-muted-foreground">Monitor order failure rate for SMM.ID.</p>
+               </div>
+               <div className="p-4 rounded-xl bg-white/[0.03] border border-white/5 space-y-1">
+                  <p className="text-[10px] font-black text-white uppercase tracking-wider">System Audit</p>
+                  <p className="text-[11px] text-muted-foreground">Database maintenance scheduled in 48h.</p>
+               </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   )

@@ -27,18 +27,15 @@ export default function TrafficServicePage() {
 
   const coinCost = Math.ceil(views / 1000)
 
-  // API Settings for provider
   const apiSettingsRef = React.useMemo(() => (db ? doc(db, "system_settings", "provider_config") : null), [db])
   const { data: apiSettings, loading: settingsLoading } = useDoc(apiSettingsRef)
 
-  // User Profile
   const profileRef = React.useMemo(() => {
     if (!db || !user?.uid) return null
     return doc(db, "users", user.uid)
   }, [db, user?.uid])
   const { data: profile } = useDoc(profileRef)
 
-  // Simple query to avoid composite index requirement
   const historyQuery = React.useMemo(() => {
     if (!db || !user?.uid) return null
     return query(
@@ -49,7 +46,6 @@ export default function TrafficServicePage() {
 
   const { data: allHistory, loading: historyLoading, error: historyError } = useCollection<any>(historyQuery)
 
-  // Filter 3 days & Sort DESC in memory to fix Index Error
   const history = React.useMemo(() => {
     if (!allHistory) return []
     const threeDaysAgo = new Date()
@@ -67,7 +63,6 @@ export default function TrafficServicePage() {
       })
   }, [allHistory])
 
-  // Auto-Complete Logic: Change PENDING to SELESAI after 50 seconds
   useEffect(() => {
     if (!db || !history || history.length === 0) return;
 
@@ -78,15 +73,14 @@ export default function TrafficServicePage() {
       for (const order of pendingOrders) {
         if (!order.createdAt) continue;
         
-        const createdAt = order.createdAt?.toDate?.()?.getTime() || 0;
-        const diffInSeconds = (now - createdAt) / 1000;
+        const createdAt = order.createdAt?.toDate?.() || 0;
+        const diffInSeconds = (now - (typeof createdAt === 'object' ? createdAt.toDate().getTime() : createdAt)) / 1000;
 
         if (diffInSeconds >= 50) {
           updateDoc(doc(db, "traffic_orders", order.id), {
             status: "SELESAI",
             updatedAt: serverTimestamp()
           });
-          console.log(`Order ${order.id} auto-completed.`);
         }
       }
     }, 5000);
@@ -98,302 +92,180 @@ export default function TrafficServicePage() {
     try {
       const parsed = new URL(input.startsWith('http') ? input : `https://${input}`);
       const hostname = parsed.hostname.toLowerCase();
-
       if (platform === "shopee") {
-        const allowedShopeeDomains = ['shopee.co.id', 'shp.ee', 'id.shp.ee', 's.shopee.co.id', 'vn.shp.ee', 'my.shp.ee', 'th.shp.ee', 'ph.shp.ee'];
-        return allowedShopeeDomains.some(domain => hostname === domain || hostname.endsWith('.' + domain));
+        const domains = ['shopee.co.id', 'shp.ee', 'id.shp.ee', 's.shopee.co.id', 'vn.shp.ee', 'my.shp.ee'];
+        return domains.some(domain => hostname === domain || hostname.endsWith('.' + domain));
       }
-      return platform === "tiktok" ? hostname.includes('tiktok.com') : false;
+      return hostname.includes('tiktok.com');
     } catch (e) { return false; }
   };
 
   const handleOrder = async (platform: "shopee" | "tiktok") => {
     if (!db || !user?.uid || !profile) return
-    
-    if (!apiSettings?.apiUrl || !apiSettings?.apiKey || !apiSettings?.serviceId) {
-      toast({ variant: "destructive", title: "Layanan Tidak Tersedia", description: "Admin belum mengonfigurasi API Provider." })
-      return
-    }
-
-    if (apiSettings.active === false) {
-      toast({ variant: "destructive", title: "Layanan Maintenance", description: "Layanan booster sedang dalam pemeliharaan rutin." })
-      return
-    }
-
-    if (profile.coins < coinCost) {
-      toast({ variant: "destructive", title: "Saldo Koin Kurang", description: `Dibutuhkan ${coinCost} koin, saldo Anda ${profile.coins} koin.` })
-      return
-    }
-
     if (!url || !validateUrl(url, platform)) {
-      toast({ variant: "destructive", title: "Link Tidak Valid", description: "Pastikan URL yang Anda masukkan benar." })
-      return
+      toast({ variant: "destructive", title: "Link Tidak Valid", description: "Masukkan link Shopee/TikTok yang benar." });
+      return;
+    }
+    if (profile.coins < coinCost) {
+      toast({ variant: "destructive", title: "Koin Kurang", description: `Butuh ${coinCost} koin.` });
+      return;
     }
 
-    setIsOrdering(true)
-    setOrderFeedback("processing")
+    setIsOrdering(true);
+    setOrderFeedback("processing");
 
     try {
       const apiResult = await processTrafficOrder({
-        apiUrl: apiSettings.apiUrl,
-        apiKey: apiSettings.apiKey,
-        serviceId: apiSettings.serviceId,
+        apiUrl: apiSettings?.apiUrl || "",
+        apiKey: apiSettings?.apiKey || "",
+        serviceId: apiSettings?.serviceId || "",
         link: url,
         quantity: views
-      })
+      });
 
-      setDoc(doc(collection(db, "api_logs")), {
-        timestamp: serverTimestamp(),
+      if (!apiResult.success) throw new Error(apiResult.error);
+
+      await setDoc(doc(collection(db, "traffic_orders")), {
         userId: user.uid,
-        userEmail: user.email,
-        link: url,
-        quantity: views,
-        provider: apiSettings.provider || 'SMM.ID',
-        requestPayload: { action: 'add', service: apiSettings.serviceId, link: url, quantity: views },
-        responseBody: apiResult.rawResponse || apiResult.debugInfo || null,
-        errorMessage: apiResult.success ? null : apiResult.error,
-        status: apiResult.success ? 'success' : 'failed'
-      })
-
-      if (!apiResult.success) {
-        throw new Error(apiResult.error || "Provider menolak pesanan.");
-      }
-
-      const orderRef = doc(collection(db, "traffic_orders"))
-      setDoc(orderRef, {
-        userId: user.uid,
-        username: profile.username || "Unknown",
-        userEmail: user.email,
         platform,
         targetLink: url,
         quantity: views,
         coinCost,
         status: "PENDING",
-        providerOrderId: apiResult.orderId,
-        providerServiceId: apiSettings.serviceId,
         createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
-      })
+      });
 
-      updateDoc(profileRef!, { coins: increment(-coinCost) })
-
-      setDoc(doc(collection(db, "coin_transactions")), {
-        userId: user.uid,
-        amount: -coinCost,
-        type: "traffic_order",
-        description: `Booster ${platform}: ${views} Views (ID: ${apiResult.orderId})`,
-        createdAt: serverTimestamp()
-      })
-
-      setOrderFeedback("success")
-      toast({ title: "Pesanan Diterima! 🚀", description: "Trafik Anda sedang disiapkan." })
-      setUrl("")
+      await updateDoc(profileRef!, { coins: increment(-coinCost) });
       
-      setTimeout(() => setOrderFeedback("idle"), 3000)
+      toast({ title: "Sukses!", description: "Pesanan trafik sedang diproses." });
+      setUrl("");
+      setOrderFeedback("success");
+      setTimeout(() => setOrderFeedback("idle"), 3000);
     } catch (err: any) {
-      setOrderFeedback("error")
-      toast({ variant: "destructive", title: "Gagal Proses", description: err.message || "Koneksi ke server gagal." })
-      setTimeout(() => setOrderFeedback("idle"), 3000)
+      setOrderFeedback("error");
+      toast({ variant: "destructive", title: "Gagal", description: err.message });
+      setTimeout(() => setOrderFeedback("idle"), 3000);
     } finally {
-      setIsOrdering(false)
+      setIsOrdering(false);
     }
-  }
-
-  const getButtonText = () => {
-    switch (orderFeedback) {
-      case "processing": return "Menyebar Trafik...";
-      case "success": return "Trafik Berhasil Disebar";
-      case "error": return "Gagal Menyebar Trafik";
-      default: return "Booster Sekarang 🚀";
-    }
-  }
+  };
 
   return (
-    <div className="space-y-8 max-w-5xl mx-auto pb-20">
-      <div className="space-y-2">
-        <h2 className="text-3xl font-headline font-bold">Booster Trafik Otomatis 🚀</h2>
-        <p className="text-muted-foreground italic">Menaikkan engagement konten secara instan dengan sistem cerdas Nexvora.</p>
+    <div className="space-y-8 max-w-[1200px] mx-auto pb-10">
+      <div className="space-y-1">
+        <h2 className="text-2xl font-headline font-bold text-white">Booster Trafik 🚀</h2>
+        <p className="text-muted-foreground text-sm">Meningkatkan engagement konten secara otomatis.</p>
       </div>
 
-      <Tabs defaultValue="shopee" className="w-full">
-        <TabsList className="bg-white/5 border border-white/10 p-1 mb-8 w-full max-w-md grid grid-cols-2 h-14 rounded-2xl">
-          <TabsTrigger value="shopee" className="rounded-xl flex items-center gap-2 data-[state=active]:bg-primary">
-            <ShoppingBag className="h-4 w-4" /> Shopee Video
-          </TabsTrigger>
-          <TabsTrigger value="tiktok" className="rounded-xl flex items-center gap-2 data-[state=active]:bg-primary">
-            <Music className="h-4 w-4" /> TikTok View
-          </TabsTrigger>
-        </TabsList>
+      <div className="grid lg:grid-cols-12 gap-8">
+        <div className="lg:col-span-8">
+          <Card className="premium-card rounded-2xl border-white/5 bg-black/40 shadow-2xl">
+            <CardHeader className="pb-4">
+              <CardTitle className="text-lg">Order Baru</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              <div className="space-y-2">
+                <Label className="text-xs font-bold text-white/70">Target Video Link</Label>
+                <Input 
+                  placeholder="https://..." 
+                  value={url}
+                  onChange={(e) => setUrl(e.target.value)}
+                  className="bg-white/5 border-white/10 h-11 rounded-xl text-sm"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                 <div className="space-y-2">
+                    <Label className="text-xs font-bold text-white/70">Jumlah Views</Label>
+                    <Input 
+                      type="number" 
+                      value={views}
+                      step="1000"
+                      onChange={(e) => setViews(parseInt(e.target.value) || 0)}
+                      className="bg-white/5 border-white/10 h-11 rounded-xl text-sm"
+                    />
+                 </div>
+                 <div className="bg-primary/10 border border-primary/20 rounded-xl flex flex-col items-center justify-center">
+                    <span className="text-[10px] font-black uppercase text-primary/70">Biaya</span>
+                    <span className="text-lg font-headline font-black text-primary">{coinCost} Koin 🪙</span>
+                 </div>
+              </div>
+              <Button 
+                onClick={() => handleOrder("shopee")}
+                disabled={isOrdering || !url}
+                className="w-full h-12 rounded-xl luxury-gradient font-bold text-sm shadow-xl"
+              >
+                {isOrdering ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                {orderFeedback === 'success' ? "Trafik Dikirim!" : isOrdering ? "Memproses..." : "Mulai Booster Sekarang"}
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
 
-        <TabsContent value="shopee" className="space-y-8">
-          <div className="grid md:grid-cols-5 gap-8">
-            <Card className="premium-card col-span-3 rounded-3xl border-white/5 bg-black/40 shadow-2xl">
-              <CardHeader>
-                <CardTitle className="text-white">Form Pemesanan Shopee</CardTitle>
-                <CardDescription>Target: Link Video atau Shortlink (id.shp.ee).</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="space-y-2">
-                  <Label htmlFor="url" className="text-white font-bold">Link Video Shopee</Label>
-                  <Input 
-                    id="url" 
-                    placeholder="https://id.shp.ee/xxxxxx" 
-                    value={url}
-                    onChange={(e) => setUrl(e.target.value)}
-                    className="bg-white/5 border-white/10 rounded-xl h-12 text-white focus:border-primary/50"
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="views" className="text-white font-bold">Jumlah Tayangan (Min 1,000)</Label>
-                  <Input 
-                    id="views" 
-                    type="number" 
-                    step="1000"
-                    min="1000"
-                    value={views}
-                    onChange={(e) => setViews(parseInt(e.target.value) || 0)}
-                    className="bg-white/5 border-white/10 rounded-xl h-12 text-white"
-                  />
-                  <p className="text-[10px] text-primary font-bold uppercase tracking-wider">Tarif: 1.000 Views = 1 Koin 🪙</p>
-                </div>
-
-                <div className="p-5 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-between">
-                    <span className="text-sm font-bold text-white">Estimasi Biaya:</span>
-                    <span className="text-2xl font-headline font-bold text-primary">{coinCost} Koin</span>
-                </div>
-
-                <Button 
-                  onClick={() => handleOrder("shopee")}
-                  disabled={isOrdering || !url || views < 1000 || settingsLoading}
-                  className={cn(
-                    "w-full h-14 rounded-xl border-none text-lg font-bold shadow-xl transition-all hover:scale-[1.02] active:scale-[0.98]",
-                    orderFeedback === 'success' ? 'bg-green-600' : 
-                    orderFeedback === 'error' ? 'bg-red-600' : 'luxury-gradient shadow-primary/20'
-                  )}
-                >
-                  {isOrdering ? (
-                    <div className="flex items-center gap-2">
-                      <Loader2 className="h-5 w-5 animate-spin" /> Menyebar Trafik...
-                    </div>
-                  ) : getButtonText()}
-                </Button>
-              </CardContent>
-            </Card>
-
-            <Card className="premium-card col-span-2 rounded-3xl border-white/5 bg-black/40 h-fit">
-              <CardHeader>
-                <CardTitle className="text-sm font-bold flex items-center gap-2 text-primary">
-                  <Info className="h-4 w-4" /> Panduan Pemesanan
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="text-sm space-y-4 text-muted-foreground">
-                <div className="flex gap-3">
-                  <Badge className="h-5 w-5 rounded-full p-0 flex items-center justify-center shrink-0">1</Badge>
-                  <p>Pastikan akun Shopee/TikTok Anda <strong>tidak diprivat</strong>.</p>
-                </div>
-                <div className="flex gap-3">
-                  <Badge className="h-5 w-5 rounded-full p-0 flex items-center justify-center shrink-0">2</Badge>
-                  <p>Pesanan akan diproses otomatis oleh sistem Nexvora.</p>
-                </div>
-                <div className="flex gap-3">
-                  <Badge className="h-5 w-5 rounded-full p-0 flex items-center justify-center shrink-0">3</Badge>
-                  <p>Riwayat order akan di-reset otomatis setiap 3 hari.</p>
-                </div>
-                <div className="p-4 rounded-xl bg-white/5 border border-white/5 mt-4">
-                  <p className="text-[10px] text-white font-bold uppercase mb-1">Status Legends:</p>
-                  <div className="grid grid-cols-2 gap-2 text-[9px] font-black">
-                    <span className="text-amber-500">PENDING = Antrean</span>
-                    <span className="text-green-500">SELESAI = Sukses</span>
-                    <span className="text-red-500">GAGAL = Batal</span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="tiktok">
-          <div className="p-20 text-center premium-card rounded-[2.5rem] border-dashed border-primary/20 bg-black/40 opacity-60">
-            <Music className="h-16 w-16 text-primary mx-auto mb-6" />
-            <h3 className="text-2xl font-headline font-bold text-white mb-2">Coming Soon</h3>
-            <p className="text-muted-foreground max-w-sm mx-auto">Layanan TikTok View sedang dalam tahap integrasi kestabilan server.</p>
-          </div>
-        </TabsContent>
-      </Tabs>
-
-      <div className="space-y-6">
-        <h3 className="text-2xl font-headline font-bold flex items-center gap-2">
-          <Clock className="h-6 w-6 text-primary" /> Riwayat Booster Saya
-        </h3>
-
-        {historyError && historyError.message.includes('index') && (
-          <div className="p-6 rounded-3xl bg-amber-500/10 border border-amber-500/20 flex flex-col items-center text-center gap-4">
-            <AlertTriangle className="h-12 w-12 text-amber-500" />
-            <div className="space-y-1">
-               <p className="text-lg font-bold text-white">Indeks Database Diperlukan</p>
-               <p className="text-sm text-muted-foreground">Database sedang menyiapkan index, silakan coba beberapa menit lagi.</p>
+        <Card className="premium-card rounded-2xl border-white/5 bg-black/40 lg:col-span-4 h-fit">
+          <CardHeader className="py-4 border-b border-white/5">
+            <CardTitle className="text-sm font-bold flex items-center gap-2">
+              <Info className="h-4 w-4 text-primary" /> Panduan
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-5 text-xs space-y-3 text-muted-foreground leading-relaxed">
+            <p>• Akun tidak boleh dalam mode <strong>Privat</strong>.</p>
+            <p>• Tarif: <strong>1.000 Views = 1 Koin</strong>.</p>
+            <p>• Status berubah otomatis dalam 50 detik.</p>
+            <div className="pt-2">
+              <Badge className="bg-amber-500/10 text-amber-500 border-none text-[9px] uppercase font-black px-2 py-0.5">Note</Badge>
+              <p className="mt-1">Riwayat di-reset otomatis setiap 3 hari.</p>
             </div>
-          </div>
-        )}
+          </CardContent>
+        </Card>
+      </div>
 
-        <Card className="premium-card rounded-3xl border-white/5 overflow-hidden bg-black/40 shadow-2xl">
-          <Table>
-            <TableHeader className="bg-white/5">
-              <TableRow className="border-white/5 h-14">
-                <TableHead className="text-white font-bold">Link Video</TableHead>
-                <TableHead className="text-white font-bold">View</TableHead>
-                <TableHead className="text-white font-bold">Koin</TableHead>
-                <TableHead className="text-white font-bold">Order ID</TableHead>
-                <TableHead className="text-white font-bold">Status</TableHead>
-                <TableHead className="text-white font-bold">Waktu</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {historyLoading ? (
-                <TableRow><TableCell colSpan={6} className="text-center py-20"><Loader2 className="animate-spin mx-auto h-8 w-8 text-primary" /></TableCell></TableRow>
-              ) : history.length === 0 ? (
-                <TableRow><TableCell colSpan={6} className="text-center py-20 text-muted-foreground italic">Belum ada riwayat pesanan (Riwayat di-reset setiap 3 hari).</TableCell></TableRow>
-              ) : (
-                history.map((row: any) => (
-                  <TableRow key={row.id} className="border-white/5 hover:bg-white/5 transition-colors h-16">
-                    <TableCell className="max-w-[200px]">
-                      <a href={row.targetLink || row.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary truncate">
-                        <ExternalLink className="h-3 w-3 shrink-0" /> {row.targetLink || row.url}
-                      </a>
-                    </TableCell>
-                    <TableCell>
-                      <span className="font-bold text-white text-sm">{(row.quantity || 0).toLocaleString()}</span>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="secondary" className="bg-primary/10 text-primary border-none font-bold">
-                        {row.coinCost} 🪙
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <span className="font-mono text-[10px] text-muted-foreground bg-white/5 px-2 py-1 rounded">
-                        {row.providerOrderId || row.id.slice(0,8)}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <Badge className={cn(
-                          "font-black text-[9px] px-3 py-1 uppercase rounded-lg transition-colors duration-500",
-                          row.status === "SELESAI" ? "bg-green-500" : 
-                          row.status === "GAGAL" ? "bg-red-500" : 
-                          "bg-amber-500 animate-pulse"
-                      )}>{row.status || "PENDING"}</Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex flex-col text-[10px] text-muted-foreground">
-                        <span className="font-bold text-white">{row.createdAt?.toDate?.().toLocaleDateString() || '-'}</span>
-                        <span>{row.createdAt?.toDate?.().toLocaleTimeString() || '-'}</span>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
+      <div className="space-y-4">
+        <h3 className="text-lg font-headline font-bold flex items-center gap-2">
+          <Clock className="h-5 w-5 text-primary" /> Riwayat 3 Hari Terakhir
+        </h3>
+        
+        <Card className="premium-card rounded-2xl border-white/5 overflow-hidden bg-black/40">
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader className="bg-white/[0.02]">
+                <TableRow className="border-white/5">
+                  <TableHead className="text-white text-xs font-bold py-4">Target Link</TableHead>
+                  <TableHead className="text-white text-xs font-bold">Views</TableHead>
+                  <TableHead className="text-white text-xs font-bold">Biaya</TableHead>
+                  <TableHead className="text-white text-xs font-bold">Status</TableHead>
+                  <TableHead className="text-white text-xs font-bold text-right">Waktu</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {historyLoading ? (
+                  <TableRow><TableCell colSpan={5} className="text-center py-10 text-xs text-muted-foreground">Memuat data...</TableCell></TableRow>
+                ) : history.length === 0 ? (
+                  <TableRow><TableCell colSpan={5} className="text-center py-12 text-xs text-muted-foreground italic">Tidak ada riwayat dalam 3 hari terakhir.</TableCell></TableRow>
+                ) : (
+                  history.map((row: any) => (
+                    <TableRow key={row.id} className="border-white/5 hover:bg-white/[0.02] transition-colors">
+                      <TableCell className="max-w-[150px] truncate text-xs text-muted-foreground font-mono">
+                        <a href={row.targetLink} target="_blank" className="hover:text-primary transition-colors flex items-center gap-1.5">
+                          <ExternalLink className="h-3 w-3 shrink-0" /> {row.targetLink}
+                        </a>
+                      </TableCell>
+                      <TableCell className="font-bold text-xs">{(row.quantity || 0).toLocaleString()}</TableCell>
+                      <TableCell className="text-primary font-bold text-xs">{row.coinCost} 🪙</TableCell>
+                      <TableCell>
+                        <Badge className={cn(
+                            "font-black text-[9px] px-2 py-0.5 uppercase",
+                            row.status === "SELESAI" ? "bg-green-500" : "bg-amber-500 animate-pulse"
+                        )}>{row.status || "PENDING"}</Badge>
+                      </TableCell>
+                      <TableCell className="text-right text-[10px] text-muted-foreground">
+                        {row.createdAt?.toDate?.().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
         </Card>
       </div>
     </div>
