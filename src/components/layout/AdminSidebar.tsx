@@ -1,4 +1,3 @@
-
 "use client"
 
 import React from "react"
@@ -12,10 +11,11 @@ import {
   ShoppingBag, 
   CreditCard,
   LogOut,
-  ChevronRight,
   ShieldCheck,
-  Sparkles,
-  Database
+  BookOpen,
+  Activity,
+  UserCog,
+  ChevronRight
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import {
@@ -30,23 +30,34 @@ import {
   SidebarGroupLabel,
   SidebarSeparator
 } from "@/components/ui/sidebar"
-import { useAuth } from "@/firebase"
+import { useAuth, useUser, useDoc, useFirestore } from "@/firebase"
 import { signOut } from "firebase/auth"
 import { useToast } from "@/hooks/use-toast"
+import { doc } from "firebase/firestore"
 
 const adminItems = [
-  { label: "Admin Console", icon: LayoutDashboard, href: "/admin" },
+  { label: "Overview", icon: LayoutDashboard, href: "/admin" },
   { label: "Manage Users", icon: Users, href: "/admin/users" },
-  { label: "Traffic Control", icon: TrendingUp, href: "/admin/traffic" },
-  { label: "Market Catalog", icon: ShoppingBag, href: "/admin/marketplace" },
-  { label: "Financial Log", icon: CreditCard, href: "/admin/financials" },
+  { label: "Traffic Orders", icon: TrendingUp, href: "/admin/traffic" },
+  { label: "Marketplace", icon: ShoppingBag, href: "/admin/marketplace" },
+  { label: "Learning Materials", icon: BookOpen, href: "/admin/materials" },
+  { label: "System Activity", icon: Activity, href: "/admin/activity" },
 ]
 
 export function AdminSidebar() {
   const pathname = usePathname()
   const router = useRouter()
   const auth = useAuth()
+  const { user } = useUser()
+  const db = useFirestore()
   const { toast } = useToast()
+
+  const adminProfileRef = React.useMemo(() => {
+    if (!db || !user?.uid) return null;
+    return doc(db, 'admins', user.uid);
+  }, [db, user?.uid]);
+
+  const { data: adminData } = useDoc(adminProfileRef);
 
   const handleAdminLogout = async () => {
     if (!auth) return
@@ -71,14 +82,14 @@ export function AdminSidebar() {
           </div>
           <div className="flex flex-col">
             <span className="text-lg font-headline font-bold text-white tracking-tight uppercase">Nexvora</span>
-            <span className="text-[10px] font-black text-primary uppercase tracking-[0.3em]">Administrator</span>
+            <span className="text-[10px] font-black text-primary uppercase tracking-[0.3em]">{adminData?.role || 'Admin'}</span>
           </div>
         </Link>
       </SidebarHeader>
       
       <SidebarContent className="px-3">
         <SidebarGroup>
-          <SidebarGroupLabel className="text-primary/50 px-3 uppercase text-[9px] tracking-[0.2em] font-black">Core Management</SidebarGroupLabel>
+          <SidebarGroupLabel className="text-primary/50 px-3 uppercase text-[9px] tracking-[0.2em] font-black">Management</SidebarGroupLabel>
           <SidebarMenu>
             {adminItems.map((item) => (
               <SidebarMenuItem key={item.label}>
@@ -100,22 +111,38 @@ export function AdminSidebar() {
           </SidebarMenu>
         </SidebarGroup>
         
+        {adminData?.role === 'super_admin' && (
+          <SidebarGroup>
+            <SidebarGroupLabel className="text-primary/50 px-3 uppercase text-[9px] tracking-[0.2em] font-black">System Controls</SidebarGroupLabel>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton 
+                  asChild 
+                  isActive={pathname === "/admin/admins"}
+                  className={cn("h-12 rounded-xl", pathname === "/admin/admins" && "bg-primary/15 text-primary border border-primary/20")}
+                >
+                  <Link href="/admin/admins">
+                    <UserCog className="h-4 w-4" />
+                    <span className="font-bold">Team Management</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild isActive={pathname === "/admin/settings"}>
+                  <Link href="/admin/settings">
+                    <Settings className="h-4 w-4" />
+                    <span className="font-bold">Global Settings</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroup>
+        )}
+        
         <SidebarSeparator className="my-6 bg-primary/10" />
         
         <SidebarGroup>
-          <SidebarGroupLabel className="text-primary/50 px-3 uppercase text-[9px] tracking-[0.2em] font-black">System Configuration</SidebarGroupLabel>
           <SidebarMenu>
-            <SidebarMenuItem>
-              <SidebarMenuButton 
-                asChild
-                className="h-12 rounded-xl hover:bg-primary/10 hover:text-primary transition-all"
-              >
-                <Link href="/dashboard/admin/settings">
-                  <Settings className="h-4 w-4" />
-                  <span className="font-bold">Global API Settings</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
             <SidebarMenuItem>
               <SidebarMenuButton 
                 onClick={handleAdminLogout}
@@ -131,13 +158,8 @@ export function AdminSidebar() {
 
       <SidebarFooter className="p-6">
         <div className="rounded-2xl bg-white/5 p-4 border border-white/5">
-          <div className="flex items-center gap-2 text-xs font-black text-primary uppercase mb-2">
-            <Database className="h-3 w-3" /> System Health
-          </div>
-          <div className="w-full bg-white/5 h-1.5 rounded-full overflow-hidden">
-             <div className="bg-primary h-full w-[85%]" />
-          </div>
-          <p className="text-[10px] text-muted-foreground mt-2 font-medium">Infrastructure Optimal</p>
+          <p className="text-[10px] text-muted-foreground uppercase font-black mb-1">Authenticated as</p>
+          <p className="text-xs font-bold text-white truncate">{user?.email}</p>
         </div>
       </SidebarFooter>
     </Sidebar>
