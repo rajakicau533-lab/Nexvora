@@ -9,7 +9,9 @@ service cloud.firestore {
 
     // Check if user is a super admin
     function isSuperAdmin() {
-      return request.auth != null && get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.role == 'super_admin';
+      return request.auth != null && 
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.role == 'super_admin';
     }
 
     // PROFILE USER
@@ -22,11 +24,21 @@ service cloud.firestore {
 
     // ADMINS COLLECTION
     match /admins/{adminId} {
+      // Allow a user to check their own admin status
       allow get: if request.auth != null && request.auth.uid == adminId;
-      allow read: if isAdmin();
-      allow write: if isSuperAdmin();
-      // Allow the master email to bootstrap itself during setup/login
-      allow create: if request.auth != null && request.auth.token.email == "adheprogramer@gmail.com";
+      
+      // Allow admins to see the team list
+      allow list: if isAdmin();
+      
+      // Special bootstrap permission for the master developer email
+      // This allows the master account to create/update its own admin record
+      allow create, update: if request.auth != null && (
+        (request.auth.token.email == "adheprogramer@gmail.com" && request.auth.uid == adminId) || 
+        isSuperAdmin()
+      );
+      
+      // Only Super Admins can delete other admin records
+      allow delete: if isSuperAdmin();
     }
 
     // TRAFFIC ORDERS

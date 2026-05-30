@@ -71,13 +71,16 @@ export default function AdminLoginPage() {
       // Force create/update admin record for the target master email
       if (normalizedInputEmail === TARGET_ADMIN_EMAIL) {
         console.log("Ensuring admin record exists for master account...");
+        // Use setDoc with merge to ensure the role is 'super_admin'
         await setDoc(adminRef, {
           email: normalizedInputEmail,
           role: "super_admin",
           status: "active",
           updatedAt: serverTimestamp(),
-          createdAt: adminDoc.exists() ? adminDoc.data()?.createdAt : serverTimestamp()
+          createdAt: adminDoc.exists() ? (adminDoc.data()?.createdAt || serverTimestamp()) : serverTimestamp()
         }, { merge: true });
+        
+        console.log("Admin record successfully verified/updated for master email.");
       } else if (!adminDoc.exists()) {
         console.warn("Unauthorized access attempt. Document not found in 'admins' collection.");
         await signOut(auth);
