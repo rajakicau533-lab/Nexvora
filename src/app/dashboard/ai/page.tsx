@@ -1,7 +1,7 @@
 
 "use client"
 
-import React, { useState } from "react"
+import React, { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Label } from "@/components/ui/label"
@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Image as ImageIcon, Video, FileText, Wand2, RefreshCcw, Download, Sparkles, AlertCircle, Copy, FileUp } from "lucide-react"
+import { Image as ImageIcon, Video, FileText, Wand2, RefreshCcw, Download, Sparkles, AlertCircle, Copy, FileUp, ShieldCheck, Activity } from "lucide-react"
 import { generateImageFromText } from "@/ai/flows/generate-image-from-text-flow"
 import { transformImageWithAI } from "@/ai/flows/transform-image-with-ai-flow"
 import { generatePromptFromImage } from "@/ai/flows/generate-prompt-from-image-flow"
@@ -18,6 +18,10 @@ import { useToast } from "@/hooks/use-toast"
 import { useUser, useFirestore, useDoc } from "@/firebase"
 import { doc, updateDoc, increment, collection, setDoc, serverTimestamp } from "firebase/firestore"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Badge } from "@/components/ui/badge"
+import { cn } from "@/lib/utils"
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError, type SecurityRuleContext } from '@/firebase/errors';
 
 const AI_COST = 1;
 
@@ -35,6 +39,7 @@ export default function CreatorAIPage() {
   const [resultImages, setResultImages] = useState<{ url: string }[]>([])
   const [resultVideo, setResultVideo] = useState<string | null>(null)
   const [resultPrompt, setResultPrompt] = useState<string | null>(null)
+  const [systemStatus, setSystemStatus] = useState<"Online" | "Busy" | "Quota Habis">("Online")
 
   const profileRef = React.useMemo(() => {
     if (!db || !user?.uid) return null
@@ -55,8 +60,30 @@ export default function CreatorAIPage() {
     }
   }
 
+  const logAiError = (error: any) => {
+    if (!db || !user) return;
+    const isQuotaError = error.message?.includes('429') || error.message?.includes('quota') || error.message?.includes('limit');
+    
+    setDoc(doc(collection(db, "ai_error_logs")), {
+      userId: user.uid,
+      userEmail: user.email,
+      tab: activeTab,
+      errorMessage: error.message || "Unknown AI error",
+      timestamp: serverTimestamp(),
+      isQuotaExceeded: isQuotaError
+    }).catch(async (serverError) => {
+        const permissionError = new FirestorePermissionError({
+          path: 'ai_error_logs',
+          operation: 'create',
+          requestResourceData: { userId: user.uid, tab: activeTab },
+        } satisfies SecurityRuleContext);
+        errorEmitter.emit('permission-error', permissionError);
+    });
+  }
+
   const handleGenerate = async () => {
     if (!db || !user?.uid || !profile) return
+    
     if (profile.coins < AI_COST) {
       toast({
         variant: "destructive",
@@ -95,20 +122,46 @@ export default function CreatorAIPage() {
         setResultVideo(result.videoDataUri)
       }
 
-      // Deduct coins ONLY after success
-      await updateDoc(profileRef!, { coins: increment(-AI_COST) })
-      await setDoc(doc(collection(db, "coin_transactions")), {
+      // 1. Deduct coins ONLY after guaranteed success
+      const costAmount = -AI_COST;
+      updateDoc(profileRef!, { 
+        coins: increment(costAmount) 
+      }).catch(async () => {
+         // Silently handle coin deduction error or emit if critical
+      });
+
+      // 2. Log transaction
+      const txRef = doc(collection(db, "coin_transactions"));
+      setDoc(txRef, {
         userId: user.uid,
-        amount: -AI_COST,
+        amount: costAmount,
         type: "purchase",
         description: `AI Creation: ${activeTab}`,
         createdAt: serverTimestamp()
-      })
+      }).catch(async () => {});
 
       toast({ title: "Proses Berhasil! 🎉", description: `1 Koin telah digunakan.` })
+      setSystemStatus("Online")
     } catch (err: any) {
-      console.error(err)
-      toast({ variant: "destructive", title: "Gagal Menghasilkan", description: err.message })
+      console.error("AI Error:", err)
+      logAiError(err);
+      
+      const isQuotaError = err.message?.includes('429') || err.message?.includes('quota') || err.message?.includes('limit');
+      
+      if (isQuotaError) {
+        setSystemStatus("Quota Habis")
+        toast({ 
+          variant: "destructive", 
+          title: "Sistem AI Sibuk", 
+          description: "Server AI sedang sibuk atau kuota harian telah habis. Silakan coba lagi beberapa saat atau hubungi admin." 
+        })
+      } else {
+        toast({ 
+          variant: "destructive", 
+          title: "Gagal Menghasilkan", 
+          description: "Terjadi gangguan pada mesin AI. Koin Anda tidak terpotong." 
+        })
+      }
     } finally {
       setIsGenerating(false)
     }
@@ -123,13 +176,21 @@ export default function CreatorAIPage() {
     <div className="space-y-8 max-w-6xl mx-auto pb-20">
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div className="space-y-2">
-          <h2 className="text-3xl font-headline font-bold flex items-center gap-2">
-            Nexvora AI Studio <Sparkles className="text-primary h-6 w-6" />
-          </h2>
+          <div className="flex items-center gap-3">
+            <h2 className="text-3xl font-headline font-bold flex items-center gap-2">
+              Nexvora AI Studio <Sparkles className="text-primary h-6 w-6" />
+            </h2>
+            <Badge className={cn(
+              "px-3 py-1 text-[10px] font-black uppercase tracking-widest",
+              systemStatus === 'Online' ? 'bg-green-500/20 text-green-500 border-green-500/30' : 'bg-red-500/20 text-red-500 border-red-500/30'
+            )}>
+              <Activity className="h-3 w-3 mr-1.5" /> System: {systemStatus}
+            </Badge>
+          </div>
           <p className="text-muted-foreground font-medium">Kualitas Studio 4K dengan Biaya Terjangkau.</p>
         </div>
         <div className="bg-primary/10 border border-primary/20 px-6 py-3 rounded-2xl flex items-center gap-3 backdrop-blur-xl">
-          <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary">🪙</div>
+          <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold">🪙</div>
           <div className="text-left">
             <p className="text-[10px] text-muted-foreground uppercase font-black">Sisa Saldo</p>
             <p className="text-lg font-headline font-bold text-white">{profile?.coins || 0} Koin</p>
@@ -269,14 +330,16 @@ export default function CreatorAIPage() {
                   </div>
                   <Button 
                     onClick={handleGenerate}
-                    disabled={isGenerating}
-                    className="w-full h-14 rounded-2xl luxury-gradient border-none font-bold text-lg shadow-xl shadow-primary/30 group active:scale-95 transition-all"
+                    disabled={isGenerating || systemStatus === 'Quota Habis'}
+                    className="w-full h-14 rounded-2xl luxury-gradient border-none font-bold text-lg shadow-xl shadow-primary/30 group active:scale-95 transition-all disabled:opacity-50 disabled:grayscale"
                   >
                     {isGenerating ? (
                       <div className="flex items-center gap-3">
                         <div className="w-5 h-5 border-3 border-white/30 border-t-white rounded-full animate-spin" />
                         Generating...
                       </div>
+                    ) : systemStatus === 'Quota Habis' ? (
+                      "Kuota Harian Habis"
                     ) : (
                       <>
                         Proses Konten AI <Wand2 className="ml-2 h-5 w-5 group-hover:rotate-12 transition-transform" />

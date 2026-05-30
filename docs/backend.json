@@ -68,15 +68,17 @@
         "createdAt": { "type": "string", "format": "date-time" }
       }
     },
-    "ApiSettings": {
-      "title": "API Configuration",
-      "description": "Settings for external booster API services.",
+    "AiErrorLog": {
+      "title": "AI Error Log",
+      "description": "Logs for AI generation failures.",
       "type": "object",
       "properties": {
-        "apiUrl": { "type": "string" },
-        "apiKey": { "type": "string" },
-        "serviceId": { "type": "string" },
-        "updatedAt": { "type": "string", "format": "date-time" }
+        "userId": { "type": "string" },
+        "userEmail": { "type": "string" },
+        "tab": { "type": "string" },
+        "errorMessage": { "type": "string" },
+        "isQuotaExceeded": { "type": "boolean" },
+        "timestamp": { "type": "string", "format": "date-time" }
       }
     }
   },
@@ -104,9 +106,9 @@
       "schema": "#/entities/TopUpRequest",
       "description": "Manual coin top-up requests"
     },
-    "/settings/api": {
-      "schema": "#/entities/ApiSettings",
-      "description": "System API configuration"
+    "/ai_error_logs/{logId}": {
+      "schema": "#/entities/AiErrorLog",
+      "description": "Audit for AI failures"
     }
   }
 }
