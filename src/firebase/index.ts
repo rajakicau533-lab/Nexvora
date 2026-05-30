@@ -10,7 +10,9 @@ let firestore: Firestore | null = null;
 let auth: Auth | null = null;
 
 export function initializeFirebase() {
+  // Prevent crash if config is missing
   if (!isFirebaseConfigured) {
+    console.warn("Firebase is not configured. Redirecting to /setup is recommended.");
     return { firebaseApp: null, firestore: null, auth: null };
   }
 

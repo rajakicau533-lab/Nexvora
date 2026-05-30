@@ -74,10 +74,10 @@ export default function RegisterPage() {
         createdAt: serverTimestamp(),
       })
 
-      // 4. Kirim Link Verifikasi (Sesuai Standar Firebase)
+      // 4. Kirim Link Verifikasi
       await sendEmailVerification(user)
       
-      // 5. Keluar paksa agar user harus login setelah verifikasi
+      // 5. Logout agar user harus login setelah verifikasi
       await signOut(auth)
 
       setIsSuccess(true)
@@ -105,7 +105,7 @@ export default function RegisterPage() {
           </div>
           <div className="space-y-3">
             <h2 className="text-3xl font-headline font-bold text-white">Cek Email Anda</h2>
-            <p className="text-muted-foreground leading-relaxed">
+            <p className="text-muted-foreground leading-relaxed text-lg">
               Link verifikasi telah dikirim ke <span className="text-white font-bold">{email}</span>. 
               Mohon klik link tersebut untuk mengaktifkan akun Anda.
             </p>
@@ -133,7 +133,7 @@ export default function RegisterPage() {
             <span className="text-4xl font-headline font-bold text-white tracking-tight">Nexvora</span>
           </Link>
           <div className="space-y-1">
-            <h1 className="text-2xl font-headline font-bold text-white">Buat Akun Kreator</h1>
+            <h1 className="text-2xl font-headline font-bold text-white uppercase tracking-wider">Buat Akun Kreator</h1>
             <p className="text-muted-foreground font-medium">Mulailah perjalanan digital Anda hari ini.</p>
           </div>
         </div>
@@ -149,7 +149,7 @@ export default function RegisterPage() {
               )}
               
               <div className="space-y-2">
-                <Label htmlFor="username" className="text-white text-sm font-bold ml-1">Username</Label>
+                <Label htmlFor="username" className="text-white text-sm font-bold ml-1 uppercase tracking-tighter">Username</Label>
                 <Input 
                   id="username" 
                   placeholder="Contoh: nexvora_user" 
@@ -161,7 +161,7 @@ export default function RegisterPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="email" className="text-white text-sm font-bold ml-1">Alamat Email</Label>
+                <Label htmlFor="email" className="text-white text-sm font-bold ml-1 uppercase tracking-tighter">Alamat Email</Label>
                 <Input 
                   id="email" 
                   type="email" 
@@ -174,7 +174,7 @@ export default function RegisterPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="password" title="Minimal 8 karakter" className="text-white text-sm font-bold ml-1">Password</Label>
+                <Label htmlFor="password" title="Minimal 8 karakter" className="text-white text-sm font-bold ml-1 uppercase tracking-tighter">Password</Label>
                 <Input 
                   id="password" 
                   type="password" 
@@ -188,7 +188,7 @@ export default function RegisterPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="referral" className="text-white text-sm font-bold ml-1">Kode Referral (Opsional)</Label>
+                <Label htmlFor="referral" className="text-white text-sm font-bold ml-1 uppercase tracking-tighter">Kode Referral (Opsional)</Label>
                 <Input 
                   id="referral" 
                   placeholder="Kode dari teman" 
@@ -200,7 +200,7 @@ export default function RegisterPage() {
 
               <Button 
                 type="submit" 
-                disabled={isLoading || !!error && !isFirebaseConfigured}
+                disabled={isLoading || (!!error && !isFirebaseConfigured)}
                 className="w-full h-14 rounded-2xl luxury-gradient border-none font-black text-lg shadow-xl shadow-primary/30 mt-6 group disabled:opacity-50"
               >
                 {isLoading ? (
