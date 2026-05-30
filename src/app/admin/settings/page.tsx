@@ -5,7 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
-import { Settings, ShieldCheck, Activity, Save, RefreshCw, AlertCircle, CheckCircle2, Loader2, Coins } from "lucide-react"
+import { Switch } from "@/components/ui/switch"
+import { Settings, ShieldCheck, Activity, Save, RefreshCw, AlertCircle, CheckCircle2, Loader2 } from "lucide-react"
 import { useFirestore, useUser, useDoc } from "@/firebase"
 import { doc, setDoc, serverTimestamp } from "firebase/firestore"
 import { useToast } from "@/hooks/use-toast"
@@ -19,16 +20,18 @@ export default function AdminSettingsPage() {
   const { toast } = useToast()
   
   const [formData, setFormData] = useState({
+    provider: "IndoSMM",
     apiUrl: "",
     apiKey: "",
-    serviceId: ""
+    serviceId: "",
+    active: true
   })
   const [isSaving, setIsSaving] = useState(false)
   const [isTesting, setIsTesting] = useState(false)
   const [testResult, setTestResult] = useState<"success" | "error" | null>(null)
   const [providerBalance, setProviderBalance] = useState<string | null>(null)
 
-  // Verify Super Admin status for this specific page
+  // Verify Super Admin status
   const adminProfileRef = React.useMemo(() => {
     if (!db || !user?.uid) return null;
     return doc(db, 'admins', user.uid);
@@ -36,10 +39,10 @@ export default function AdminSettingsPage() {
   
   const { data: adminData, loading: adminLoading } = useDoc(adminProfileRef);
 
-  // API Settings
+  // Load from system_settings/provider_config
   const settingsRef = React.useMemo(() => {
     if (!db) return null
-    return doc(db, "settings", "api")
+    return doc(db, "system_settings", "provider_config")
   }, [db])
   const { data: apiSettings, loading: settingsLoading } = useDoc(settingsRef)
 
@@ -53,9 +56,11 @@ export default function AdminSettingsPage() {
   useEffect(() => {
     if (apiSettings) {
       setFormData({
+        provider: apiSettings.provider || "IndoSMM",
         apiUrl: apiSettings.apiUrl || "",
         apiKey: apiSettings.apiKey || "",
-        serviceId: apiSettings.serviceId || ""
+        serviceId: apiSettings.serviceId || "",
+        active: apiSettings.active ?? true
       })
     }
   }, [apiSettings])
@@ -64,12 +69,12 @@ export default function AdminSettingsPage() {
     if (!db) return
     setIsSaving(true)
     try {
-      await setDoc(doc(db, "settings", "api"), {
+      await setDoc(doc(db, "system_settings", "provider_config"), {
         ...formData,
         updatedAt: serverTimestamp()
       }, { merge: true })
       
-      toast({ title: "Pengaturan Tersimpan", description: "API Settings Nexvora telah diperbarui." })
+      toast({ title: "Pengaturan Tersimpan", description: "Konfigurasi provider telah diperbarui di Firestore." })
     } catch (err: any) {
       toast({ variant: "destructive", title: "Gagal Menyimpan", description: err.message })
     } finally {
@@ -78,8 +83,9 @@ export default function AdminSettingsPage() {
   }
 
   const handleTest = async () => {
-    if (!formData.apiUrl || !formData.apiKey) {
-      toast({ variant: "destructive", title: "Error", description: "URL dan Key harus diisi." })
+    // We use the data from Firestore for testing as requested
+    if (!apiSettings?.apiUrl || !apiSettings?.apiKey) {
+      toast({ variant: "destructive", title: "Error", description: "Simpan konfigurasi ke Firestore terlebih dahulu sebelum testing." })
       return
     }
     
@@ -89,8 +95,8 @@ export default function AdminSettingsPage() {
     
     try {
       const result = await checkProviderBalance({
-        apiUrl: formData.apiUrl,
-        apiKey: formData.apiKey
+        apiUrl: apiSettings.apiUrl,
+        apiKey: apiSettings.apiKey
       })
       
       if (result.success) {
@@ -137,16 +143,26 @@ export default function AdminSettingsPage() {
           <Card className="premium-card rounded-[2.5rem] border-white/5 bg-black/60 backdrop-blur-xl">
             <CardHeader>
               <CardTitle className="text-lg text-white font-bold">Provider Configuration</CardTitle>
-              <CardDescription>Enter the API details from your SMM provider panel (IndoSMM).</CardDescription>
+              <CardDescription>Enter the API details from your SMM provider panel.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
+              <div className="space-y-2">
+                <Label className="text-white font-bold ml-1 uppercase text-xs tracking-widest">Provider Name</Label>
+                <Input 
+                  placeholder="IndoSMM" 
+                  value={formData.provider}
+                  onChange={(e) => setFormData({...formData, provider: e.target.value})}
+                  className="bg-white/5 border-white/10 rounded-2xl h-14 text-white px-6 focus:border-primary/50"
+                />
+              </div>
+
               <div className="space-y-2">
                 <Label className="text-white font-bold ml-1 uppercase text-xs tracking-widest">API Endpoint URL</Label>
                 <Input 
                   placeholder="https://indosmm.com/api/v2" 
                   value={formData.apiUrl}
                   onChange={(e) => setFormData({...formData, apiUrl: e.target.value})}
-                  className="bg-white/5 border-white/10 rounded-2xl h-14 text-white placeholder:text-white/20 px-6 focus:border-primary/50"
+                  className="bg-white/5 border-white/10 rounded-2xl h-14 text-white px-6 focus:border-primary/50"
                 />
               </div>
 
@@ -157,18 +173,30 @@ export default function AdminSettingsPage() {
                   placeholder="••••••••••••••••" 
                   value={formData.apiKey}
                   onChange={(e) => setFormData({...formData, apiKey: e.target.value})}
-                  className="bg-white/5 border-white/10 rounded-2xl h-14 text-white placeholder:text-white/20 px-6 focus:border-primary/50"
+                  className="bg-white/5 border-white/10 rounded-2xl h-14 text-white px-6 focus:border-primary/50"
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label className="text-white font-bold ml-1 uppercase text-xs tracking-widest">Default Service ID</Label>
-                <Input 
-                  placeholder="Example: 8402" 
-                  value={formData.serviceId}
-                  onChange={(e) => setFormData({...formData, serviceId: e.target.value})}
-                  className="bg-white/5 border-white/10 rounded-2xl h-14 text-white placeholder:text-white/20 px-6 focus:border-primary/50"
-                />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-white font-bold ml-1 uppercase text-xs tracking-widest">Default Service ID</Label>
+                  <Input 
+                    placeholder="8402" 
+                    value={formData.serviceId}
+                    onChange={(e) => setFormData({...formData, serviceId: e.target.value})}
+                    className="bg-white/5 border-white/10 rounded-2xl h-14 text-white px-6 focus:border-primary/50"
+                  />
+                </div>
+                <div className="space-y-2 flex flex-col justify-center">
+                  <Label className="text-white font-bold ml-1 uppercase text-xs tracking-widest mb-2">Service Status</Label>
+                  <div className="flex items-center gap-3">
+                    <Switch 
+                      checked={formData.active} 
+                      onCheckedChange={(v) => setFormData({...formData, active: v})} 
+                    />
+                    <span className="text-xs text-muted-foreground">{formData.active ? 'Active' : 'Disabled'}</span>
+                  </div>
+                </div>
               </div>
 
               <div className="pt-4 flex gap-4">
@@ -181,11 +209,11 @@ export default function AdminSettingsPage() {
                 </Button>
                 <Button 
                   onClick={handleTest} 
-                  disabled={isTesting || !formData.apiUrl}
+                  disabled={isTesting}
                   variant="outline"
                   className="h-14 rounded-2xl border-white/10 bg-white/5 px-8 hover:bg-white/10 text-white"
                 >
-                  {isTesting ? <RefreshCw className="h-5 w-5 animate-spin" /> : "Test Connection"}
+                  {isTesting ? <RefreshCw className="h-5 w-5 animate-spin" /> : "Test Firestore Config"}
                 </Button>
               </div>
             </CardContent>
@@ -219,7 +247,7 @@ export default function AdminSettingsPage() {
                     </div>
                     <div className="space-y-1">
                       <p className="text-xl font-headline font-bold text-white uppercase">Connection Failed</p>
-                      <p className="text-[10px] text-muted-foreground uppercase font-black">Check your URL and Key</p>
+                      <p className="text-[10px] text-muted-foreground uppercase font-black">Check your URL and Key in Firestore</p>
                     </div>
                   </>
                 ) : (
@@ -229,18 +257,18 @@ export default function AdminSettingsPage() {
                     </div>
                     <div className="space-y-1">
                       <p className="text-xl font-headline font-bold text-muted-foreground uppercase tracking-widest">IDLE</p>
-                      <p className="text-[10px] text-muted-foreground font-black uppercase tracking-widest">Press Test to check status</p>
+                      <p className="text-[10px] text-muted-foreground font-black uppercase tracking-widest">Press Test to check Firestore config</p>
                     </div>
                   </>
                 )}
               </div>
 
               <div className="p-4 rounded-2xl bg-black/40 border border-white/5 space-y-3">
-                 <p className="text-[10px] text-primary uppercase font-bold tracking-widest">IndoSMM Integration</p>
+                 <p className="text-[10px] text-primary uppercase font-bold tracking-widest">Integration Guide</p>
                  <ul className="space-y-2 text-xs text-white/60">
-                    <li className="flex items-start gap-2">• Key: Found in Profile &gt; Settings.</li>
+                    <li className="flex items-start gap-2">• Key: Found in Provider Panel &gt; Settings.</li>
                     <li className="flex items-start gap-2">• URL: Must end with /api/v2</li>
-                    <li className="flex items-start gap-2">• Allow IP if required by panel.</li>
+                    <li className="flex items-start gap-2">• System uses system_settings/provider_config.</li>
                  </ul>
               </div>
             </CardContent>

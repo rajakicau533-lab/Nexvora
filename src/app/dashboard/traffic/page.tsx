@@ -25,9 +25,9 @@ export default function TrafficServicePage() {
 
   const coinCost = Math.ceil(views / 1000)
 
-  // API Settings for provider
-  const apiSettingsRef = React.useMemo(() => (db ? doc(db, "settings", "api") : null), [db])
-  const { data: apiSettings } = useDoc(apiSettingsRef)
+  // API Settings for provider from central config
+  const apiSettingsRef = React.useMemo(() => (db ? doc(db, "system_settings", "provider_config") : null), [db])
+  const { data: apiSettings, loading: settingsLoading } = useDoc(apiSettingsRef)
 
   // User Profile
   const profileRef = React.useMemo(() => {
@@ -51,9 +51,14 @@ export default function TrafficServicePage() {
   const handleOrder = async (platform: "shopee" | "tiktok") => {
     if (!db || !user?.uid || !profile) return
     
-    // 1. Validate configuration
-    if (!apiSettings?.apiUrl || !apiSettings?.apiKey) {
-      toast({ variant: "destructive", title: "Konfigurasi Belum Lengkap", description: "Sistem belum terhubung ke provider. Hubungi Admin." })
+    // 1. Validate configuration exists and is active
+    if (!apiSettings?.apiUrl || !apiSettings?.apiKey || !apiSettings?.serviceId) {
+      toast({ variant: "destructive", title: "Layanan Tidak Tersedia", description: "Konfigurasi provider belum lengkap. Hubungi Admin." })
+      return
+    }
+
+    if (apiSettings.active === false) {
+      toast({ variant: "destructive", title: "Layanan Dimatikan", description: "Layanan booster sedang dalam pemeliharaan rutin." })
       return
     }
 
@@ -72,11 +77,10 @@ export default function TrafficServicePage() {
     setIsOrdering(true)
 
     try {
-      console.log("LINK:", url)
-      console.log("SERVICE_ID:", apiSettings.serviceId)
-      console.log("QUANTITY:", views)
+      console.log("ORDER_REQUEST:", { platform, url, quantity: views });
 
-      // 4. Call Provider API first
+      // 4. Call Provider API first via Genkit Flow
+      // This uses the apiUrl and apiKey already fetched from Firestore settings
       const apiResult = await processTrafficOrder({
         apiUrl: apiSettings.apiUrl,
         apiKey: apiSettings.apiKey,
@@ -86,7 +90,7 @@ export default function TrafficServicePage() {
       })
 
       if (!apiResult.success) {
-        // Log failure to admin traffic logs
+        // Log failure to system activity for admin audit
         await setDoc(doc(collection(db, "activity_logs")), {
           type: "system_error",
           action: "TRAFFIC_ORDER_FAILED",
@@ -100,7 +104,8 @@ export default function TrafficServicePage() {
         throw new Error(apiResult.error || "Provider rejected the request.")
       }
 
-      // 5. If provider success, then deduct coins and save order
+      // 5. Success Flow: Deduct coins and save order
+      // We ONLY do this if the API returned a success code and order ID
       const orderRef = doc(collection(db, "traffic_orders"))
       await setDoc(orderRef, {
         userId: user.uid,
@@ -115,23 +120,25 @@ export default function TrafficServicePage() {
         createdAt: serverTimestamp()
       })
 
+      // Atomic coin deduction
       await updateDoc(profileRef!, {
         coins: increment(-coinCost)
       })
 
+      // Log transaction
       await setDoc(doc(collection(db, "coin_transactions")), {
         userId: user.uid,
         amount: -coinCost,
         type: "traffic_order",
-        description: `Order Trafik ${platform.toUpperCase()}: ${views} Views (Provider ID: ${apiResult.orderId})`,
+        description: `Order Trafik ${platform.toUpperCase()}: ${views} Views (ID: ${apiResult.orderId})`,
         createdAt: serverTimestamp()
       })
 
-      toast({ title: "Pesanan Diterima! 🚀", description: `Order ID: ${apiResult.orderId}. Views sedang dikirim.` })
+      toast({ title: "Pesanan Diterima! 🚀", description: `ID: ${apiResult.orderId}. Views sedang dalam antrean pengiriman.` })
       setUrl("")
       setViews(1000)
     } catch (err: any) {
-      console.error(err)
+      console.error("TRAFFIC_ERROR:", err)
       toast({ variant: "destructive", title: "Gagal Proses", description: err.message || "Terjadi kesalahan saat menghubungi provider." })
     } finally {
       setIsOrdering(false)
@@ -142,7 +149,7 @@ export default function TrafficServicePage() {
     <div className="space-y-8 max-w-5xl mx-auto">
       <div className="space-y-2">
         <h2 className="text-3xl font-headline font-bold">Booster Trafik Service 🚀</h2>
-        <p className="text-muted-foreground">Meningkatkan interaksi video Shopee & TikTok secara instan.</p>
+        <p className="text-muted-foreground">Meningkatkan interaksi video Shopee & TikTok secara instan menggunakan provider {apiSettings?.provider || 'IndoSMM'}.</p>
       </div>
 
       <Tabs defaultValue="shopee" className="w-full">
@@ -205,7 +212,7 @@ export default function TrafficServicePage() {
 
                 <Button 
                   onClick={() => handleOrder("shopee")}
-                  disabled={isOrdering || !url || views < 1000}
+                  disabled={isOrdering || !url || views < 1000 || settingsLoading}
                   className="w-full h-14 rounded-xl luxury-gradient border-none text-lg font-bold shadow-xl shadow-primary/20 group"
                 >
                   {isOrdering ? (
