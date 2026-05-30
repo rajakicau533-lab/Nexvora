@@ -23,13 +23,17 @@ export default function AdminDashboardPage() {
     }
   }, [db])
 
-  const { data: recentOrders } = useCollection<any>(
-    statsQueries.orders ? query(statsQueries.orders, orderBy("createdAt", "desc"), limit(5)) : null
-  )
+  // Fix: Memoize the specific query to prevent infinite re-renders
+  const recentOrdersQuery = React.useMemo(() => {
+    if (!statsQueries.orders) return null;
+    return query(statsQueries.orders, orderBy("createdAt", "desc"), limit(5));
+  }, [statsQueries.orders]);
+
+  const { data: recentOrders } = useCollection<any>(recentOrdersQuery)
   
-  const { data: allUsers } = useCollection<any>(statsQueries.users)
-  const { data: allOrders } = useCollection<any>(statsQueries.orders)
-  const { data: allTopups } = useCollection<any>(statsQueries.topups)
+  const { data: allUsers } = useCollection<any>(statsQueries.users || null)
+  const { data: allOrders } = useCollection<any>(statsQueries.orders || null)
+  const { data: allTopups } = useCollection<any>(statsQueries.topups || null)
 
   return (
     <div className="space-y-10 max-w-7xl mx-auto pb-10">

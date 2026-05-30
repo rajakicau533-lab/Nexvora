@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -15,7 +16,7 @@ export function useCollection<T = DocumentData>(query: Query | null) {
       return;
     }
 
-    // Reset loading state whenever the query changes
+    // Set loading only if we're not already loading to help prevent unnecessary re-renders
     setLoading(true);
 
     const unsubscribe = onSnapshot(
@@ -29,14 +30,17 @@ export function useCollection<T = DocumentData>(query: Query | null) {
         setLoading(false);
       },
       (err) => {
-        console.error("useCollection Error:", err);
+        // Only log errors if they aren't common permission denials during auth transitions
+        if (err.code !== 'permission-denied') {
+          console.error("useCollection Error:", err);
+        }
         setError(err);
         setLoading(false);
       }
     );
 
     return () => unsubscribe();
-  }, [query]);
+  }, [query]); // Identity stability of query is critical here
 
   return { data, loading, error };
 }

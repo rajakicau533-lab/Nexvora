@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -8,6 +9,9 @@ export function useDoc<T = any>(ref: DocumentReference | null) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
+  // Using ref.path in the dependency array is more stable than the ref object itself
+  const path = ref?.path;
+
   useEffect(() => {
     if (!ref) {
       setData(null);
@@ -15,7 +19,6 @@ export function useDoc<T = any>(ref: DocumentReference | null) {
       return;
     }
 
-    // Reset loading state whenever the ref changes
     setLoading(true);
 
     const unsubscribe = onSnapshot(
@@ -25,14 +28,16 @@ export function useDoc<T = any>(ref: DocumentReference | null) {
         setLoading(false);
       },
       (err) => {
-        console.error("useDoc Error:", err);
+        if (err.code !== 'permission-denied') {
+          console.error("useDoc Error:", err);
+        }
         setError(err);
         setLoading(false);
       }
     );
 
     return () => unsubscribe();
-  }, [ref?.path]);
+  }, [path]); // Dependency on the path string is more reliable
 
   return { data, loading, error };
 }
