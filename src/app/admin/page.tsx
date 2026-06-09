@@ -1,7 +1,7 @@
 
 "use client"
 
-import React, { useMemo } from "react"
+import React, { useMemo, useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { 
   Users, 
@@ -16,24 +16,27 @@ import {
   Clock,
   ChevronRight,
   ShieldCheck,
-  UserPlus,
   Zap,
-  Loader2
+  Loader2,
+  RefreshCw,
+  Wallet
 } from "lucide-react"
-import { useFirestore, useCollection } from "@/firebase"
-import { collection, query, limit, orderBy, where, Timestamp } from "firebase/firestore"
+import { useFirestore, useCollection, useDoc } from "@/firebase"
+import { collection, query, limit, orderBy, where, Timestamp, doc } from "firebase/firestore"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
 import Link from "next/link"
-import { 
-  ChartContainer, 
-  ChartTooltip, 
-  ChartTooltipContent 
-} from "@/components/ui/chart"
 import { Area, AreaChart, ResponsiveContainer, XAxis, YAxis, CartesianGrid, Tooltip } from "recharts"
+import { checkProviderBalance } from "@/ai/flows/process-traffic-order-flow"
 
 export default function AdminDashboardPage() {
   const db = useFirestore()
+  const [providerBalance, setProviderBalance] = useState<string | null>(null)
+  const [isCheckingBalance, setIsCheckingBalance] = useState(false)
+
+  // API Config for Balance Check
+  const apiSettingsRef = React.useMemo(() => (db ? doc(db, "system_settings", "provider_config") : null), [db])
+  const { data: apiSettings } = useDoc(apiSettingsRef)
 
   // Data Fetching
   const { data: allUsers, loading: usersLoading } = useCollection<any>(db ? collection(db, "users") : null)
@@ -42,13 +45,33 @@ export default function AdminDashboardPage() {
   const { data: marketplacePurchases } = useCollection<any>(db ? collection(db, "marketplace_purchases") : null)
   const { data: allMaterials } = useCollection<any>(db ? collection(db, "materials") : null)
 
+  const fetchBalance = async () => {
+    if (!apiSettings?.apiUrl || !apiSettings?.apiKey || isCheckingBalance) return
+    setIsCheckingBalance(true)
+    try {
+      const res = await checkProviderBalance({
+        apiUrl: apiSettings.apiUrl,
+        apiKey: apiSettings.apiKey
+      })
+      if (res.success) setProviderBalance(res.balance || "0")
+    } catch (e) {
+      console.error("Balance fetch error", e)
+    } finally {
+      setIsCheckingBalance(false)
+    }
+  }
+
+  useEffect(() => {
+    if (apiSettings) fetchBalance()
+  }, [!!apiSettings])
+
   // 1. Process Stats
   const stats = useMemo(() => {
     const now = new Date()
     const startOfToday = new Timestamp(Math.floor(new Date(now.setHours(0,0,0,0)).getTime() / 1000), 0)
 
     const todayUsers = allUsers?.filter(u => u.createdAt?.seconds >= startOfToday.seconds).length || 0
-    const activeOrders = allOrders?.filter(o => ["pending", "processing", "PROCESSING", "PENDING"].includes(o.status)).length || 0
+    const activeOrders = allOrders?.filter(o => ["pending", "processing", "PROCESSING", "PENDING", "Pending", "Processing"].includes(o.status)).length || 0
     const pendingTopups = allTopups?.filter(t => t.status === 'pending').length || 0
     const totalRevenue = allOrders?.reduce((acc, o) => acc + (o.coinCost || 0), 0) || 0
     const todayRevenue = allOrders?.filter(o => o.createdAt?.seconds >= startOfToday.seconds).reduce((acc, o) => acc + (o.coinCost || 0), 0) || 0
@@ -100,10 +123,16 @@ export default function AdminDashboardPage() {
   const pendingActions = useMemo(() => {
     const actions = []
     if (stats.pendingTopups > 0) actions.push({ label: `${stats.pendingTopups} Topup Menunggu Konfirmasi`, type: 'topup', color: 'text-amber-500', href: '/admin/users' })
-    const failedOrders = allOrders?.filter(o => ["failed", "GAGAL"].includes(o.status)).slice(0, 3)
+    const failedOrders = allOrders?.filter(o => ["failed", "GAGAL", "CANCELLED", "CANCEL", "FAILED"].includes(o.status)).slice(0, 3)
     failedOrders?.forEach(o => actions.push({ label: `Order Gagal: ${o.id?.slice(0,8)}`, type: 'order', color: 'text-red-500', href: '/admin/traffic' }))
+    
+    // Add provider balance warning
+    if (providerBalance && parseInt(providerBalance.replace(/[^0-9]/g, '')) < 50000) {
+      actions.push({ label: `Saldo SMM.ID Menipis: Rp ${providerBalance}`, type: 'warning', color: 'text-red-600', href: '/admin/settings' })
+    }
+
     return actions
-  }, [stats.pendingTopups, allOrders])
+  }, [stats.pendingTopups, allOrders, providerBalance])
 
   // 4. Recent Activity
   const recentActivities = useMemo(() => {
@@ -133,9 +162,23 @@ export default function AdminDashboardPage() {
           <h2 className="text-3xl font-headline font-bold text-white tracking-tight">Nexvora Executive Dashboard</h2>
           <p className="text-muted-foreground text-sm">Pemantauan ekosistem digital Nexvora secara terpusat.</p>
         </div>
-        <Badge variant="outline" className="w-fit border-primary/20 bg-primary/5 text-primary font-black uppercase text-[10px] px-4 py-1.5 tracking-widest">
-          SYSTEM STABLE ✓
-        </Badge>
+        <div className="flex flex-col items-end gap-2">
+           <Badge variant="outline" className="w-fit border-primary/20 bg-primary/5 text-primary font-black uppercase text-[10px] px-4 py-1.5 tracking-widest">
+            SYSTEM STABLE ✓
+          </Badge>
+          {apiSettings && (
+             <div className="flex items-center gap-3 bg-black/40 border border-white/5 px-4 py-1.5 rounded-full">
+                <Wallet className="h-3 w-3 text-primary" />
+                <span className="text-[10px] font-black text-white/60 uppercase">SMM.ID: </span>
+                <span className={cn("text-xs font-bold", parseInt(providerBalance || "0") < 20000 ? "text-red-500 animate-pulse" : "text-primary")}>
+                  {isCheckingBalance ? "..." : `Rp ${providerBalance || "Checking..."}`}
+                </span>
+                <button onClick={fetchBalance} disabled={isCheckingBalance} className="hover:text-primary transition-colors">
+                  <RefreshCw className={cn("h-3 w-3", isCheckingBalance && "animate-spin")} />
+                </button>
+             </div>
+          )}
+        </div>
       </div>
 
       {/* 1. Quick Stats Grid */}
@@ -298,7 +341,9 @@ export default function AdminDashboardPage() {
                       <Link key={i} href={action.href} className="flex items-center justify-between p-6 hover:bg-white/[0.02] transition-colors group">
                         <div className="flex items-center gap-4">
                            <div className={cn("p-2.5 rounded-xl bg-white/5", action.color)}>
-                              {action.type === 'topup' ? <CreditCard className="h-5 w-5" /> : <Zap className="h-5 w-5" />}
+                              {action.type === 'topup' ? <CreditCard className="h-5 w-5" /> : 
+                               action.type === 'warning' ? <AlertCircle className="h-5 w-5" /> :
+                               <Zap className="h-5 w-5" />}
                            </div>
                            <p className="text-sm font-bold text-white group-hover:text-primary transition-colors">{action.label}</p>
                         </div>

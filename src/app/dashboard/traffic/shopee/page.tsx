@@ -145,7 +145,13 @@ export default function ShopeeTrafficPage() {
         quantity: views
       });
 
-      if (!apiResult.success) throw new Error(apiResult.error);
+      if (!apiResult.success) {
+        let errorMsg = apiResult.error || "Gagal membuat pesanan.";
+        if (errorMsg.toLowerCase().includes("not enough funds")) {
+          errorMsg = "Layanan sedang dalam pemeliharaan (Restocking). Silakan coba lagi nanti atau hubungi Admin.";
+        }
+        throw new Error(errorMsg);
+      }
 
       await addDoc(collection(db, "traffic_orders"), {
         userId: user.uid,
@@ -275,7 +281,7 @@ export default function ShopeeTrafficPage() {
                 ) : (
                   history.map((row: any) => (
                     <TableRow key={row.id} className="border-white/5 hover:bg-white/[0.02] transition-colors">
-                      <TableCell className="max-w-[200px] truncate text-xs text-muted-foreground font-mono">
+                      <TableCell className="max-w-[150px] truncate text-xs text-muted-foreground font-mono">
                         <a href={row.targetLink} target="_blank" className="hover:text-primary transition-colors flex items-center gap-1.5">
                           <ExternalLink className="h-3 w-3 shrink-0" /> {row.targetLink}
                         </a>
