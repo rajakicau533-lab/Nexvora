@@ -95,8 +95,8 @@ export default function AdminTrafficMonitoringPage() {
         <Table>
           <TableHeader className="bg-white/5">
             <TableRow className="border-white/5">
-              <TableHead className="text-white font-bold">Platform / Target</TableHead>
-              <TableHead className="text-white font-bold">Views / Cost</TableHead>
+              <TableHead className="text-white font-bold">Service / Target</TableHead>
+              <TableHead className="text-white font-bold">Qty / Cost</TableHead>
               <TableHead className="text-white font-bold">Ordered By</TableHead>
               <TableHead className="text-white font-bold">Status</TableHead>
               <TableHead className="text-right text-white font-bold">Actions</TableHead>
@@ -111,7 +111,7 @@ export default function AdminTrafficMonitoringPage() {
               <TableRow key={order.id} className="border-white/5 hover:bg-white/5">
                 <TableCell>
                   <div className="flex flex-col">
-                    <span className="text-[10px] font-black text-primary uppercase">{order.platform}</span>
+                    <span className="text-[10px] font-black text-primary uppercase">{order.serviceLabel || order.platform}</span>
                     <a href={order.targetLink || order.url} target="_blank" rel="noopener noreferrer" className="text-xs text-muted-foreground hover:text-white flex items-center gap-1 max-w-[200px] truncate">
                       {order.targetLink || order.url} <ExternalLink className="h-2 w-2" />
                     </a>
@@ -119,8 +119,8 @@ export default function AdminTrafficMonitoringPage() {
                 </TableCell>
                 <TableCell>
                   <div className="flex flex-col">
-                    <span className="font-bold text-white">{(order.views || order.quantity || 0).toLocaleString()} Views</span>
-                    <span className="text-[10px] text-muted-foreground">{order.coinCost} 🪙 Nexus Coins</span>
+                    <span className="font-bold text-white">{(order.views || order.quantity || 0).toLocaleString()}</span>
+                    <span className="text-[10px] text-muted-foreground">{order.coinCost} 🪙</span>
                   </div>
                 </TableCell>
                 <TableCell>

@@ -19,7 +19,8 @@ import {
   ChevronRight,
   Settings,
   ShieldCheck,
-  GraduationCap
+  GraduationCap,
+  ChevronDown
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { APP_NAME, CONTACT_INFO } from "@/lib/constants"
@@ -34,27 +35,22 @@ import {
   SidebarGroup,
   SidebarGroupLabel,
   SidebarSeparator,
-  useSidebar
+  useSidebar,
+  SidebarMenuSub,
+  SidebarMenuSubItem,
+  SidebarMenuSubButton
 } from "@/components/ui/sidebar"
 import { useAuth, useUser, useFirestore, useDoc } from "@/firebase"
 import { signOut } from "firebase/auth"
 import { useToast } from "@/hooks/use-toast"
 import { doc } from "firebase/firestore"
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 
 const menuItems = [
   { label: "Dashboard", icon: LayoutDashboard, href: "/dashboard" },
   { label: "Fitur", icon: Sparkles, href: "/#features" },
   { label: "Testimoni", icon: MessageSquare, href: "/#testimonials" },
   { label: "Tentang Kami", icon: Info, href: "/#about" },
-]
-
-const serviceItems = [
-  { label: "Dashboard Overview", icon: LayoutDashboard, href: "/dashboard" },
-  { label: "Trafik Service", icon: TrendingUp, href: "/dashboard/traffic" },
-  { label: "Creator AI", icon: Cpu, href: "/dashboard/ai" },
-  { label: "Marketplace", icon: ShoppingBag, href: "/dashboard/marketplace" },
-  { label: "Free Materi", icon: GraduationCap, href: "/dashboard/materials" },
-  { label: "Top Up Koin", icon: CreditCard, href: "/dashboard/topup" },
 ]
 
 export function AppSidebar() {
@@ -68,7 +64,6 @@ export function AppSidebar() {
   
   const isDashboard = pathname.startsWith('/dashboard')
 
-  // Close sidebar on route change for mobile
   useEffect(() => {
     if (isMobile) {
       setOpenMobile(false)
@@ -163,23 +158,116 @@ export function AppSidebar() {
             <SidebarGroup>
               <SidebarGroupLabel className="text-muted-foreground/50 px-3 uppercase text-[10px] tracking-widest font-bold">Services</SidebarGroupLabel>
               <SidebarMenu>
-                {serviceItems.map((item) => (
-                  <SidebarMenuItem key={item.label}>
-                    <SidebarMenuButton 
-                      asChild 
-                      isActive={pathname === item.href}
-                      className={cn(
-                        "hover:bg-primary/10 hover:text-primary transition-all duration-200",
-                        pathname === item.href && "bg-primary/15 text-primary"
-                      )}
-                    >
-                      <Link href={item.href} onClick={handleLinkClick} className="flex items-center gap-3">
-                        <item.icon className="h-4 w-4" />
-                        <span className="font-medium">{item.label}</span>
-                      </Link>
-                    </SidebarMenuButton>
+                <SidebarMenuItem>
+                  <SidebarMenuButton 
+                    asChild 
+                    isActive={pathname === "/dashboard"}
+                    className={cn(
+                      "hover:bg-primary/10 hover:text-primary transition-all duration-200",
+                      pathname === "/dashboard" && "bg-primary/15 text-primary"
+                    )}
+                  >
+                    <Link href="/dashboard" onClick={handleLinkClick} className="flex items-center gap-3">
+                      <LayoutDashboard className="h-4 w-4" />
+                      <span className="font-medium">Dashboard Overview</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+
+                <Collapsible defaultOpen={pathname.startsWith('/dashboard/traffic')} className="group/collapsible">
+                  <SidebarMenuItem>
+                    <CollapsibleTrigger asChild>
+                      <SidebarMenuButton className="hover:bg-primary/10 hover:text-primary transition-all duration-200">
+                        <TrendingUp className="h-4 w-4" />
+                        <span className="font-medium">Trafik</span>
+                        <ChevronDown className="ml-auto h-4 w-4 transition-transform group-data-[state=open]/collapsible:rotate-180" />
+                      </SidebarMenuButton>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <SidebarMenuSub>
+                        <SidebarMenuSubItem>
+                          <SidebarMenuSubButton asChild isActive={pathname === "/dashboard/traffic/shopee"}>
+                            <Link href="/dashboard/traffic/shopee" onClick={handleLinkClick}>Trafik Shopee</Link>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                        <SidebarMenuSubItem>
+                          <SidebarMenuSubButton asChild isActive={pathname === "/dashboard/traffic/followers"}>
+                            <Link href="/dashboard/traffic/followers" onClick={handleLinkClick}>Shopee Followers</Link>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                        <SidebarMenuSubItem>
+                          <SidebarMenuSubButton asChild isActive={pathname === "/dashboard/traffic/likes"}>
+                            <Link href="/dashboard/traffic/likes" onClick={handleLinkClick}>Shopee Like</Link>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                      </SidebarMenuSub>
+                    </CollapsibleContent>
                   </SidebarMenuItem>
-                ))}
+                </Collapsible>
+
+                <SidebarMenuItem>
+                  <SidebarMenuButton 
+                    asChild 
+                    isActive={pathname === "/dashboard/ai"}
+                    className={cn(
+                      "hover:bg-primary/10 hover:text-primary transition-all duration-200",
+                      pathname === "/dashboard/ai" && "bg-primary/15 text-primary"
+                    )}
+                  >
+                    <Link href="/dashboard/ai" onClick={handleLinkClick} className="flex items-center gap-3">
+                      <Cpu className="h-4 w-4" />
+                      <span className="font-medium">Creator AI</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+
+                <SidebarMenuItem>
+                  <SidebarMenuButton 
+                    asChild 
+                    isActive={pathname === "/dashboard/marketplace"}
+                    className={cn(
+                      "hover:bg-primary/10 hover:text-primary transition-all duration-200",
+                      pathname === "/dashboard/marketplace" && "bg-primary/15 text-primary"
+                    )}
+                  >
+                    <Link href="/dashboard/marketplace" onClick={handleLinkClick} className="flex items-center gap-3">
+                      <ShoppingBag className="h-4 w-4" />
+                      <span className="font-medium">Marketplace</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+
+                <SidebarMenuItem>
+                  <SidebarMenuButton 
+                    asChild 
+                    isActive={pathname === "/dashboard/materials"}
+                    className={cn(
+                      "hover:bg-primary/10 hover:text-primary transition-all duration-200",
+                      pathname === "/dashboard/materials" && "bg-primary/15 text-primary"
+                    )}
+                  >
+                    <Link href="/dashboard/materials" onClick={handleLinkClick} className="flex items-center gap-3">
+                      <GraduationCap className="h-4 w-4" />
+                      <span className="font-medium">Free Materi</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+
+                <SidebarMenuItem>
+                  <SidebarMenuButton 
+                    asChild 
+                    isActive={pathname === "/dashboard/topup"}
+                    className={cn(
+                      "hover:bg-primary/10 hover:text-primary transition-all duration-200",
+                      pathname === "/dashboard/topup" && "bg-primary/15 text-primary"
+                    )}
+                  >
+                    <Link href="/dashboard/topup" onClick={handleLinkClick} className="flex items-center gap-3">
+                      <CreditCard className="h-4 w-4" />
+                      <span className="font-medium">Top Up Koin</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
               </SidebarMenu>
             </SidebarGroup>
             
