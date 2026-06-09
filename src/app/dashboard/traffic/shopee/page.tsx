@@ -116,7 +116,17 @@ export default function ShopeeTrafficPage() {
     try {
       const parsed = new URL(input.startsWith('http') ? input : `https://${input}`);
       const hostname = parsed.hostname.toLowerCase();
-      const domains = ['shopee.co.id', 'shp.ee', 'id.shp.ee', 's.shopee.co.id', 'vn.shp.ee', 'my.shp.ee'];
+      // Valid domains for Shopee
+      const domains = [
+        'shopee.co.id', 
+        'shp.ee', 
+        'id.shp.ee', 
+        's.shopee.co.id', 
+        'vn.shp.ee', 
+        'my.shp.ee',
+        'th.shp.ee',
+        'tw.shp.ee'
+      ];
       return domains.some(domain => hostname === domain || hostname.endsWith('.' + domain));
     } catch (e) { return false; }
   };
@@ -130,16 +140,19 @@ export default function ShopeeTrafficPage() {
     }
 
     if (!url || !validateUrl(url)) {
-      toast({ variant: "destructive", title: "Link Tidak Valid", description: "Masukkan link Shopee yang benar." });
+      toast({ variant: "destructive", title: "Link Tidak Valid", description: "Masukkan link Shopee (shopee.co.id atau shp.ee) yang benar." });
       return;
     }
     if (profile.coins < coinCost) {
-      toast({ variant: "destructive", title: "Koin Kurang", description: `Butuh ${coinCost} koin.` });
+      toast({ variant: "destructive", title: "Koin Kurang", description: `Butuh ${coinCost} koin. Saldo Anda: ${profile.coins}` });
       return;
     }
 
     setIsOrdering(true);
     setOrderFeedback("processing");
+
+    // Technical Log Entry
+    const logId = doc(collection(db, "api_logs")).id;
 
     try {
       const apiResult = await processTrafficOrder({
@@ -150,12 +163,22 @@ export default function ShopeeTrafficPage() {
         quantity: views
       });
 
+      // Save TECHNICAL LOG for Admin
+      await addDoc(collection(db, "api_logs"), {
+        userId: user.uid,
+        userEmail: user.email,
+        timestamp: serverTimestamp(),
+        provider: "SMM.ID",
+        link: url,
+        quantity: views,
+        serviceId: serviceConfig.id,
+        status: apiResult.success ? "success" : "failed",
+        responseBody: apiResult.rawResponse || apiResult.debugInfo || "No body",
+        errorMessage: apiResult.error || null
+      });
+
       if (!apiResult.success) {
-        let errorMsg = apiResult.error || "Gagal membuat pesanan.";
-        if (errorMsg.toLowerCase().includes("not enough funds")) {
-          errorMsg = "Layanan sedang dalam pemeliharaan (Restocking). Silakan coba lagi nanti atau hubungi Admin.";
-        }
-        throw new Error(errorMsg);
+        throw new Error(apiResult.error);
       }
 
       await addDoc(collection(db, "traffic_orders"), {
@@ -252,7 +275,7 @@ export default function ShopeeTrafficPage() {
           <CardContent className="p-5 text-xs space-y-3 text-muted-foreground leading-relaxed">
             <p>• Gunakan link produk Shopee yang valid.</p>
             <p>• Tarif: <strong>1.000 Views = 1 Koin</strong>.</p>
-            <p>• Status sinkronisasi otomatis setiap 30 detik.</p>
+            <p>• Jika order gagal, pastikan link benar dan sistem provider online.</p>
             <div className="pt-2">
               <Badge className="bg-amber-500/10 text-amber-500 border-none text-[9px] uppercase font-black px-2 py-0.5">Note</Badge>
               <p className="mt-1">Riwayat di-reset otomatis setiap 3 hari.</p>

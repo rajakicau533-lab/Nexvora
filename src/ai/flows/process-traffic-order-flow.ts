@@ -108,9 +108,18 @@ const processTrafficOrderFlow = ai.defineFlow(
           rawResponse: data,
         };
       } else {
+        // Log more descriptive errors based on provider response
+        let errorMsg = data.error || 'Provider menolak permintaan.';
+        
+        if (errorMsg.toLowerCase().includes("not enough funds")) {
+          errorMsg = "Layanan sedang dalam pemeliharaan (Restocking). Silakan coba lagi nanti.";
+        } else if (errorMsg.toLowerCase().includes("invalid api key")) {
+          errorMsg = "Konfigurasi server belum lengkap (Invalid Key).";
+        }
+
         return {
           success: false,
-          error: data.error || 'Provider menolak permintaan. Cek saldo atau link Anda.',
+          error: errorMsg,
           rawResponse: data,
         };
       }

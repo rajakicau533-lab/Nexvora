@@ -175,7 +175,7 @@ export default function AdminSettingsPage() {
                 <div className="space-y-2">
                   <Label className="text-white font-bold uppercase text-[10px] tracking-widest ml-1">Shopee Service ID</Label>
                   <Input 
-                    placeholder="e.g. 3262" 
+                    placeholder="e.g. 8402" 
                     value={formData.serviceId}
                     onChange={(e) => setFormData({...formData, serviceId: e.target.value})}
                     className="bg-white/5 border-white/10 rounded-2xl h-14"
@@ -268,7 +268,7 @@ export default function AdminSettingsPage() {
                  <p className="text-[10px] text-primary uppercase font-bold tracking-widest">SMM.ID Requirements</p>
                  <ul className="space-y-2 text-xs text-white/60">
                     <li className="flex items-start gap-2">• End-point must be: https://smm.id/api/v2</li>
-                    <li className="flex items-start gap-2">• API Key: From Profile &gt; Settings in SMM.ID</li>
+                    <li className="flex items-start gap-2">• API Key: From Profile > Settings in SMM.ID</li>
                     <li className="flex items-start gap-2">• Method: POST with form-urlencoded</li>
                  </ul>
               </div>
