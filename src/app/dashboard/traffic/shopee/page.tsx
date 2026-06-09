@@ -147,10 +147,13 @@ export default function ShopeeTrafficPage() {
     setOrderFeedback("processing");
 
     try {
+      // Prioritize service ID from settings page, fallback to constant
+      const activeServiceId = apiSettings.serviceId || serviceConfig.id;
+
       const apiResult = await processTrafficOrder({
         apiUrl: apiSettings.apiUrl,
         apiKey: apiSettings.apiKey,
-        serviceId: serviceConfig.id,
+        serviceId: activeServiceId,
         link: url.trim(),
         quantity: views
       });
@@ -163,14 +166,13 @@ export default function ShopeeTrafficPage() {
         provider: "SMM.ID",
         link: url.trim(),
         quantity: views,
-        serviceId: serviceConfig.id,
+        serviceId: activeServiceId,
         status: apiResult.success ? "success" : "failed",
         responseBody: apiResult.rawResponse ? (typeof apiResult.rawResponse === 'object' ? JSON.stringify(apiResult.rawResponse) : apiResult.rawResponse) : "No Response Content",
         errorMessage: apiResult.error || null
       });
 
       if (!apiResult.success) {
-        // Show raw error from provider
         throw new Error(apiResult.error || "Gagal membuat pesanan di server provider.");
       }
 

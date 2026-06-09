@@ -55,7 +55,6 @@ const processTrafficOrderFlow = ai.defineFlow(
       orderId: z.string().optional(),
       error: z.string().optional(),
       rawResponse: z.any().optional(),
-      debugInfo: z.any().optional(),
     }),
   },
   async (input) => {
@@ -88,14 +87,6 @@ const processTrafficOrderFlow = ai.defineFlow(
         }
       });
 
-      if (!response.ok) {
-        return {
-          success: false,
-          error: `Gagal terhubung ke server layanan. (HTTP ${response.status})`,
-          rawResponse: await response.text().catch(() => "Unknown error")
-        };
-      }
-
       const responseText = await response.text();
       let data;
       try {
@@ -115,7 +106,6 @@ const processTrafficOrderFlow = ai.defineFlow(
           rawResponse: data,
         };
       } else {
-        // Return actual error message from provider as requested
         return {
           success: false,
           error: data.error || 'Provider menolak permintaan.',
