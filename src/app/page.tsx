@@ -1,18 +1,16 @@
 import React from "react"
-import Link from "next/link"
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar"
 import { AppSidebar } from "@/components/layout/AppSidebar"
 import { LandingHero } from "@/components/sections/LandingHero"
 import { Testimonials } from "@/components/sections/Testimonials"
-import { Zap, Shield, Cpu, ShoppingCart, Users, GraduationCap, Layout } from "lucide-react"
+import { Zap, Shield, BookOpen, ShoppingCart, Users, GraduationCap, Layout, Headset } from "lucide-react"
 import { WhatsAppFloating } from "@/components/ui/WhatsAppFloating"
-import { CONTACT_INFO } from "@/lib/constants"
 
 const benefits = [
   { title: "Trafik Otomatis", desc: "Tingkatkan engagement Shopee & TikTok secara instan dengan sistem cerdas.", icon: Zap },
-  { title: "Creator AI", desc: "Hasilkan gambar dan video visual 4K premium hanya dengan perintah teks.", icon: Cpu },
+  { title: "Materi Eksklusif", desc: "Akses video tutorial premium untuk strategi Shopee & TikTok terbaru.", icon: BookOpen },
   { title: "Marketplace Digital", desc: "Akses produk digital eksklusif yang dikurasi khusus untuk member.", icon: ShoppingCart },
-  { title: "Referral Reward", desc: "Dapatkan pasif koin 10% dari setiap pengisian koin rekan Anda.", icon: Users },
+  { title: "Support 24/7", desc: "Dukungan penuh dari tim admin profesional melalui WhatsApp.", icon: Headset },
   { title: "Panel Profesional", desc: "Manajemen seluruh layanan dalam satu dashboard modern dan cepat.", icon: Layout },
   { title: "Enkripsi Aman", desc: "Sistem keamanan tingkat tinggi untuk perlindungan privasi data Anda.", icon: Shield },
 ]
@@ -63,7 +61,7 @@ export default function LandingPage() {
                 <div className="p-8 md:p-16 flex flex-col justify-center space-y-6">
                   <h2 className="text-3xl md:text-4xl font-headline font-bold leading-tight">Misi Memberdayakan <br /><span className="text-primary">Kreator & Pebisnis</span></h2>
                   <p className="text-base text-muted-foreground leading-relaxed">
-                    Nexvora Studio didirikan untuk menjembatani teknologi AI dan strategi pemasaran modern bagi masyarakat Indonesia. Kami percaya akses ke alat pertumbuhan digital haruslah mudah dan terjangkau bagi siapa saja.
+                    Nexvora Studio didirikan untuk menjembatani teknologi pemasaran modern bagi masyarakat Indonesia. Kami percaya akses ke alat pertumbuhan digital haruslah mudah dan terjangkau bagi siapa saja.
                   </p>
                   <div className="space-y-3 pt-2">
                     <div className="flex items-center gap-3 text-sm font-bold text-white/80">

@@ -73,21 +73,8 @@ export default function ManageUsersPage() {
   const handleUpdateCoins = async () => {
     if (!db || !selectedUser || !coinAction) return
     
-    // Debug Logs
-    console.log("--- COIN ADJUSTMENT DEBUG ---");
-    console.log("ADMIN UID:", currentUser?.uid);
-    console.log("ADMIN ROLE:", adminData?.role);
-    console.log("TARGET USER:", selectedUser.uid);
-    console.log("ACTION:", coinAction);
-    console.log("AMOUNT:", coinAmount);
-
     if (isAssistant) {
       toast({ variant: "destructive", title: "Akses Ditolak", description: "Assistant Admin tidak memiliki hak untuk menambah/kurang koin." })
-      return
-    }
-
-    if (!adminData && currentUser?.email !== 'adheprogramer@gmail.com') {
-      toast({ variant: "destructive", title: "Gagal", description: "Admin belum terdaftar di Firestore" })
       return
     }
 
@@ -97,7 +84,6 @@ export default function ManageUsersPage() {
       const amount = coinAction === "add" ? coinAmount : -coinAmount
       const userRef = doc(db, "users", selectedUser.uid)
       
-      // Atomic increment for balance
       await updateDoc(userRef, {
         coins: increment(amount)
       })
@@ -126,14 +112,12 @@ export default function ManageUsersPage() {
       setSelectedUser(null)
       setCoinAmount(0)
     } catch (err: any) {
-      console.error("Adjustment Error:", err);
       toast({ variant: "destructive", title: "Error", description: err.message })
     } finally {
       setIsProcessing(false)
     }
   }
 
-  // Helper for addDoc since it's not imported
   const addDoc = async (collRef: any, data: any) => {
     const newDocRef = doc(collRef);
     await setDoc(newDocRef, data);
@@ -193,8 +177,8 @@ export default function ManageUsersPage() {
             <TableRow className="border-white/5">
               <TableHead className="text-white font-bold">User</TableHead>
               <TableHead className="text-white font-bold">Balance</TableHead>
-              <TableHead className="text-white font-bold">Referral</TableHead>
               <TableHead className="text-white font-bold">Status</TableHead>
+              <TableHead className="text-white font-bold">Joined</TableHead>
               <TableHead className="text-right text-white font-bold">Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -224,15 +208,15 @@ export default function ManageUsersPage() {
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    <span className="text-xs font-mono text-muted-foreground">{u.referralCode}</span>
-                  </TableCell>
-                  <TableCell>
                     <Badge className={cn(
                       "text-[10px] uppercase font-black px-2",
                       u.status === 'active' ? 'bg-green-500' : 'bg-red-500'
                     )}>
                       {u.status}
                     </Badge>
+                  </TableCell>
+                  <TableCell className="text-xs text-muted-foreground">
+                    {u.createdAt?.toDate?.().toLocaleDateString() || '-'}
                   </TableCell>
                   <TableCell className="text-right">
                     <DropdownMenu>

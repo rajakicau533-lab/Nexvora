@@ -1,46 +1,36 @@
-
 "use client"
 
-import React, { useState } from "react"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import React from "react"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { 
   Wallet, 
   Crown, 
-  UserPlus, 
   ShoppingBag, 
   Zap, 
   Users, 
   PlayCircle, 
   TrendingUp, 
-  Copy, 
-  CheckCircle2, 
   ArrowRight,
-  Clock,
-  ExternalLink,
-  Loader2,
-  CreditCard,
-  ShoppingBasket,
   History,
   GraduationCap,
-  Music,
+  ShoppingBasket,
+  CreditCard,
+  Calendar,
   ArrowUpRight,
-  Calendar
+  Loader2
 } from "lucide-react"
 import { useUser, useDoc, useFirestore, useCollection } from "@/firebase"
-import { doc, collection, query, where, orderBy, limit } from "firebase/firestore"
+import { doc, collection, query, where, orderBy } from "firebase/firestore"
 import { cn } from "@/lib/utils"
-import { useToast } from "@/hooks/use-toast"
 import Link from "next/link"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 
 export default function DashboardPage() {
   const { user } = useUser()
   const db = useFirestore()
-  const { toast } = useToast()
-  const [isCopied, setIsCopied] = useState(false)
 
   // 1. Ambil Data Profil User dari Firestore
   const userProfileRef = React.useMemo(() => {
@@ -103,15 +93,6 @@ export default function DashboardPage() {
       .filter((tx: any) => tx.amount < 0)
       .reduce((acc: number, tx: any) => acc + Math.abs(tx.amount), 0);
   }, [transactions]);
-
-  const copyReferral = () => {
-    if (profile?.referralCode) {
-      navigator.clipboard.writeText(profile.referralCode);
-      setIsCopied(true);
-      toast({ title: "Copied!", description: "Kode referral berhasil disalin." });
-      setTimeout(() => setIsCopied(false), 2000);
-    }
-  }
 
   const getLevelInfo = (role: string) => {
     const roles = ['user', 'premium', 'private', 'vip', 'mbah paijo'];
@@ -219,17 +200,14 @@ export default function DashboardPage() {
         <Card className="premium-card rounded-3xl bg-black/40 border-white/5 overflow-hidden group">
           <CardHeader className="pb-2">
             <CardTitle className="text-[10px] font-black text-muted-foreground uppercase tracking-widest flex items-center gap-2">
-              <UserPlus className="h-3 w-3 text-primary" /> Referral Code
+              <Zap className="h-3 w-3 text-primary" /> Koin Digunakan
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <div className="text-3xl font-headline font-black text-white tracking-widest">
-              {profile?.referralCode || 'NXV-0000'}
+            <div className="text-4xl font-headline font-black text-white">
+              {totalSpending.toLocaleString()}
             </div>
-            <button onClick={copyReferral} className="flex items-center gap-1.5 text-[10px] text-primary font-black uppercase hover:opacity-80 transition-all">
-              {isCopied ? <CheckCircle2 className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
-              {isCopied ? 'Berhasil Salin' : 'Salin Kode Referral'}
-            </button>
+            <span className="text-[10px] text-white/40 font-bold uppercase">Total Sepanjang Waktu</span>
           </CardContent>
         </Card>
 
@@ -376,7 +354,7 @@ export default function DashboardPage() {
              <CardContent className="grid grid-cols-2 gap-3">
                 {[
                   { label: 'Trafik Shopee', icon: ShoppingBag, href: '/dashboard/traffic/shopee' },
-                  { label: 'Followers', icon: UserPlus, href: '/dashboard/traffic/followers' },
+                  { label: 'Followers', icon: Users, href: '/dashboard/traffic/followers' },
                   { label: 'VT View', icon: PlayCircle, href: '/dashboard/traffic/tiktok-view' },
                   { label: 'Marketplace', icon: ShoppingBasket, href: '/dashboard/marketplace' },
                   { label: 'Materi Gratis', icon: GraduationCap, href: '/dashboard/materials' },

@@ -10,9 +10,7 @@
         "email": { "type": "string", "format": "email" },
         "coins": { "type": "number" },
         "status": { "type": "string", "enum": ["active", "suspended"] },
-        "role": { "type": "string", "enum": ["user", "admin"] },
-        "referralCode": { "type": "string" },
-        "referredBy": { "type": "string" },
+        "role": { "type": "string", "enum": ["user", "admin", "premium", "private", "vip", "mbah paijo"] },
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["uid", "username", "email", "coins", "role"]
@@ -23,7 +21,7 @@
       "type": "object",
       "properties": {
         "email": { "type": "string", "format": "email" },
-        "role": { "type": "string", "enum": ["admin"] },
+        "role": { "type": "string", "enum": ["super_admin", "assistant_admin", "admin"] },
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["email", "role"]
@@ -38,7 +36,7 @@
         "url": { "type": "string" },
         "views": { "type": "number" },
         "coinCost": { "type": "number" },
-        "status": { "type": "string", "enum": ["pending", "processing", "completed", "failed"] },
+        "status": { "type": "string", "enum": ["pending", "processing", "completed", "failed", "PENDING", "PROCESSING", "SELESAI", "GAGAL"] },
         "createdAt": { "type": "string", "format": "date-time" }
       }
     },
@@ -49,7 +47,7 @@
       "properties": {
         "userId": { "type": "string" },
         "amount": { "type": "number" },
-        "type": { "type": "string", "enum": ["topup", "purchase", "referral_bonus", "traffic_order"] },
+        "type": { "type": "string", "enum": ["topup", "purchase", "traffic_order"] },
         "description": { "type": "string" },
         "createdAt": { "type": "string", "format": "date-time" }
       }

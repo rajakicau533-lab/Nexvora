@@ -18,7 +18,6 @@ export default function RegisterPage() {
   const [username, setUsername] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
-  const [referralCode, setReferralCode] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isSuccess, setIsSuccess] = useState(false)
@@ -53,9 +52,6 @@ export default function RegisterPage() {
       const user = userCredential.user
 
       // 3. Simpan Profil User ke Firestore (users/{uid})
-      // NXV + Random 4 digits
-      const generatedReferral = "NXV" + Math.floor(1000 + Math.random() * 9000)
-      
       await setDoc(doc(db, "users", user.uid), {
         uid: user.uid,
         username: cleanUsername,
@@ -63,8 +59,6 @@ export default function RegisterPage() {
         coins: 0,
         status: "active",
         role: "user",
-        referralCode: generatedReferral,
-        referredBy: referralCode.trim() || null,
         createdAt: serverTimestamp(),
       })
 
@@ -180,17 +174,6 @@ export default function RegisterPage() {
                   minLength={6}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="bg-white/10 border-white/20 rounded-2xl h-14 text-white placeholder:text-white/40 focus:border-primary/50 text-lg px-6"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="referral" className="text-white text-sm font-black ml-1 uppercase tracking-tight">Kode Referral (Opsional)</Label>
-                <Input 
-                  id="referral" 
-                  placeholder="Kode dari teman (jika ada)" 
-                  value={referralCode}
-                  onChange={(e) => setReferralCode(e.target.value)}
                   className="bg-white/10 border-white/20 rounded-2xl h-14 text-white placeholder:text-white/40 focus:border-primary/50 text-lg px-6"
                 />
               </div>
