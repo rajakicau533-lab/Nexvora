@@ -14,7 +14,7 @@ import { useRouter } from "next/navigation"
 import { checkProviderBalance, getProviderServices } from "@/ai/flows/process-traffic-order-flow"
 
 export default function AdminSettingsPage() {
-  const { user } = useUser()
+  const { user, loading: authLoading } = useUser()
   const db = useFirestore()
   const router = useRouter()
   const { toast } = useToast()
@@ -45,11 +45,21 @@ export default function AdminSettingsPage() {
   const { data: apiSettings, loading: settingsLoading } = useDoc(settingsRef)
 
   useEffect(() => {
-    if (!adminLoading && adminData && adminData.role !== "super_admin" && user?.email !== "adheprogramer@gmail.com") {
+    if (authLoading || adminLoading) return;
+
+    // Master email or super_admin role required
+    const isMaster = user?.email === "adheprogramer@gmail.com";
+    const isSuper = adminData?.role === "super_admin";
+
+    if (!isMaster && !isSuper) {
       router.push("/admin")
-      toast({ variant: "destructive", title: "Akses Ditolak", description: "Hanya Super Admin yang dapat mengakses pengaturan sistem." })
+      toast({ 
+        variant: "destructive", 
+        title: "Akses Ditolak", 
+        description: "Hanya Super Admin yang dapat mengakses pengaturan sistem." 
+      })
     }
-  }, [adminData, adminLoading, router, toast, user?.email])
+  }, [adminData, adminLoading, authLoading, router, toast, user?.email])
 
   useEffect(() => {
     if (apiSettings) {
@@ -118,9 +128,12 @@ export default function AdminSettingsPage() {
     setIsTesting(true);
     try {
       const result = await getProviderServices({ apiUrl: formData.apiUrl, apiKey: formData.apiKey });
-      if (result.success) {
+      if (result.success && Array.isArray(result.services)) {
         setAvailableServices(result.services);
-        toast({ title: "Data Services Ditarik", description: `Berhasil mendapatkan ${result.services?.length || 0} layanan.` });
+        toast({ title: "Data Services Ditarik", description: `Berhasil mendapatkan ${result.services.length} layanan.` });
+      } else {
+        setAvailableServices(null);
+        toast({ variant: "destructive", title: "Data Tidak Valid", description: "Provider tidak mengembalikan daftar layanan yang valid." });
       }
     } catch (err: any) {
       toast({ variant: "destructive", title: "Gagal ambil services", description: err.message });
@@ -129,7 +142,7 @@ export default function AdminSettingsPage() {
     }
   }
 
-  if (adminLoading || settingsLoading) {
+  if (authLoading || adminLoading || settingsLoading) {
     return <div className="min-h-[400px] flex items-center justify-center"><Loader2 className="w-12 h-12 text-primary animate-spin" /></div>
   }
 
@@ -275,7 +288,7 @@ export default function AdminSettingsPage() {
             </CardContent>
           </Card>
           
-          {availableServices && (
+          {availableServices && Array.isArray(availableServices) && (
             <Card className="premium-card rounded-[2rem] bg-black/40 border-white/5 max-h-[300px] overflow-hidden">
                <CardHeader className="py-4 px-6 border-b border-white/5">
                  <CardTitle className="text-xs uppercase font-black text-white">Active Services List</CardTitle>
