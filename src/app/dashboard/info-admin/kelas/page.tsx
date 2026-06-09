@@ -4,7 +4,7 @@ import React from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { CheckCircle, MessageCircle, Star, Sparkles, ShieldCheck, Zap } from "lucide-react"
+import { CheckCircle, MessageCircle, Star, Sparkles, ShieldCheck, Zap, Users } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 const packages = [
@@ -44,7 +44,7 @@ const packages = [
 
 export default function InfoKelasPage() {
   return (
-    <div className="space-y-10 max-w-[1400px] mx-auto pb-20">
+    <div className="space-y-10 max-w-[1400px] mx-auto pb-20 px-6">
       {/* Banner Section */}
       <div className="relative w-full rounded-[2.5rem] overflow-hidden bg-black/40 border border-white/5 shadow-2xl">
         <div className="aspect-[21/9] md:aspect-[3/1] relative">
@@ -67,7 +67,7 @@ export default function InfoKelasPage() {
       </div>
 
       {/* Pricing Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 px-4 md:px-0">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {packages.map((pkg, idx) => (
           <Card 
             key={idx} 
@@ -80,7 +80,7 @@ export default function InfoKelasPage() {
             
             {pkg.popular && (
               <div className="absolute top-4 right-4">
-                <Badge className="luxury-gradient text-[10px] font-black uppercase px-3 py-1 rounded-full">Terpopuler</Badge>
+                <Badge className="luxury-gradient text-[10px] font-black uppercase px-3 py-1 rounded-full border-none">Terpopuler</Badge>
               </div>
             )}
 
