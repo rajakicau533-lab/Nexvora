@@ -78,7 +78,6 @@ const processTrafficOrderFlow = ai.defineFlow(
       params.append('link', link.trim());
       params.append('quantity', quantity.toString());
 
-      // Use a standard User-Agent and structured request
       const response = await fetch(endpoint, {
         method: 'POST',
         body: params,
@@ -89,6 +88,14 @@ const processTrafficOrderFlow = ai.defineFlow(
         }
       });
 
+      if (!response.ok) {
+        return {
+          success: false,
+          error: `Gagal terhubung ke server layanan. (HTTP ${response.status})`,
+          rawResponse: await response.text().catch(() => "Unknown error")
+        };
+      }
+
       const responseText = await response.text();
       let data;
       try {
@@ -96,9 +103,8 @@ const processTrafficOrderFlow = ai.defineFlow(
       } catch (e) {
         return {
           success: false,
-          error: `Respon server provider tidak valid atau bukan JSON. (Status: ${response.status})`,
-          rawResponse: responseText.slice(0, 1000),
-          debugInfo: { body: responseText.slice(0, 1000) }
+          error: `Respon server provider tidak valid. Mohon coba beberapa saat lagi.`,
+          rawResponse: responseText.slice(0, 1000)
         };
       }
 
@@ -110,19 +116,17 @@ const processTrafficOrderFlow = ai.defineFlow(
         };
       } else {
         // If there's an error field in the JSON response
+        const rawError = (data.error || "").toLowerCase();
         let errorMsg = data.error || 'Provider SMM menolak permintaan (Tanpa Pesan Error).';
         
-        // Detailed Error Mapping for Better User Feedback
-        const rawError = (data.error || "").toLowerCase();
-        
-        // Ensure we only show "Not enough funds" if it's actually returned by provider
-        if (rawError.includes("not enough funds")) {
+        // Detailed Error Mapping - ONLY show "funds" error if explicitly stated
+        if (rawError.includes("not enough funds") || rawError.includes("insufficient balance")) {
           errorMsg = "Saldo sistem (Provider) sedang tidak mencukupi untuk memproses pesanan ini. Mohon hubungi Admin.";
-        } else if (rawError.includes("invalid api key")) {
+        } else if (rawError.includes("invalid api key") || rawError.includes("key is invalid")) {
           errorMsg = "Konfigurasi API Key sistem tidak valid. Hubungi Admin.";
-        } else if (rawError.includes("service not found")) {
-          errorMsg = "Layanan (ID: " + serviceId + ") tidak tersedia di provider.";
-        } else if (rawError.includes("incorrect link") || rawError.includes("invalid link")) {
+        } else if (rawError.includes("service not found") || rawError.includes("service invalid")) {
+          errorMsg = "Layanan (ID: " + serviceId + ") tidak tersedia di provider saat ini.";
+        } else if (rawError.includes("link") || rawError.includes("incorrect link") || rawError.includes("invalid link")) {
           errorMsg = "Format link yang dimasukkan tidak sesuai dengan syarat layanan provider.";
         } else if (rawError.includes("maintenance")) {
           errorMsg = "Layanan provider sedang dalam pemeliharaan.";
@@ -138,7 +142,7 @@ const processTrafficOrderFlow = ai.defineFlow(
       console.error("Critical Fetch Error:", err);
       return {
         success: false,
-        error: `Kesalahan Koneksi Jaringan: ${err.message || 'Gagal terhubung ke server provider'}`,
+        error: "Gagal terhubung ke server layanan. Silakan coba beberapa saat lagi.",
       };
     }
   }

@@ -118,13 +118,18 @@ export default function ShopeeTrafficPage() {
   const handleOrder = async () => {
     if (!db || !user?.uid || !profile) return
     
-    if (settingsLoading || !apiSettings?.apiKey) {
-      toast({ variant: "destructive", title: "Sistem Menghubungkan", description: "Mohon tunggu sejenak..." });
+    // Ensure settings are loaded
+    if (!apiSettings || !apiSettings.apiUrl || !apiSettings.apiKey) {
+      toast({ 
+        variant: "destructive", 
+        title: "Konfigurasi Belum Siap", 
+        description: "Gagal memuat pengaturan API. Mohon tunggu sejenak atau refresh halaman." 
+      });
       return;
     }
 
     if (!url || url.trim().length < 5) {
-      toast({ variant: "destructive", title: "Link Tidak Valid", description: "Masukkan link Shopee dengan benar." });
+      toast({ variant: "destructive", title: "Link Wajib", description: "Masukkan link produk Shopee yang valid." });
       return;
     }
 
@@ -134,7 +139,7 @@ export default function ShopeeTrafficPage() {
     }
     
     if (profile.coins < coinCost) {
-      toast({ variant: "destructive", title: "Koin Kurang", description: `Butuh ${coinCost} koin. Saldo Anda: ${profile.coins}` });
+      toast({ variant: "destructive", title: "Saldo Koin Kurang", description: `Dibutuhkan ${coinCost} koin. Saldo Anda: ${profile.coins}` });
       return;
     }
 
@@ -143,14 +148,14 @@ export default function ShopeeTrafficPage() {
 
     try {
       const apiResult = await processTrafficOrder({
-        apiUrl: apiSettings?.apiUrl || "",
-        apiKey: apiSettings?.apiKey || "",
+        apiUrl: apiSettings.apiUrl,
+        apiKey: apiSettings.apiKey,
         serviceId: serviceConfig.id,
         link: url.trim(),
         quantity: views
       });
 
-      // technical auditing log (Save attempt regardless of success for audit)
+      // Technical logging for auditing
       await addDoc(collection(db, "api_logs"), {
         userId: user.uid,
         userEmail: user.email,
@@ -165,10 +170,10 @@ export default function ShopeeTrafficPage() {
       });
 
       if (!apiResult.success) {
-        throw new Error(apiResult.error || "Provider SMM menolak pesanan ini.");
+        throw new Error(apiResult.error || "Gagal terhubung ke server layanan.");
       }
 
-      // ONLY RECORD ORDER AND DEDUCT COINS IF API WAS SUCCESSFUL
+      // Success Path
       await addDoc(collection(db, "traffic_orders"), {
         userId: user.uid,
         platform: "shopee",
@@ -185,16 +190,14 @@ export default function ShopeeTrafficPage() {
         coins: increment(-coinCost) 
       });
       
-      toast({ title: "Booster Berhasil! 🚀", description: "Pesanan trafik Shopee Anda sedang diproses." });
+      toast({ title: "Pesanan Diterima! 🚀", description: "Booster trafik Shopee Anda sedang diproses." });
       setUrl("");
       setOrderFeedback("success");
       setTimeout(() => setOrderFeedback("idle"), 3000);
-      
-      // Force sync soon
-      setTimeout(syncStatus, 2000);
+      setTimeout(syncStatus, 1500);
     } catch (err: any) {
       setOrderFeedback("error");
-      toast({ variant: "destructive", title: "Booster Gagal", description: err.message });
+      toast({ variant: "destructive", title: "Pemesanan Gagal", description: err.message });
       setTimeout(() => setOrderFeedback("idle"), 3000);
     } finally {
       setIsOrdering(false);
@@ -253,7 +256,7 @@ export default function ShopeeTrafficPage() {
                 className="w-full h-12 rounded-xl luxury-gradient font-bold text-sm shadow-xl"
               >
                 {isOrdering ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                {orderFeedback === 'success' ? "Berhasil Dipesan!" : isOrdering ? "Menghubungkan Provider..." : "Mulai Booster Sekarang"}
+                {orderFeedback === 'success' ? "Berhasil Dipesan!" : isOrdering ? "Menghubungkan..." : "Mulai Booster Sekarang"}
               </Button>
             </CardContent>
           </Card>
