@@ -107,7 +107,7 @@ export default function ShopeeTrafficPage() {
   }, [db, apiSettings, history, isSyncing]);
 
   useEffect(() => {
-    const interval = setInterval(syncStatus, 30000);
+    const interval = setInterval(syncStatus, 60000);
     syncStatus();
     return () => clearInterval(interval);
   }, [syncStatus]);
@@ -125,7 +125,10 @@ export default function ShopeeTrafficPage() {
         'vn.shp.ee', 
         'my.shp.ee',
         'th.shp.ee',
-        'tw.shp.ee'
+        'tw.shp.ee',
+        'shopee.com.my',
+        'shopee.vn',
+        'shopee.ph'
       ];
       return domains.some(domain => hostname === domain || hostname.endsWith('.' + domain));
     } catch (e) { return false; }
@@ -135,7 +138,7 @@ export default function ShopeeTrafficPage() {
     if (!db || !user?.uid || !profile) return
     
     if (settingsLoading || !apiSettings?.apiKey) {
-      toast({ variant: "destructive", title: "API Belum Siap", description: "Menghubungkan ke sistem, coba lagi dalam 2 detik." });
+      toast({ variant: "destructive", title: "API Belum Siap", description: "Menghubungkan ke sistem, coba lagi dalam beberapa detik." });
       return;
     }
 
@@ -143,6 +146,7 @@ export default function ShopeeTrafficPage() {
       toast({ variant: "destructive", title: "Link Tidak Valid", description: "Masukkan link Shopee (shopee.co.id atau shp.ee) yang benar." });
       return;
     }
+    
     if (profile.coins < coinCost) {
       toast({ variant: "destructive", title: "Koin Kurang", description: `Butuh ${coinCost} koin. Saldo Anda: ${profile.coins}` });
       return;
@@ -150,9 +154,6 @@ export default function ShopeeTrafficPage() {
 
     setIsOrdering(true);
     setOrderFeedback("processing");
-
-    // Technical Log Entry
-    const logId = doc(collection(db, "api_logs")).id;
 
     try {
       const apiResult = await processTrafficOrder({
@@ -163,7 +164,7 @@ export default function ShopeeTrafficPage() {
         quantity: views
       });
 
-      // Save TECHNICAL LOG for Admin
+      // Save TECHNICAL LOG for Admin with stringified response for safety
       await addDoc(collection(db, "api_logs"), {
         userId: user.uid,
         userEmail: user.email,
@@ -173,14 +174,15 @@ export default function ShopeeTrafficPage() {
         quantity: views,
         serviceId: serviceConfig.id,
         status: apiResult.success ? "success" : "failed",
-        responseBody: apiResult.rawResponse || apiResult.debugInfo || "No body",
+        responseBody: typeof apiResult.rawResponse === 'object' ? JSON.stringify(apiResult.rawResponse) : (apiResult.rawResponse || "No response"),
         errorMessage: apiResult.error || null
       });
 
       if (!apiResult.success) {
-        throw new Error(apiResult.error);
+        throw new Error(apiResult.error || "Gagal menghubungi provider SMM.");
       }
 
+      // Record Order in Database
       await addDoc(collection(db, "traffic_orders"), {
         userId: user.uid,
         platform: "shopee",
@@ -193,16 +195,21 @@ export default function ShopeeTrafficPage() {
         createdAt: serverTimestamp(),
       });
 
-      await updateDoc(profileRef!, { coins: increment(-coinCost) });
+      // Deduct User Coins
+      await updateDoc(profileRef!, { 
+        coins: increment(-coinCost) 
+      });
       
-      toast({ title: "Sukses!", description: "Pesanan trafik sedang diproses." });
+      toast({ title: "Booster Berhasil Dipesan! 🚀", description: "Pesanan trafik sedang diproses oleh server." });
       setUrl("");
       setOrderFeedback("success");
       setTimeout(() => setOrderFeedback("idle"), 3000);
-      syncStatus();
+      
+      // Initial status check after 3 seconds
+      setTimeout(syncStatus, 3000);
     } catch (err: any) {
       setOrderFeedback("error");
-      toast({ variant: "destructive", title: "Gagal", description: err.message });
+      toast({ variant: "destructive", title: "Order Gagal", description: err.message });
       setTimeout(() => setOrderFeedback("idle"), 3000);
     } finally {
       setIsOrdering(false);
@@ -260,7 +267,7 @@ export default function ShopeeTrafficPage() {
                 className="w-full h-12 rounded-xl luxury-gradient font-bold text-sm shadow-xl"
               >
                 {isOrdering ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                {orderFeedback === 'success' ? "Trafik Dikirim!" : isOrdering ? "Memproses..." : "Mulai Booster Sekarang"}
+                {orderFeedback === 'success' ? "Booster Berhasil!" : isOrdering ? "Menghubungkan Server..." : "Mulai Booster Sekarang"}
               </Button>
             </CardContent>
           </Card>
@@ -269,16 +276,17 @@ export default function ShopeeTrafficPage() {
         <Card className="premium-card rounded-2xl border-white/5 bg-black/40 lg:col-span-4 h-fit">
           <CardHeader className="py-4 border-b border-white/5">
             <CardTitle className="text-sm font-bold flex items-center gap-2">
-              <Info className="h-4 w-4 text-primary" /> Panduan
+              <Info className="h-4 w-4 text-primary" /> Panduan Penggunaan
             </CardTitle>
           </CardHeader>
           <CardContent className="p-5 text-xs space-y-3 text-muted-foreground leading-relaxed">
             <p>• Gunakan link produk Shopee yang valid.</p>
+            <p>• Link yang disarankan adalah dari share aplikasi Shopee.</p>
             <p>• Tarif: <strong>1.000 Views = 1 Koin</strong>.</p>
-            <p>• Jika order gagal, pastikan link benar dan sistem provider online.</p>
+            <p>• Jika status gagal, pastikan link produk bisa dibuka secara publik.</p>
             <div className="pt-2">
-              <Badge className="bg-amber-500/10 text-amber-500 border-none text-[9px] uppercase font-black px-2 py-0.5">Note</Badge>
-              <p className="mt-1">Riwayat di-reset otomatis setiap 3 hari.</p>
+              <Badge className="bg-amber-500/10 text-amber-500 border-none text-[9px] uppercase font-black px-2 py-0.5">Catatan</Badge>
+              <p className="mt-1">Riwayat pesanan tersimpan selama 3 hari terakhir.</p>
             </div>
           </CardContent>
         </Card>
@@ -305,7 +313,7 @@ export default function ShopeeTrafficPage() {
                 {historyLoading ? (
                   <TableRow><TableCell colSpan={5} className="text-center py-10 text-xs text-muted-foreground">Memuat data...</TableCell></TableRow>
                 ) : history.length === 0 ? (
-                  <TableRow><TableCell colSpan={5} className="text-center py-12 text-xs text-muted-foreground italic">Tidak ada riwayat dalam 3 hari terakhir.</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={5} className="text-center py-12 text-xs text-muted-foreground italic">Belum ada riwayat pesanan.</TableCell></TableRow>
                 ) : (
                   history.map((row: any) => (
                     <TableRow key={row.id} className="border-white/5 hover:bg-white/[0.02] transition-colors">

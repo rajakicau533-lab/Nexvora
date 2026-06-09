@@ -68,6 +68,17 @@ const processTrafficOrderFlow = ai.defineFlow(
       };
     }
 
+    // Normalize Link: Remove shopee referral parameters that often cause API rejection
+    let cleanLink = link.trim();
+    try {
+      const urlObj = new URL(cleanLink);
+      // Remove common tracking params but keep essential product ID params
+      ['smtt', 'sp_atk', 'share_relation_origin'].forEach(p => urlObj.searchParams.delete(p));
+      cleanLink = urlObj.toString();
+    } catch (e) {
+      // If URL parsing fails, use original
+    }
+
     const endpoint = apiUrl.trim();
 
     try {
@@ -75,7 +86,7 @@ const processTrafficOrderFlow = ai.defineFlow(
       params.append('key', apiKey.trim());
       params.append('action', 'add');
       params.append('service', serviceId);
-      params.append('link', link);
+      params.append('link', cleanLink);
       params.append('quantity', quantity.toString());
 
       const response = await fetch(endpoint, {
@@ -115,6 +126,8 @@ const processTrafficOrderFlow = ai.defineFlow(
           errorMsg = "Layanan sedang dalam pemeliharaan (Restocking). Silakan coba lagi nanti.";
         } else if (errorMsg.toLowerCase().includes("invalid api key")) {
           errorMsg = "Konfigurasi server belum lengkap (Invalid Key).";
+        } else if (errorMsg.toLowerCase().includes("service not found")) {
+          errorMsg = "Layanan (Service ID) tidak ditemukan atau sudah tidak aktif.";
         }
 
         return {
