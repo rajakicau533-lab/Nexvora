@@ -40,7 +40,7 @@ export default function ShopeeTrafficPage() {
   }, [db, user?.uid])
   const { data: profile } = useDoc(profileRef)
 
-  // Order history (limited to user and shopee platform)
+  // Order history
   const historyQuery = React.useMemo(() => {
     if (!db || !user?.uid) return null
     return query(
@@ -150,7 +150,7 @@ export default function ShopeeTrafficPage() {
         quantity: views
       });
 
-      // technical auditing log
+      // technical auditing log (Save attempt regardless of success for audit)
       await addDoc(collection(db, "api_logs"), {
         userId: user.uid,
         userEmail: user.email,
@@ -160,7 +160,7 @@ export default function ShopeeTrafficPage() {
         quantity: views,
         serviceId: serviceConfig.id,
         status: apiResult.success ? "success" : "failed",
-        responseBody: apiResult.rawResponse ? JSON.stringify(apiResult.rawResponse) : "No Response Content",
+        responseBody: apiResult.rawResponse ? (typeof apiResult.rawResponse === 'object' ? JSON.stringify(apiResult.rawResponse) : apiResult.rawResponse) : "No Response Content",
         errorMessage: apiResult.error || null
       });
 
@@ -168,7 +168,7 @@ export default function ShopeeTrafficPage() {
         throw new Error(apiResult.error || "Provider SMM menolak pesanan ini.");
       }
 
-      // Record Order in Database
+      // ONLY RECORD ORDER AND DEDUCT COINS IF API WAS SUCCESSFUL
       await addDoc(collection(db, "traffic_orders"), {
         userId: user.uid,
         platform: "shopee",
@@ -181,7 +181,6 @@ export default function ShopeeTrafficPage() {
         createdAt: serverTimestamp(),
       });
 
-      // Deduct User Coins
       await updateDoc(profileRef!, { 
         coins: increment(-coinCost) 
       });
@@ -192,7 +191,7 @@ export default function ShopeeTrafficPage() {
       setTimeout(() => setOrderFeedback("idle"), 3000);
       
       // Force sync soon
-      setTimeout(syncStatus, 1500);
+      setTimeout(syncStatus, 2000);
     } catch (err: any) {
       setOrderFeedback("error");
       toast({ variant: "destructive", title: "Booster Gagal", description: err.message });

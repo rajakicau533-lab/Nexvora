@@ -1,4 +1,3 @@
-
 "use client"
 
 import React, { useState, useEffect, useCallback } from "react"
@@ -10,7 +9,7 @@ import { Clock, ExternalLink, Loader2, Info, AlertCircle, RefreshCw } from "luci
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { useFirestore, useUser, useCollection, useDoc } from "@/firebase"
-import { collection, doc, setDoc, updateDoc, increment, serverTimestamp, query, where, addDoc } from "firebase/firestore"
+import { collection, doc, updateDoc, increment, serverTimestamp, query, where, addDoc } from "firebase/firestore"
 import { useToast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
 import { processTrafficOrder, checkOrderStatus } from "@/ai/flows/process-traffic-order-flow"
@@ -109,7 +108,7 @@ export default function ShopeeFollowersPage() {
   }, [db, apiSettings, history, isSyncing]);
 
   useEffect(() => {
-    const interval = setInterval(syncStatus, 30000);
+    const interval = setInterval(syncStatus, 60000);
     syncStatus();
     return () => clearInterval(interval);
   }, [syncStatus]);
@@ -141,8 +140,23 @@ export default function ShopeeFollowersPage() {
         quantity: quantity
       });
 
+      // technical auditing log
+      await addDoc(collection(db, "api_logs"), {
+        userId: user.uid,
+        userEmail: user.email,
+        timestamp: serverTimestamp(),
+        provider: "SMM.ID",
+        link: url,
+        quantity: quantity,
+        serviceId: serviceConfig.id,
+        status: apiResult.success ? "success" : "failed",
+        responseBody: apiResult.rawResponse ? (typeof apiResult.rawResponse === 'object' ? JSON.stringify(apiResult.rawResponse) : apiResult.rawResponse) : "No Response Content",
+        errorMessage: apiResult.error || null
+      });
+
       if (!apiResult.success) throw new Error(apiResult.error);
 
+      // ONLY RECORD ORDER AND DEDUCT COINS ON SUCCESS
       await addDoc(collection(db, "traffic_orders"), {
         userId: user.uid,
         platform: "shopee",
@@ -161,7 +175,7 @@ export default function ShopeeFollowersPage() {
       setUrl("");
       setOrderFeedback("success");
       setTimeout(() => setOrderFeedback("idle"), 3000);
-      syncStatus();
+      setTimeout(syncStatus, 2000);
     } catch (err: any) {
       setOrderFeedback("error");
       toast({ variant: "destructive", title: "Gagal", description: err.message });
@@ -293,7 +307,7 @@ export default function ShopeeFollowersPage() {
                             row.status === "COMPLETED" ? "bg-green-500" : 
                             row.status === "PROCESSING" ? "bg-blue-600 animate-pulse" :
                             row.status === "PARTIAL" ? "bg-orange-500" :
-                            row.status === "CANCELLED" ? "bg-red-500" : "bg-amber-500"
+                            row.status === "CANCELLED" || row.status === "FAILED" ? "bg-red-500" : "bg-amber-500"
                         )}>{row.status || "PENDING"}</Badge>
                       </TableCell>
                     </TableRow>
