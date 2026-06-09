@@ -1,3 +1,4 @@
+
 {
   "entities": {
     "User": {
@@ -36,7 +37,10 @@
         "url": { "type": "string" },
         "views": { "type": "number" },
         "coinCost": { "type": "number" },
-        "status": { "type": "string", "enum": ["pending", "processing", "completed", "failed", "PENDING", "PROCESSING", "SELESAI", "GAGAL"] },
+        "status": { "type": "string", "enum": ["PENDING", "PROCESSING", "COMPLETED", "PARTIAL", "CANCELLED", "FAILED"] },
+        "providerOrderId": { "type": "string" },
+        "serviceLabel": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" },
         "createdAt": { "type": "string", "format": "date-time" }
       }
     },

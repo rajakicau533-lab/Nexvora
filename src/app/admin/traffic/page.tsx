@@ -1,7 +1,7 @@
 
 "use client"
 
-import React, { useState, useMemo } from "react"
+import React, { useState, useMemo, useCallback, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
@@ -21,7 +21,9 @@ import {
   ChevronRight,
   MoreVertical,
   CheckSquare,
-  Square
+  Square,
+  RefreshCw,
+  Database
 } from "lucide-react"
 import { useFirestore, useCollection, useUser, useDoc } from "@/firebase"
 import { collection, query, orderBy, doc, updateDoc, serverTimestamp, deleteDoc, writeBatch, getDocs } from "firebase/firestore"
@@ -39,6 +41,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { Checkbox } from "@/components/ui/checkbox"
+import { checkOrderStatus } from "@/ai/flows/process-traffic-order-flow"
 
 const ITEMS_PER_PAGE = 8
 
@@ -52,6 +55,7 @@ export default function AdminTrafficMonitoringPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const [selectedOrders, setSelectedOrders] = useState<string[]>([])
   const [isDeleting, setIsDeleting] = useState(false)
+  const [isSyncing, setIsSyncing] = useState(false)
 
   // Auth check for Assistant Admin
   const adminProfileRef = React.useMemo(() => {
@@ -61,11 +65,71 @@ export default function AdminTrafficMonitoringPage() {
   const { data: adminData } = useDoc(adminProfileRef);
   const isAssistant = adminData?.role === 'assistant_admin';
 
+  // API Config for Sync
+  const apiSettingsRef = React.useMemo(() => (db ? doc(db, "system_settings", "provider_config") : null), [db])
+  const { data: apiSettings } = useDoc(apiSettingsRef)
+
   const ordersQuery = React.useMemo(() => {
     if (!db) return null
     return query(collection(db, "traffic_orders"), orderBy("createdAt", "desc"))
   }, [db])
   const { data: orders, loading } = useCollection<any>(ordersQuery)
+
+  const syncProviderStatus = useCallback(async () => {
+    if (!db || !apiSettings || !orders || isSyncing) return;
+    
+    const ordersToSync = orders.filter(o => 
+      ["PENDING", "PROCESSING", "Pending", "Processing"].includes(o.status) && o.providerOrderId
+    ).slice(0, 10); // Batch sync 10 at a time to avoid rate limit
+
+    if (ordersToSync.length === 0) return;
+
+    setIsSyncing(true);
+    let updatedCount = 0;
+
+    try {
+      for (const order of ordersToSync) {
+        const result = await checkOrderStatus({
+          apiUrl: apiSettings.apiUrl,
+          apiKey: apiSettings.apiKey,
+          orderId: order.providerOrderId
+        });
+
+        if (result.success && result.status) {
+          const rawStatus = result.status.toLowerCase();
+          let mappedStatus = "PENDING";
+
+          if (["processing", "in progress", "in_progress"].includes(rawStatus)) mappedStatus = "PROCESSING";
+          else if (["completed", "success", "finished"].includes(rawStatus)) mappedStatus = "COMPLETED";
+          else if (["partial"].includes(rawStatus)) mappedStatus = "PARTIAL";
+          else if (["cancelled", "canceled", "failed"].includes(rawStatus)) mappedStatus = "CANCELLED";
+
+          if (mappedStatus !== order.status) {
+            await updateDoc(doc(db, "traffic_orders", order.id), {
+              status: mappedStatus,
+              updatedAt: serverTimestamp(),
+              lastSyncAt: serverTimestamp()
+            });
+            updatedCount++;
+          }
+        }
+      }
+      if (updatedCount > 0) {
+        toast({ title: "Sinkronisasi Berhasil", description: `${updatedCount} status pesanan diperbarui dari provider.` });
+      }
+    } catch (err) {
+      console.error("Sync error:", err);
+    } finally {
+      setIsSyncing(false);
+    }
+  }, [db, apiSettings, orders, isSyncing, toast]);
+
+  // Auto sync on mount
+  useEffect(() => {
+    if (orders && orders.length > 0 && apiSettings) {
+      syncProviderStatus();
+    }
+  }, [orders?.length, !!apiSettings]);
 
   // Filtering & Searching Logic
   const filteredOrders = useMemo(() => {
@@ -73,6 +137,7 @@ export default function AdminTrafficMonitoringPage() {
     return orders.filter(order => {
       const matchesSearch = 
         order.id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        order.providerOrderId?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         order.targetLink?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         order.url?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         order.serviceLabel?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -80,9 +145,7 @@ export default function AdminTrafficMonitoringPage() {
 
       const matchesStatus = 
         statusFilter === "all" || 
-        order.status?.toLowerCase() === statusFilter.toLowerCase() ||
-        (statusFilter === "success" && (order.status === "SELESAI" || order.status === "completed")) ||
-        (statusFilter === "failed" && (order.status === "GAGAL" || order.status === "failed"))
+        order.status?.toLowerCase() === statusFilter.toLowerCase()
 
       return matchesSearch && matchesStatus
     })
@@ -95,13 +158,13 @@ export default function AdminTrafficMonitoringPage() {
     return filteredOrders.slice(startIndex, startIndex + ITEMS_PER_PAGE)
   }, [filteredOrders, currentPage])
 
-  // Stats Logic (Based on ALL orders, not filtered)
+  // Stats Logic
   const stats = useMemo(() => {
     if (!orders) return { total: 0, pending: 0, completed: 0, coins: 0 }
     return {
       total: orders.length,
-      pending: orders.filter((o: any) => ["pending", "processing", "PROCESSING", "PENDING"].includes(o.status)).length,
-      completed: orders.filter((o: any) => ["completed", "SELESAI"].includes(o.status)).length,
+      pending: orders.filter((o: any) => ["PENDING", "PROCESSING", "Pending", "Processing"].includes(o.status)).length,
+      completed: orders.filter((o: any) => ["COMPLETED", "SELESAI", "success", "Completed"].includes(o.status)).length,
       coins: orders.reduce((acc: number, o: any) => acc + (o.coinCost || 0), 0)
     }
   }, [orders])
@@ -184,14 +247,20 @@ export default function AdminTrafficMonitoringPage() {
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div className="space-y-1">
           <h2 className="text-3xl font-headline font-bold text-white">Traffic Control 🚀</h2>
-          <p className="text-muted-foreground text-sm">Manajemen dan pemrosesan pesanan booster sosial media.</p>
+          <p className="text-muted-foreground text-sm">Monitor dan sinkronisasi pesanan SMM secara realtime.</p>
         </div>
-        <Card className="bg-black/40 border-white/5 px-6 py-2 rounded-2xl flex items-center gap-4 w-fit">
-          <div className="text-right">
-            <p className="text-[9px] text-muted-foreground uppercase font-black">Total Revenue</p>
-            <p className="text-xl font-bold text-primary">{stats.coins.toLocaleString()} 🪙</p>
-          </div>
-        </Card>
+        <div className="flex items-center gap-3">
+          <Button onClick={() => syncProviderStatus()} disabled={isSyncing || !apiSettings} variant="outline" className="rounded-xl border-primary/20 bg-primary/5 text-primary font-bold h-12">
+            {isSyncing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <RefreshCw className="h-4 w-4 mr-2" />}
+            Sync Provider Status
+          </Button>
+          <Card className="bg-black/40 border-white/5 px-6 py-2 h-12 rounded-2xl flex items-center gap-4 w-fit">
+            <div className="text-right">
+              <p className="text-[9px] text-muted-foreground uppercase font-black">Total Revenue</p>
+              <p className="text-xl font-bold text-primary">{stats.coins.toLocaleString()} 🪙</p>
+            </div>
+          </Card>
+        </div>
       </div>
 
       {/* Stats Summary */}
@@ -216,14 +285,14 @@ export default function AdminTrafficMonitoringPage() {
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input 
-            placeholder="Cari order, layanan, link, atau ID..."
+            placeholder="Cari order, provider ID, atau link..."
             value={searchTerm}
             onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
             className="pl-10 bg-black/40 border-white/10 rounded-xl h-12"
           />
         </div>
         <div className="flex flex-wrap gap-2">
-          {['all', 'pending', 'processing', 'success', 'failed'].map((f) => (
+          {['all', 'pending', 'processing', 'completed', 'partial', 'cancelled'].map((f) => (
             <Button
               key={f}
               variant={statusFilter === f ? "default" : "outline"}
@@ -290,7 +359,6 @@ export default function AdminTrafficMonitoringPage() {
 
       {/* Orders List */}
       <Card className="premium-card rounded-[2.5rem] overflow-hidden border-white/5 bg-black/40">
-        {/* Desktop Table View */}
         <div className="hidden md:block overflow-x-auto">
           <Table>
             <TableHeader className="bg-white/5">
@@ -305,6 +373,7 @@ export default function AdminTrafficMonitoringPage() {
                    )}
                 </TableHead>
                 <TableHead className="text-white font-bold">Service / Link</TableHead>
+                <TableHead className="text-white font-bold">ID / Provider</TableHead>
                 <TableHead className="text-white font-bold">Qty / Cost</TableHead>
                 <TableHead className="text-white font-bold">Status</TableHead>
                 <TableHead className="text-white font-bold">Waktu</TableHead>
@@ -313,9 +382,9 @@ export default function AdminTrafficMonitoringPage() {
             </TableHeader>
             <TableBody>
               {loading ? (
-                <TableRow><TableCell colSpan={6} className="text-center py-20"><Loader2 className="animate-spin mx-auto h-8 w-8 text-primary" /></TableCell></TableRow>
+                <TableRow><TableCell colSpan={7} className="text-center py-20"><Loader2 className="animate-spin mx-auto h-8 w-8 text-primary" /></TableCell></TableRow>
               ) : filteredOrders.length === 0 ? (
-                <TableRow><TableCell colSpan={6} className="text-center py-20 text-muted-foreground italic">Tidak ada pesanan ditemukan.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={7} className="text-center py-20 text-muted-foreground italic">Tidak ada pesanan ditemukan.</TableCell></TableRow>
               ) : (
                 paginatedOrders.map((order) => (
                   <TableRow key={order.id} className="border-white/5 hover:bg-white/5 transition-colors group">
@@ -331,11 +400,16 @@ export default function AdminTrafficMonitoringPage() {
                     <TableCell>
                       <div className="flex flex-col">
                         <span className="text-[10px] font-black text-primary uppercase">{order.serviceLabel || order.platform}</span>
-                        <a href={order.targetLink || order.url} target="_blank" rel="noopener noreferrer" className="text-xs text-muted-foreground hover:text-white flex items-center gap-1 max-w-[250px] truncate">
+                        <a href={order.targetLink || order.url} target="_blank" rel="noopener noreferrer" className="text-xs text-muted-foreground hover:text-white flex items-center gap-1 max-w-[200px] truncate">
                           {order.targetLink || order.url} <ExternalLink className="h-2 w-2" />
                         </a>
-                        <span className="text-[9px] font-mono text-white/30 mt-0.5">ID: {order.id}</span>
                       </div>
+                    </TableCell>
+                    <TableCell>
+                       <div className="flex flex-col">
+                         <span className="text-[10px] text-white/40 uppercase font-bold">NXV: {order.id?.slice(-6).toUpperCase()}</span>
+                         <span className="text-[10px] text-primary font-black">SMM: {order.providerOrderId || "-"}</span>
+                       </div>
                     </TableCell>
                     <TableCell>
                       <div className="flex flex-col">
@@ -346,9 +420,10 @@ export default function AdminTrafficMonitoringPage() {
                     <TableCell>
                        <Badge className={cn(
                          "text-[9px] font-black uppercase px-2 py-0.5",
-                         ["completed", "SELESAI", "success"].includes(order.status) ? 'bg-green-500' : 
-                         ["processing", "PROCESSING"].includes(order.status) ? 'bg-blue-600 animate-pulse' : 
-                         ["failed", "GAGAL"].includes(order.status) ? 'bg-red-500' : 'bg-amber-500'
+                         ["COMPLETED", "SELESAI", "success"].includes(order.status) ? 'bg-green-500' : 
+                         ["PROCESSING", "processing", "in progress"].includes(order.status) ? 'bg-blue-600 animate-pulse' : 
+                         ["CANCELLED", "FAILED", "failed"].includes(order.status) ? 'bg-red-500' : 
+                         order.status === "PARTIAL" ? 'bg-orange-500' : 'bg-amber-500'
                        )}>
                          {order.status}
                        </Badge>
@@ -363,10 +438,10 @@ export default function AdminTrafficMonitoringPage() {
                            <Button size="icon" variant="ghost" onClick={() => handleUpdateStatus(order.id, "PROCESSING")} title="Proses" className="h-8 w-8 text-blue-500 hover:bg-blue-500/10">
                              <Clock className="h-4 w-4" />
                            </Button>
-                           <Button size="icon" variant="ghost" onClick={() => handleUpdateStatus(order.id, "SELESAI")} title="Selesai" className="h-8 w-8 text-green-500 hover:bg-green-500/10">
+                           <Button size="icon" variant="ghost" onClick={() => handleUpdateStatus(order.id, "COMPLETED")} title="Selesai" className="h-8 w-8 text-green-500 hover:bg-green-500/10">
                              <CheckCircle2 className="h-4 w-4" />
                            </Button>
-                           <Button size="icon" variant="ghost" onClick={() => handleUpdateStatus(order.id, "GAGAL")} title="Gagal" className="h-8 w-8 text-red-500 hover:bg-red-500/10">
+                           <Button size="icon" variant="ghost" onClick={() => handleUpdateStatus(order.id, "CANCELLED")} title="Gagal" className="h-8 w-8 text-red-500 hover:bg-red-500/10">
                              <AlertCircle className="h-4 w-4" />
                            </Button>
                            <AlertDialog>
@@ -417,11 +492,12 @@ export default function AdminTrafficMonitoringPage() {
                        <div>
                          <p className="text-[10px] font-black text-primary uppercase">{order.serviceLabel || order.platform}</p>
                          <p className="text-[11px] font-bold text-white max-w-[150px] truncate">{order.targetLink || order.url}</p>
+                         <p className="text-[9px] text-muted-foreground font-mono mt-1">SMM ID: {order.providerOrderId || "-"}</p>
                        </div>
                     </div>
                     <Badge className={cn(
                         "text-[8px] font-black uppercase",
-                        ["completed", "SELESAI", "success"].includes(order.status) ? 'bg-green-500' : 'bg-amber-500'
+                        ["COMPLETED", "SELESAI", "success"].includes(order.status) ? 'bg-green-500' : 'bg-amber-500'
                     )}>
                       {order.status}
                     </Badge>
@@ -440,7 +516,7 @@ export default function AdminTrafficMonitoringPage() {
                      <p className="text-[10px] text-muted-foreground italic">{new Date(order.createdAt?.toDate()).toLocaleString()}</p>
                      {!isAssistant && (
                        <div className="flex gap-1">
-                         <Button size="icon" variant="ghost" onClick={() => handleUpdateStatus(order.id, "SELESAI")} className="h-8 w-8 text-green-500 bg-green-500/5 rounded-lg"><CheckCircle2 className="h-4 w-4" /></Button>
+                         <Button size="icon" variant="ghost" onClick={() => handleUpdateStatus(order.id, "COMPLETED")} className="h-8 w-8 text-green-500 bg-green-500/5 rounded-lg"><CheckCircle2 className="h-4 w-4" /></Button>
                          <Button size="icon" variant="ghost" onClick={() => handleDeleteSingle(order.id)} className="h-8 w-8 text-red-500 bg-red-500/5 rounded-lg"><Trash2 className="h-4 w-4" /></Button>
                        </div>
                      )}

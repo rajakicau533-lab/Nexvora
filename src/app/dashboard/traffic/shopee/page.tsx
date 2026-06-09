@@ -1,24 +1,26 @@
+
 "use client"
 
-import React, { useState, useEffect } from "react"
+import React, { useState, useEffect, useCallback } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
-import { Clock, ExternalLink, Loader2, Info } from "lucide-react"
+import { Clock, ExternalLink, Loader2, Info, RefreshCw } from "lucide-react"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { useFirestore, useUser, useCollection, useDoc } from "@/firebase"
-import { collection, doc, setDoc, updateDoc, increment, serverTimestamp, query, where } from "firebase/firestore"
+import { collection, doc, setDoc, updateDoc, increment, serverTimestamp, query, where, addDoc } from "firebase/firestore"
 import { useToast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
-import { processTrafficOrder } from "@/ai/flows/process-traffic-order-flow"
+import { processTrafficOrder, checkOrderStatus } from "@/ai/flows/process-traffic-order-flow"
 import { TRAFFIC_SERVICES } from "@/lib/constants"
 
 export default function ShopeeTrafficPage() {
   const [url, setUrl] = useState("")
   const [views, setViews] = useState(1000)
   const [isOrdering, setIsOrdering] = useState(false)
+  const [isSyncing, setIsSyncing] = useState(false)
   const [orderFeedback, setOrderFeedback] = useState<"idle" | "processing" | "success" | "error">("idle")
   
   const { user } = useUser()
@@ -55,36 +57,61 @@ export default function ShopeeTrafficPage() {
     return [...allHistory]
       .filter(order => {
         const createdAt = order.createdAt?.toDate?.() || new Date()
-        return createdAt >= threeDaysAgo
+        return createdAt >= threeDaysAgo && order.platform === 'shopee' && (order.serviceLabel === serviceConfig.label || !order.serviceLabel)
       })
       .sort((a, b) => {
         const timeA = a.createdAt?.toDate?.()?.getTime() || 0
         const timeB = b.createdAt?.toDate?.()?.getTime() || 0
         return timeB - timeA
       })
-  }, [allHistory])
+  }, [allHistory, serviceConfig.label])
 
-  useEffect(() => {
-    if (!db || !history || history.length === 0) return;
+  const syncStatus = useCallback(async () => {
+    if (!db || !apiSettings || !history || history.length === 0 || isSyncing) return;
+    
+    const activeOrders = history.filter(o => ["PENDING", "PROCESSING", "Pending", "Processing"].includes(o.status));
+    if (activeOrders.length === 0) return;
 
-    const interval = setInterval(() => {
-      const now = new Date().getTime();
-      const pendingOrders = history.filter((order: any) => order.status === "PENDING");
+    setIsSyncing(true);
+    try {
+      for (const order of activeOrders) {
+        if (!order.providerOrderId) continue;
 
-      for (const order of pendingOrders) {
-        if (!order.createdAt) continue;
-        const createdAt = order.createdAt?.toDate?.() || 0;
-        const diffInSeconds = (now - (typeof createdAt === 'object' ? createdAt.toDate().getTime() : createdAt)) / 1000;
-        if (diffInSeconds >= 50) {
-          updateDoc(doc(db, "traffic_orders", order.id), {
-            status: "SELESAI",
-            updatedAt: serverTimestamp()
-          });
+        const result = await checkOrderStatus({
+          apiUrl: apiSettings.apiUrl,
+          apiKey: apiSettings.apiKey,
+          orderId: order.providerOrderId
+        });
+
+        if (result.success && result.status) {
+          const rawStatus = result.status.toLowerCase();
+          let mappedStatus = "PENDING";
+
+          if (["processing", "in progress", "in_progress"].includes(rawStatus)) mappedStatus = "PROCESSING";
+          else if (["completed", "success", "finished"].includes(rawStatus)) mappedStatus = "COMPLETED";
+          else if (["partial"].includes(rawStatus)) mappedStatus = "PARTIAL";
+          else if (["cancelled", "canceled", "failed"].includes(rawStatus)) mappedStatus = "CANCELLED";
+
+          if (mappedStatus !== order.status) {
+            updateDoc(doc(db, "traffic_orders", order.id), {
+              status: mappedStatus,
+              updatedAt: serverTimestamp()
+            });
+          }
         }
       }
-    }, 5000);
+    } catch (err) {
+      console.error("Sync error:", err);
+    } finally {
+      setIsSyncing(false);
+    }
+  }, [db, apiSettings, history, isSyncing]);
+
+  useEffect(() => {
+    const interval = setInterval(syncStatus, 30000);
+    syncStatus();
     return () => clearInterval(interval);
-  }, [db, history]);
+  }, [syncStatus]);
 
   const validateUrl = (input: string) => {
     try {
@@ -120,7 +147,7 @@ export default function ShopeeTrafficPage() {
 
       if (!apiResult.success) throw new Error(apiResult.error);
 
-      await setDoc(doc(collection(db, "traffic_orders")), {
+      await addDoc(collection(db, "traffic_orders"), {
         userId: user.uid,
         platform: "shopee",
         serviceLabel: serviceConfig.label,
@@ -128,6 +155,7 @@ export default function ShopeeTrafficPage() {
         quantity: views,
         coinCost,
         status: "PENDING",
+        providerOrderId: apiResult.orderId,
         createdAt: serverTimestamp(),
       });
 
@@ -137,6 +165,7 @@ export default function ShopeeTrafficPage() {
       setUrl("");
       setOrderFeedback("success");
       setTimeout(() => setOrderFeedback("idle"), 3000);
+      syncStatus();
     } catch (err: any) {
       setOrderFeedback("error");
       toast({ variant: "destructive", title: "Gagal", description: err.message });
@@ -148,9 +177,15 @@ export default function ShopeeTrafficPage() {
 
   return (
     <div className="space-y-8 max-w-[1200px] mx-auto pb-10">
-      <div className="space-y-1">
-        <h2 className="text-2xl font-headline font-bold text-white">Trafik Shopee 🚀</h2>
-        <p className="text-muted-foreground text-sm">Meningkatkan engagement produk Shopee Anda secara instan.</p>
+      <div className="flex items-end justify-between">
+        <div className="space-y-1">
+          <h2 className="text-2xl font-headline font-bold text-white">Trafik Shopee 🚀</h2>
+          <p className="text-muted-foreground text-sm">Meningkatkan engagement produk Shopee Anda secara instan.</p>
+        </div>
+        <Button variant="ghost" size="sm" onClick={() => syncStatus()} disabled={isSyncing} className="text-[10px] font-black uppercase text-primary">
+          {isSyncing ? <Loader2 className="h-3 w-3 animate-spin mr-2" /> : <RefreshCw className="h-3 w-3 mr-2" />}
+          Sync Status
+        </Button>
       </div>
 
       <div className="grid lg:grid-cols-12 gap-8">
@@ -206,7 +241,7 @@ export default function ShopeeTrafficPage() {
           <CardContent className="p-5 text-xs space-y-3 text-muted-foreground leading-relaxed">
             <p>• Gunakan link produk Shopee yang valid.</p>
             <p>• Tarif: <strong>1.000 Views = 1 Koin</strong>.</p>
-            <p>• Proses pengiriman dimulai secara otomatis.</p>
+            <p>• Status sinkronisasi otomatis setiap 30 detik.</p>
             <div className="pt-2">
               <Badge className="bg-amber-500/10 text-amber-500 border-none text-[9px] uppercase font-black px-2 py-0.5">Note</Badge>
               <p className="mt-1">Riwayat di-reset otomatis setiap 3 hari.</p>
@@ -225,11 +260,11 @@ export default function ShopeeTrafficPage() {
             <Table>
               <TableHeader className="bg-white/[0.02]">
                 <TableRow className="border-white/5">
-                  <TableHead className="text-white text-xs font-bold py-4">Layanan</TableHead>
-                  <TableHead className="text-white text-xs font-bold">Target Link</TableHead>
-                  <TableHead className="text-white text-xs font-bold">Jumlah</TableHead>
-                  <TableHead className="text-white text-xs font-bold">Koin</TableHead>
+                  <TableHead className="text-white text-xs font-bold py-4">Target Link</TableHead>
+                  <TableHead className="text-white text-xs font-bold">Views</TableHead>
+                  <TableHead className="text-white text-xs font-bold">Biaya</TableHead>
                   <TableHead className="text-white text-xs font-bold">Status</TableHead>
+                  <TableHead className="text-white text-xs font-bold text-right">Provider ID</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -240,8 +275,7 @@ export default function ShopeeTrafficPage() {
                 ) : (
                   history.map((row: any) => (
                     <TableRow key={row.id} className="border-white/5 hover:bg-white/[0.02] transition-colors">
-                      <TableCell className="text-xs font-bold text-white">{row.serviceLabel || "Trafik Shopee"}</TableCell>
-                      <TableCell className="max-w-[150px] truncate text-xs text-muted-foreground font-mono">
+                      <TableCell className="max-w-[200px] truncate text-xs text-muted-foreground font-mono">
                         <a href={row.targetLink} target="_blank" className="hover:text-primary transition-colors flex items-center gap-1.5">
                           <ExternalLink className="h-3 w-3 shrink-0" /> {row.targetLink}
                         </a>
@@ -251,8 +285,14 @@ export default function ShopeeTrafficPage() {
                       <TableCell>
                         <Badge className={cn(
                             "font-black text-[9px] px-2 py-0.5 uppercase",
-                            row.status === "SELESAI" ? "bg-green-500" : "bg-amber-500 animate-pulse"
+                            row.status === "COMPLETED" ? "bg-green-500" : 
+                            row.status === "PROCESSING" ? "bg-blue-600 animate-pulse" :
+                            row.status === "PARTIAL" ? "bg-orange-500" :
+                            row.status === "CANCELLED" ? "bg-red-500" : "bg-amber-500"
                         )}>{row.status || "PENDING"}</Badge>
+                      </TableCell>
+                      <TableCell className="text-right text-[10px] text-muted-foreground font-mono">
+                        {row.providerOrderId || "-"}
                       </TableCell>
                     </TableRow>
                   ))
