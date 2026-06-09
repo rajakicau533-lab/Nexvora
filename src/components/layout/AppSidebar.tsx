@@ -8,19 +8,18 @@ import {
   UserPlus, 
   LogIn, 
   Sparkles, 
-  Zap, 
   MessageSquare, 
   Info,
   TrendingUp,
-  Cpu,
   ShoppingBag,
   CreditCard,
   LogOut,
   ChevronRight,
-  Settings,
   ShieldCheck,
   GraduationCap,
-  ChevronDown
+  ChevronDown,
+  BookOpen,
+  Users
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { APP_NAME, CONTACT_INFO } from "@/lib/constants"
@@ -215,21 +214,31 @@ export function AppSidebar() {
                   </SidebarMenuItem>
                 </Collapsible>
 
-                <SidebarMenuItem>
-                  <SidebarMenuButton 
-                    asChild 
-                    isActive={pathname === "/dashboard/ai"}
-                    className={cn(
-                      "hover:bg-primary/10 hover:text-primary transition-all duration-200",
-                      pathname === "/dashboard/ai" && "bg-primary/15 text-primary"
-                    )}
-                  >
-                    <Link href="/dashboard/ai" onClick={handleLinkClick} className="flex items-center gap-3">
-                      <Cpu className="h-4 w-4" />
-                      <span className="font-medium">Creator AI</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
+                <Collapsible defaultOpen={pathname.startsWith('/dashboard/info-admin')} className="group/collapsible">
+                  <SidebarMenuItem>
+                    <CollapsibleTrigger asChild>
+                      <SidebarMenuButton className="hover:bg-primary/10 hover:text-primary transition-all duration-200">
+                        <Info className="h-4 w-4" />
+                        <span className="font-medium">Info Admin</span>
+                        <ChevronDown className="ml-auto h-4 w-4 transition-transform group-data-[state=open]/collapsible:rotate-180" />
+                      </SidebarMenuButton>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <SidebarMenuSub>
+                        <SidebarMenuSubItem>
+                          <SidebarMenuSubButton asChild isActive={pathname === "/dashboard/info-admin/kelas"}>
+                            <Link href="/dashboard/info-admin/kelas" onClick={handleLinkClick}>Info Kelas</Link>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                        <SidebarMenuSubItem>
+                          <SidebarMenuSubButton asChild isActive={pathname === "/dashboard/info-admin/forum"}>
+                            <Link href="/dashboard/info-admin/forum" onClick={handleLinkClick}>Forum</Link>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                      </SidebarMenuSub>
+                    </CollapsibleContent>
+                  </SidebarMenuItem>
+                </Collapsible>
 
                 <SidebarMenuItem>
                   <SidebarMenuButton 

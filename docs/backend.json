@@ -1,4 +1,3 @@
-
 {
   "entities": {
     "User": {
@@ -67,19 +66,6 @@
         "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
         "createdAt": { "type": "string", "format": "date-time" }
       }
-    },
-    "AiErrorLog": {
-      "title": "AI Error Log",
-      "description": "Logs for AI generation failures.",
-      "type": "object",
-      "properties": {
-        "userId": { "type": "string" },
-        "userEmail": { "type": "string" },
-        "tab": { "type": "string" },
-        "errorMessage": { "type": "string" },
-        "isQuotaExceeded": { "type": "boolean" },
-        "timestamp": { "type": "string", "format": "date-time" }
-      }
     }
   },
   "auth": {
@@ -105,10 +91,6 @@
     "/topup_requests/{requestId}": {
       "schema": "#/entities/TopUpRequest",
       "description": "Manual coin top-up requests"
-    },
-    "/ai_error_logs/{logId}": {
-      "schema": "#/entities/AiErrorLog",
-      "description": "Audit for AI failures"
     }
   }
 }
