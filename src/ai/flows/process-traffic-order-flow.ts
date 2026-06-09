@@ -64,40 +64,30 @@ const processTrafficOrderFlow = ai.defineFlow(
     if (!apiUrl || !apiKey || apiKey.trim() === "") {
       return {
         success: false,
-        error: "Konfigurasi API (URL/Key) tidak ditemukan di sistem. Mohon hubungi Admin."
+        error: "Konfigurasi API (URL/Key) belum lengkap di sistem."
       };
     }
 
-    // Normalize Link: Remove shopee referral parameters that often cause API rejection
-    let cleanLink = link.trim();
-    try {
-      const urlObj = new URL(cleanLink);
-      // Remove common tracking params but keep essential product ID params
-      ['smtt', 'sp_atk', 'share_relation_origin'].forEach(p => urlObj.searchParams.delete(p));
-      cleanLink = urlObj.toString();
-    } catch (e) {
-      // If URL parsing fails, use original
-    }
-
+    // Clean URL: ensure no trailing spaces and proper protocol
     const endpoint = apiUrl.trim();
 
     try {
       const params = new URLSearchParams();
       params.append('key', apiKey.trim());
       params.append('action', 'add');
-      params.append('service', serviceId);
-      params.append('link', cleanLink);
+      params.append('service', serviceId.trim());
+      params.append('link', link.trim());
       params.append('quantity', quantity.toString());
 
+      // Use a standard fetch without AbortSignal.timeout for better compatibility in older Node runtimes
       const response = await fetch(endpoint, {
         method: 'POST',
         body: params,
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
           'Accept': 'application/json',
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        },
-        signal: AbortSignal.timeout(30000), 
+          'User-Agent': 'NexvoraStudio/1.0',
+        }
       });
 
       const responseText = await response.text();
@@ -107,7 +97,7 @@ const processTrafficOrderFlow = ai.defineFlow(
       } catch (e) {
         return {
           success: false,
-          error: `Respon server bukan JSON. Status: ${response.status}`,
+          error: `Respon server tidak valid. Status: ${response.status}`,
           debugInfo: { body: responseText.slice(0, 500) }
         };
       }
@@ -119,15 +109,17 @@ const processTrafficOrderFlow = ai.defineFlow(
           rawResponse: data,
         };
       } else {
-        // Log more descriptive errors based on provider response
         let errorMsg = data.error || 'Provider menolak permintaan.';
         
+        // Accurate Error Mapping
         if (errorMsg.toLowerCase().includes("not enough funds")) {
-          errorMsg = "Layanan sedang dalam pemeliharaan (Restocking). Silakan coba lagi nanti.";
+          errorMsg = "Layanan sedang dalam pemeliharaan (Restocking). Mohon coba beberapa saat lagi.";
         } else if (errorMsg.toLowerCase().includes("invalid api key")) {
-          errorMsg = "Konfigurasi server belum lengkap (Invalid Key).";
+          errorMsg = "Konfigurasi API Key tidak valid atau IP server belum di-whitelist oleh provider.";
         } else if (errorMsg.toLowerCase().includes("service not found")) {
-          errorMsg = "Layanan (Service ID) tidak ditemukan atau sudah tidak aktif.";
+          errorMsg = "ID Layanan (" + serviceId + ") tidak ditemukan atau sudah dinonaktifkan oleh provider.";
+        } else if (errorMsg.toLowerCase().includes("incorrect link")) {
+          errorMsg = "Format link tidak sesuai dengan syarat layanan provider.";
         }
 
         return {
@@ -137,6 +129,7 @@ const processTrafficOrderFlow = ai.defineFlow(
         };
       }
     } catch (err: any) {
+      console.error("Fetch Error in Flow:", err);
       return {
         success: false,
         error: `Kesalahan Jaringan: ${err.message || 'Gagal terhubung ke provider'}`,
@@ -174,9 +167,8 @@ const checkProviderBalanceFlow = ai.defineFlow(
         body: params,
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        },
-        signal: AbortSignal.timeout(20000),
+          'User-Agent': 'NexvoraStudio/1.0',
+        }
       });
 
       const responseText = await response.text();
@@ -201,7 +193,7 @@ const checkProviderBalanceFlow = ai.defineFlow(
       } else {
         return {
           success: false,
-          error: data.error || 'API Key valid tapi field balance tidak ditemukan.',
+          error: data.error || 'Gagal mengambil saldo.',
           debugInfo: data
         };
       }
@@ -235,7 +227,7 @@ const getProviderServicesFlow = ai.defineFlow(
         body: params,
         headers: { 
           'Content-Type': 'application/x-www-form-urlencoded',
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'User-Agent': 'NexvoraStudio/1.0',
         }
       });
 
@@ -269,9 +261,8 @@ const checkOrderStatusFlow = ai.defineFlow(
         body: params,
         headers: { 
           'Content-Type': 'application/x-www-form-urlencoded',
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        },
-        signal: AbortSignal.timeout(20000),
+          'User-Agent': 'NexvoraStudio/1.0',
+        }
       });
 
       const data = await response.json();

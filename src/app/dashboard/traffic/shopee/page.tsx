@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
-import { Clock, ExternalLink, Loader2, Info, RefreshCw } from "lucide-react"
+import { Clock, ExternalLink, Loader2, Info, RefreshCw, AlertTriangle } from "lucide-react"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { useFirestore, useUser, useCollection, useDoc } from "@/firebase"
@@ -29,15 +29,18 @@ export default function ShopeeTrafficPage() {
   const serviceConfig = TRAFFIC_SERVICES.SHOPEE_VIEW
   const coinCost = Math.ceil(views / serviceConfig.rate_view_per_coin)
 
+  // Fetch API configuration
   const apiSettingsRef = React.useMemo(() => (db ? doc(db, "system_settings", "provider_config") : null), [db])
   const { data: apiSettings, loading: settingsLoading } = useDoc(apiSettingsRef)
 
+  // User Profile for coins
   const profileRef = React.useMemo(() => {
     if (!db || !user?.uid) return null
     return doc(db, "users", user.uid)
   }, [db, user?.uid])
   const { data: profile } = useDoc(profileRef)
 
+  // Order history (limited to user and shopee platform)
   const historyQuery = React.useMemo(() => {
     if (!db || !user?.uid) return null
     return query(
@@ -138,12 +141,17 @@ export default function ShopeeTrafficPage() {
     if (!db || !user?.uid || !profile) return
     
     if (settingsLoading || !apiSettings?.apiKey) {
-      toast({ variant: "destructive", title: "API Belum Siap", description: "Menghubungkan ke sistem, coba lagi dalam beberapa detik." });
+      toast({ variant: "destructive", title: "API Belum Siap", description: "Sistem sedang menghubungkan ke server, mohon tunggu..." });
       return;
     }
 
     if (!url || !validateUrl(url)) {
       toast({ variant: "destructive", title: "Link Tidak Valid", description: "Masukkan link Shopee (shopee.co.id atau shp.ee) yang benar." });
+      return;
+    }
+
+    if (views < 1000) {
+      toast({ variant: "destructive", title: "Jumlah Minimal", description: "Minimal pesanan adalah 1.000 views." });
       return;
     }
     
@@ -164,7 +172,7 @@ export default function ShopeeTrafficPage() {
         quantity: views
       });
 
-      // Save TECHNICAL LOG for Admin with stringified response for safety
+      // Technical Log for debugging
       await addDoc(collection(db, "api_logs"), {
         userId: user.uid,
         userEmail: user.email,
@@ -200,16 +208,16 @@ export default function ShopeeTrafficPage() {
         coins: increment(-coinCost) 
       });
       
-      toast({ title: "Booster Berhasil Dipesan! 🚀", description: "Pesanan trafik sedang diproses oleh server." });
+      toast({ title: "Booster Dipesan! 🚀", description: "Trafik sedang dikirim ke target." });
       setUrl("");
       setOrderFeedback("success");
       setTimeout(() => setOrderFeedback("idle"), 3000);
       
-      // Initial status check after 3 seconds
-      setTimeout(syncStatus, 3000);
+      // Sync status after success
+      setTimeout(syncStatus, 2000);
     } catch (err: any) {
       setOrderFeedback("error");
-      toast({ variant: "destructive", title: "Order Gagal", description: err.message });
+      toast({ variant: "destructive", title: "Booster Gagal", description: err.message });
       setTimeout(() => setOrderFeedback("idle"), 3000);
     } finally {
       setIsOrdering(false);
@@ -237,9 +245,9 @@ export default function ShopeeTrafficPage() {
             </CardHeader>
             <CardContent className="space-y-5">
               <div className="space-y-2">
-                <Label className="text-xs font-bold text-white/70">Link Produk Shopee</Label>
+                <Label className="text-xs font-bold text-white/70">Link Produk/Video Shopee</Label>
                 <Input 
-                  placeholder="https://shopee.co.id/product/..." 
+                  placeholder="https://shopee.co.id/product/... atau https://shp.ee/..." 
                   value={url}
                   onChange={(e) => setUrl(e.target.value)}
                   className="bg-white/5 border-white/10 h-11 rounded-xl text-sm"
@@ -252,6 +260,7 @@ export default function ShopeeTrafficPage() {
                       type="number" 
                       value={views}
                       step="1000"
+                      min="1000"
                       onChange={(e) => setViews(parseInt(e.target.value) || 0)}
                       className="bg-white/5 border-white/10 h-11 rounded-xl text-sm"
                     />
@@ -267,7 +276,7 @@ export default function ShopeeTrafficPage() {
                 className="w-full h-12 rounded-xl luxury-gradient font-bold text-sm shadow-xl"
               >
                 {isOrdering ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                {orderFeedback === 'success' ? "Booster Berhasil!" : isOrdering ? "Menghubungkan Server..." : "Mulai Booster Sekarang"}
+                {orderFeedback === 'success' ? "Berhasil Dipesan!" : isOrdering ? "Menghubungkan Server..." : "Mulai Booster Sekarang"}
               </Button>
             </CardContent>
           </Card>
@@ -276,17 +285,19 @@ export default function ShopeeTrafficPage() {
         <Card className="premium-card rounded-2xl border-white/5 bg-black/40 lg:col-span-4 h-fit">
           <CardHeader className="py-4 border-b border-white/5">
             <CardTitle className="text-sm font-bold flex items-center gap-2">
-              <Info className="h-4 w-4 text-primary" /> Panduan Penggunaan
+              <Info className="h-4 w-4 text-primary" /> Panduan & Info
             </CardTitle>
           </CardHeader>
           <CardContent className="p-5 text-xs space-y-3 text-muted-foreground leading-relaxed">
-            <p>• Gunakan link produk Shopee yang valid.</p>
-            <p>• Link yang disarankan adalah dari share aplikasi Shopee.</p>
+            <p>• Gunakan link yang dapat diakses publik.</p>
+            <p>• Gunakan link produk lengkap atau link pendek (shp.ee).</p>
             <p>• Tarif: <strong>1.000 Views = 1 Koin</strong>.</p>
-            <p>• Jika status gagal, pastikan link produk bisa dibuka secara publik.</p>
-            <div className="pt-2">
-              <Badge className="bg-amber-500/10 text-amber-500 border-none text-[9px] uppercase font-black px-2 py-0.5">Catatan</Badge>
-              <p className="mt-1">Riwayat pesanan tersimpan selama 3 hari terakhir.</p>
+            <div className="bg-amber-500/5 p-3 rounded-lg border border-amber-500/10">
+               <div className="flex items-center gap-2 text-amber-500 mb-1">
+                 <AlertTriangle className="h-3 w-3" />
+                 <span className="text-[10px] font-black uppercase">Penting</span>
+               </div>
+               <p className="text-[10px]">Jika booster gagal, pastikan stok provider masih tersedia atau coba gunakan link produk utama bukan dari menu 'Flash Sale'.</p>
             </div>
           </CardContent>
         </Card>
