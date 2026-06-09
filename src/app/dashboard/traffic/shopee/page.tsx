@@ -1,4 +1,3 @@
-
 "use client"
 
 import React, { useState, useEffect, useCallback } from "react"
@@ -10,7 +9,7 @@ import { Clock, ExternalLink, Loader2, Info, RefreshCw } from "lucide-react"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { useFirestore, useUser, useCollection, useDoc } from "@/firebase"
-import { collection, doc, setDoc, updateDoc, increment, serverTimestamp, query, where, addDoc } from "firebase/firestore"
+import { collection, doc, updateDoc, increment, serverTimestamp, query, where, addDoc } from "firebase/firestore"
 import { useToast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
 import { processTrafficOrder, checkOrderStatus } from "@/ai/flows/process-traffic-order-flow"
@@ -31,7 +30,7 @@ export default function ShopeeTrafficPage() {
   const coinCost = Math.ceil(views / serviceConfig.rate_view_per_coin)
 
   const apiSettingsRef = React.useMemo(() => (db ? doc(db, "system_settings", "provider_config") : null), [db])
-  const { data: apiSettings } = useDoc(apiSettingsRef)
+  const { data: apiSettings, loading: settingsLoading } = useDoc(apiSettingsRef)
 
   const profileRef = React.useMemo(() => {
     if (!db || !user?.uid) return null
@@ -124,6 +123,12 @@ export default function ShopeeTrafficPage() {
 
   const handleOrder = async () => {
     if (!db || !user?.uid || !profile) return
+    
+    if (settingsLoading || !apiSettings?.apiKey) {
+      toast({ variant: "destructive", title: "API Belum Siap", description: "Menghubungkan ke sistem, coba lagi dalam 2 detik." });
+      return;
+    }
+
     if (!url || !validateUrl(url)) {
       toast({ variant: "destructive", title: "Link Tidak Valid", description: "Masukkan link Shopee yang benar." });
       return;
@@ -228,7 +233,7 @@ export default function ShopeeTrafficPage() {
               </div>
               <Button 
                 onClick={handleOrder}
-                disabled={isOrdering || !url}
+                disabled={isOrdering || !url || settingsLoading}
                 className="w-full h-12 rounded-xl luxury-gradient font-bold text-sm shadow-xl"
               >
                 {isOrdering ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}

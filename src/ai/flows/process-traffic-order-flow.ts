@@ -60,11 +60,19 @@ const processTrafficOrderFlow = ai.defineFlow(
   },
   async (input) => {
     const { apiUrl, apiKey, serviceId, link, quantity } = input;
+    
+    if (!apiUrl || !apiKey || apiKey.trim() === "") {
+      return {
+        success: false,
+        error: "Konfigurasi API (URL/Key) tidak ditemukan di sistem. Mohon hubungi Admin."
+      };
+    }
+
     const endpoint = apiUrl.trim();
 
     try {
       const params = new URLSearchParams();
-      params.append('key', apiKey);
+      params.append('key', apiKey.trim());
       params.append('action', 'add');
       params.append('service', serviceId);
       params.append('link', link);
@@ -88,7 +96,7 @@ const processTrafficOrderFlow = ai.defineFlow(
       } catch (e) {
         return {
           success: false,
-          error: `Provider Response non-JSON. Status: ${response.status}`,
+          error: `Respon server bukan JSON. Status: ${response.status}`,
           debugInfo: { body: responseText.slice(0, 500) }
         };
       }
@@ -102,14 +110,14 @@ const processTrafficOrderFlow = ai.defineFlow(
       } else {
         return {
           success: false,
-          error: data.error || 'Provider rejected the request.',
+          error: data.error || 'Provider menolak permintaan. Cek saldo atau link Anda.',
           rawResponse: data,
         };
       }
     } catch (err: any) {
       return {
         success: false,
-        error: `Network Error: ${err.message || 'connection failed'}`,
+        error: `Kesalahan Jaringan: ${err.message || 'Gagal terhubung ke provider'}`,
       };
     }
   }
@@ -130,9 +138,13 @@ const checkProviderBalanceFlow = ai.defineFlow(
   async (input) => {
     const { apiUrl, apiKey } = input;
     
+    if (!apiUrl || !apiKey || apiKey.trim() === "") {
+       return { success: false, error: "API Key kosong." };
+    }
+
     try {
       const params = new URLSearchParams();
-      params.append('key', apiKey);
+      params.append('key', apiKey.trim());
       params.append('action', 'balance');
 
       const response = await fetch(apiUrl.trim(), {
@@ -152,7 +164,7 @@ const checkProviderBalanceFlow = ai.defineFlow(
       } catch (e) {
         return { 
           success: false, 
-          error: `Not a JSON response.`,
+          error: `Bukan respon JSON valid.`,
           debugInfo: responseText 
         };
       }
@@ -167,7 +179,7 @@ const checkProviderBalanceFlow = ai.defineFlow(
       } else {
         return {
           success: false,
-          error: data.error || 'API Key valid but balance field missing.',
+          error: data.error || 'API Key valid tapi field balance tidak ditemukan.',
           debugInfo: data
         };
       }
@@ -193,7 +205,7 @@ const getProviderServicesFlow = ai.defineFlow(
   async (input) => {
     try {
       const params = new URLSearchParams();
-      params.append('key', input.apiKey);
+      params.append('key', input.apiKey.trim());
       params.append('action', 'services');
 
       const response = await fetch(input.apiUrl.trim(), {
@@ -226,7 +238,7 @@ const checkOrderStatusFlow = ai.defineFlow(
   async (input) => {
     try {
       const params = new URLSearchParams();
-      params.append('key', input.apiKey);
+      params.append('key', input.apiKey.trim());
       params.append('action', 'status');
       params.append('order', input.orderId);
 
@@ -245,7 +257,7 @@ const checkOrderStatusFlow = ai.defineFlow(
       if (data.status) {
         return { success: true, status: data.status };
       } else {
-        return { success: false, error: data.error || 'Status not found' };
+        return { success: false, error: data.error || 'Status tidak ditemukan' };
       }
     } catch (err: any) {
       return { success: false, error: err.message };
