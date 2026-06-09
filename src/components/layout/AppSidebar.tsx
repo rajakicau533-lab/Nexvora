@@ -200,6 +200,16 @@ export function AppSidebar() {
                             <Link href="/dashboard/traffic/likes" onClick={handleLinkClick}>Shopee Like</Link>
                           </SidebarMenuSubButton>
                         </SidebarMenuSubItem>
+                        <SidebarMenuSubItem>
+                          <SidebarMenuSubButton asChild isActive={pathname === "/dashboard/traffic/tiktok-view"}>
+                            <Link href="/dashboard/traffic/tiktok-view" onClick={handleLinkClick}>TikTok VT View</Link>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                        <SidebarMenuSubItem>
+                          <SidebarMenuSubButton asChild isActive={pathname === "/dashboard/traffic/tiktok-saved"}>
+                            <Link href="/dashboard/traffic/tiktok-saved" onClick={handleLinkClick}>TikTok Saved</Link>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
                       </SidebarMenuSub>
                     </CollapsibleContent>
                   </SidebarMenuItem>
