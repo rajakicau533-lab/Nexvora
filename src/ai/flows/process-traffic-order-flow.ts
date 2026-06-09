@@ -15,7 +15,7 @@ const OrderInputSchema = z.object({
   apiUrl: z.string(),
   apiKey: z.string(),
   serviceId: z.string(),
-  link: z.string().url(),
+  link: z.string(),
   quantity: z.number(),
 });
 
@@ -68,7 +68,6 @@ const processTrafficOrderFlow = ai.defineFlow(
       };
     }
 
-    // Clean URL: ensure no trailing spaces and proper protocol
     const endpoint = apiUrl.trim();
 
     try {
@@ -79,14 +78,14 @@ const processTrafficOrderFlow = ai.defineFlow(
       params.append('link', link.trim());
       params.append('quantity', quantity.toString());
 
-      // Use a standard fetch without AbortSignal.timeout for better compatibility in older Node runtimes
+      // Use a standard User-Agent and timeout logic
       const response = await fetch(endpoint, {
         method: 'POST',
         body: params,
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
           'Accept': 'application/json',
-          'User-Agent': 'NexvoraStudio/1.0',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         }
       });
 
@@ -97,8 +96,8 @@ const processTrafficOrderFlow = ai.defineFlow(
       } catch (e) {
         return {
           success: false,
-          error: `Respon server tidak valid. Status: ${response.status}`,
-          debugInfo: { body: responseText.slice(0, 500) }
+          error: `Respon server provider tidak valid. (Status: ${response.status})`,
+          debugInfo: { body: responseText.slice(0, 1000) }
         };
       }
 
@@ -109,17 +108,20 @@ const processTrafficOrderFlow = ai.defineFlow(
           rawResponse: data,
         };
       } else {
-        let errorMsg = data.error || 'Provider menolak permintaan.';
+        let errorMsg = data.error || 'Provider SMM menolak permintaan.';
         
-        // Accurate Error Mapping
-        if (errorMsg.toLowerCase().includes("not enough funds")) {
-          errorMsg = "Layanan sedang dalam pemeliharaan (Restocking). Mohon coba beberapa saat lagi.";
-        } else if (errorMsg.toLowerCase().includes("invalid api key")) {
-          errorMsg = "Konfigurasi API Key tidak valid atau IP server belum di-whitelist oleh provider.";
-        } else if (errorMsg.toLowerCase().includes("service not found")) {
-          errorMsg = "ID Layanan (" + serviceId + ") tidak ditemukan atau sudah dinonaktifkan oleh provider.";
-        } else if (errorMsg.toLowerCase().includes("incorrect link")) {
-          errorMsg = "Format link tidak sesuai dengan syarat layanan provider.";
+        // Detailed Error Mapping for Better User Feedback
+        const rawError = (data.error || "").toLowerCase();
+        if (rawError.includes("not enough funds")) {
+          errorMsg = "Layanan sedang dalam pemeliharaan (Restocking Saldo Provider). Mohon coba beberapa saat lagi.";
+        } else if (rawError.includes("invalid api key")) {
+          errorMsg = "Konfigurasi API Key tidak valid. Hubungi Admin.";
+        } else if (rawError.includes("service not found")) {
+          errorMsg = "ID Layanan (" + serviceId + ") sudah tidak aktif di provider.";
+        } else if (rawError.includes("incorrect link")) {
+          errorMsg = "Format link tidak sesuai dengan syarat layanan. Gunakan link produk asli.";
+        } else if (rawError.includes("maintenance")) {
+          errorMsg = "Layanan provider sedang maintenance.";
         }
 
         return {
@@ -129,10 +131,10 @@ const processTrafficOrderFlow = ai.defineFlow(
         };
       }
     } catch (err: any) {
-      console.error("Fetch Error in Flow:", err);
+      console.error("Critical Fetch Error:", err);
       return {
         success: false,
-        error: `Kesalahan Jaringan: ${err.message || 'Gagal terhubung ke provider'}`,
+        error: `Kesalahan Jaringan: ${err.message || 'Gagal terhubung ke server provider'}`,
       };
     }
   }
@@ -167,7 +169,7 @@ const checkProviderBalanceFlow = ai.defineFlow(
         body: params,
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
-          'User-Agent': 'NexvoraStudio/1.0',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         }
       });
 
@@ -178,7 +180,7 @@ const checkProviderBalanceFlow = ai.defineFlow(
       } catch (e) {
         return { 
           success: false, 
-          error: `Bukan respon JSON valid.`,
+          error: `Bukan respon JSON valid dari server.`,
           debugInfo: responseText 
         };
       }
@@ -227,7 +229,7 @@ const getProviderServicesFlow = ai.defineFlow(
         body: params,
         headers: { 
           'Content-Type': 'application/x-www-form-urlencoded',
-          'User-Agent': 'NexvoraStudio/1.0',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         }
       });
 
@@ -261,7 +263,7 @@ const checkOrderStatusFlow = ai.defineFlow(
         body: params,
         headers: { 
           'Content-Type': 'application/x-www-form-urlencoded',
-          'User-Agent': 'NexvoraStudio/1.0',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         }
       });
 

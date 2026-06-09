@@ -115,38 +115,16 @@ export default function ShopeeTrafficPage() {
     return () => clearInterval(interval);
   }, [syncStatus]);
 
-  const validateUrl = (input: string) => {
-    try {
-      const parsed = new URL(input.startsWith('http') ? input : `https://${input}`);
-      const hostname = parsed.hostname.toLowerCase();
-      // Valid domains for Shopee
-      const domains = [
-        'shopee.co.id', 
-        'shp.ee', 
-        'id.shp.ee', 
-        's.shopee.co.id', 
-        'vn.shp.ee', 
-        'my.shp.ee',
-        'th.shp.ee',
-        'tw.shp.ee',
-        'shopee.com.my',
-        'shopee.vn',
-        'shopee.ph'
-      ];
-      return domains.some(domain => hostname === domain || hostname.endsWith('.' + domain));
-    } catch (e) { return false; }
-  };
-
   const handleOrder = async () => {
     if (!db || !user?.uid || !profile) return
     
     if (settingsLoading || !apiSettings?.apiKey) {
-      toast({ variant: "destructive", title: "API Belum Siap", description: "Sistem sedang menghubungkan ke server, mohon tunggu..." });
+      toast({ variant: "destructive", title: "Sistem Menghubungkan", description: "Mohon tunggu sejenak..." });
       return;
     }
 
-    if (!url || !validateUrl(url)) {
-      toast({ variant: "destructive", title: "Link Tidak Valid", description: "Masukkan link Shopee (shopee.co.id atau shp.ee) yang benar." });
+    if (!url || url.trim().length < 5) {
+      toast({ variant: "destructive", title: "Link Tidak Valid", description: "Masukkan link Shopee dengan benar." });
       return;
     }
 
@@ -168,26 +146,26 @@ export default function ShopeeTrafficPage() {
         apiUrl: apiSettings?.apiUrl || "",
         apiKey: apiSettings?.apiKey || "",
         serviceId: serviceConfig.id,
-        link: url,
+        link: url.trim(),
         quantity: views
       });
 
-      // Technical Log for debugging
+      // technical auditing log
       await addDoc(collection(db, "api_logs"), {
         userId: user.uid,
         userEmail: user.email,
         timestamp: serverTimestamp(),
         provider: "SMM.ID",
-        link: url,
+        link: url.trim(),
         quantity: views,
         serviceId: serviceConfig.id,
         status: apiResult.success ? "success" : "failed",
-        responseBody: typeof apiResult.rawResponse === 'object' ? JSON.stringify(apiResult.rawResponse) : (apiResult.rawResponse || "No response"),
+        responseBody: apiResult.rawResponse ? JSON.stringify(apiResult.rawResponse) : "No Response Content",
         errorMessage: apiResult.error || null
       });
 
       if (!apiResult.success) {
-        throw new Error(apiResult.error || "Gagal menghubungi provider SMM.");
+        throw new Error(apiResult.error || "Provider SMM menolak pesanan ini.");
       }
 
       // Record Order in Database
@@ -195,7 +173,7 @@ export default function ShopeeTrafficPage() {
         userId: user.uid,
         platform: "shopee",
         serviceLabel: serviceConfig.label,
-        targetLink: url,
+        targetLink: url.trim(),
         quantity: views,
         coinCost,
         status: "PENDING",
@@ -208,13 +186,13 @@ export default function ShopeeTrafficPage() {
         coins: increment(-coinCost) 
       });
       
-      toast({ title: "Booster Dipesan! 🚀", description: "Trafik sedang dikirim ke target." });
+      toast({ title: "Booster Berhasil! 🚀", description: "Pesanan trafik Shopee Anda sedang diproses." });
       setUrl("");
       setOrderFeedback("success");
       setTimeout(() => setOrderFeedback("idle"), 3000);
       
-      // Sync status after success
-      setTimeout(syncStatus, 2000);
+      // Force sync soon
+      setTimeout(syncStatus, 1500);
     } catch (err: any) {
       setOrderFeedback("error");
       toast({ variant: "destructive", title: "Booster Gagal", description: err.message });
@@ -229,11 +207,11 @@ export default function ShopeeTrafficPage() {
       <div className="flex items-end justify-between">
         <div className="space-y-1">
           <h2 className="text-2xl font-headline font-bold text-white">Trafik Shopee 🚀</h2>
-          <p className="text-muted-foreground text-sm">Meningkatkan engagement produk Shopee Anda secara instan.</p>
+          <p className="text-muted-foreground text-sm">Tingkatkan engagement produk atau video Shopee Anda.</p>
         </div>
         <Button variant="ghost" size="sm" onClick={() => syncStatus()} disabled={isSyncing} className="text-[10px] font-black uppercase text-primary">
           {isSyncing ? <Loader2 className="h-3 w-3 animate-spin mr-2" /> : <RefreshCw className="h-3 w-3 mr-2" />}
-          Sync Status
+          Update Status
         </Button>
       </div>
 
@@ -241,13 +219,13 @@ export default function ShopeeTrafficPage() {
         <div className="lg:col-span-8">
           <Card className="premium-card rounded-2xl border-white/5 bg-black/40 shadow-2xl">
             <CardHeader className="pb-4">
-              <CardTitle className="text-lg">Order Trafik Shopee</CardTitle>
+              <CardTitle className="text-lg">Order Booster Baru</CardTitle>
             </CardHeader>
             <CardContent className="space-y-5">
               <div className="space-y-2">
                 <Label className="text-xs font-bold text-white/70">Link Produk/Video Shopee</Label>
                 <Input 
-                  placeholder="https://shopee.co.id/product/... atau https://shp.ee/..." 
+                  placeholder="Contoh: https://shopee.co.id/product/..." 
                   value={url}
                   onChange={(e) => setUrl(e.target.value)}
                   className="bg-white/5 border-white/10 h-11 rounded-xl text-sm"
@@ -276,7 +254,7 @@ export default function ShopeeTrafficPage() {
                 className="w-full h-12 rounded-xl luxury-gradient font-bold text-sm shadow-xl"
               >
                 {isOrdering ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                {orderFeedback === 'success' ? "Berhasil Dipesan!" : isOrdering ? "Menghubungkan Server..." : "Mulai Booster Sekarang"}
+                {orderFeedback === 'success' ? "Berhasil Dipesan!" : isOrdering ? "Menghubungkan Provider..." : "Mulai Booster Sekarang"}
               </Button>
             </CardContent>
           </Card>
@@ -289,15 +267,15 @@ export default function ShopeeTrafficPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="p-5 text-xs space-y-3 text-muted-foreground leading-relaxed">
-            <p>• Gunakan link yang dapat diakses publik.</p>
-            <p>• Gunakan link produk lengkap atau link pendek (shp.ee).</p>
+            <p>• Gunakan link produk publik yang valid.</p>
             <p>• Tarif: <strong>1.000 Views = 1 Koin</strong>.</p>
+            <p>• Hubungi Admin jika booster gagal dikirim.</p>
             <div className="bg-amber-500/5 p-3 rounded-lg border border-amber-500/10">
                <div className="flex items-center gap-2 text-amber-500 mb-1">
                  <AlertTriangle className="h-3 w-3" />
                  <span className="text-[10px] font-black uppercase">Penting</span>
                </div>
-               <p className="text-[10px]">Jika booster gagal, pastikan stok provider masih tersedia atau coba gunakan link produk utama bukan dari menu 'Flash Sale'.</p>
+               <p className="text-[10px]">Jangan menggunakan link dari menu 'Flash Sale' karena struktur tautannya sering berubah.</p>
             </div>
           </CardContent>
         </Card>
@@ -305,7 +283,7 @@ export default function ShopeeTrafficPage() {
 
       <div className="space-y-4">
         <h3 className="text-lg font-headline font-bold flex items-center gap-2">
-          <Clock className="h-5 w-5 text-primary" /> Riwayat Order Trafik
+          <Clock className="h-5 w-5 text-primary" /> Riwayat 3 Hari Terakhir
         </h3>
         
         <Card className="premium-card rounded-2xl border-white/5 overflow-hidden bg-black/40">
@@ -340,8 +318,7 @@ export default function ShopeeTrafficPage() {
                             "font-black text-[9px] px-2 py-0.5 uppercase",
                             row.status === "COMPLETED" ? "bg-green-500" : 
                             row.status === "PROCESSING" ? "bg-blue-600 animate-pulse" :
-                            row.status === "PARTIAL" ? "bg-orange-500" :
-                            row.status === "CANCELLED" ? "bg-red-500" : "bg-amber-500"
+                            row.status === "CANCELLED" || row.status === "FAILED" ? "bg-red-500" : "bg-amber-500"
                         )}>{row.status || "PENDING"}</Badge>
                       </TableCell>
                       <TableCell className="text-right text-[10px] text-muted-foreground font-mono">
