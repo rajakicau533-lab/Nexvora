@@ -281,7 +281,7 @@ export default function AdminSettingsPage() {
                  <p className="text-[10px] text-primary uppercase font-bold tracking-widest">SMM.ID Requirements</p>
                  <ul className="space-y-2 text-xs text-white/60">
                     <li className="flex items-start gap-2">• End-point must be: https://smm.id/api/v2</li>
-                    <li className="flex items-start gap-2">• API Key: From Profile > Settings in SMM.ID</li>
+                    <li className="flex items-start gap-2">• API Key: From Profile &gt; Settings in SMM.ID</li>
                     <li className="flex items-start gap-2">• Method: POST with form-urlencoded</li>
                  </ul>
               </div>
