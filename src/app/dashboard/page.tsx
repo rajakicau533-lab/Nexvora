@@ -42,14 +42,15 @@ export default function DashboardPage() {
   const { toast } = useToast()
   const [isCopied, setIsCopied] = useState(false)
 
-  // User Profile Data
-  const userProfileQuery = React.useMemo(() => {
+  // 1. Ambil Data Profil User dari Firestore
+  const userProfileRef = React.useMemo(() => {
     if (!db || !user?.uid) return null;
     return doc(db, 'users', user.uid);
   }, [db, user?.uid]);
-  const { data: profile, loading: profileLoading } = useDoc(userProfileQuery);
+  
+  const { data: profile, loading: profileLoading } = useDoc(userProfileRef);
 
-  // Stats Collections
+  // 2. Ambil Statistik Aktivitas
   const ordersQuery = React.useMemo(() => {
     if (!db || !user?.uid) return null;
     return query(collection(db, "traffic_orders"), where("userId", "==", user.uid));
@@ -74,7 +75,10 @@ export default function DashboardPage() {
   }, [db, user?.uid]);
   const { data: purchases } = useCollection<any>(purchasesQuery);
 
-  // Combined Activities for "Aktivitas Terakhir"
+  // Resolusi Nama User
+  const displayName = profile?.username || user?.displayName || "Pengguna";
+
+  // Gabungkan Aktivitas Terakhir
   const recentActivities = React.useMemo(() => {
     if (!orders && !topups && !purchases) return [];
     
@@ -86,8 +90,8 @@ export default function DashboardPage() {
 
     return combined
       .sort((a, b) => {
-        const dateA = a.createdAt?.toDate?.().getTime() || 0;
-        const dateB = b.createdAt?.toDate?.().getTime() || 0;
+        const dateA = a.createdAt?.toDate?.()?.getTime() || 0;
+        const dateB = b.createdAt?.toDate?.()?.getTime() || 0;
         return dateB - dateA;
       })
       .slice(0, 5);
@@ -111,7 +115,8 @@ export default function DashboardPage() {
 
   const getLevelInfo = (role: string) => {
     const roles = ['user', 'premium', 'private', 'vip', 'mbah paijo'];
-    const currentIdx = roles.indexOf(role?.toLowerCase() || 'user');
+    const currentRole = role?.toLowerCase() || 'user';
+    const currentIdx = roles.indexOf(currentRole);
     const nextRole = currentIdx < roles.length - 1 ? roles[currentIdx + 1] : null;
     const progress = ((currentIdx + 1) / roles.length) * 100;
 
@@ -124,10 +129,10 @@ export default function DashboardPage() {
     };
 
     return { 
-      current: role || 'USER', 
+      current: currentRole.toUpperCase(), 
       next: nextRole?.toUpperCase() || 'MAX LEVEL',
       progress,
-      color: colors[role?.toLowerCase() as keyof typeof colors] || colors.user
+      color: colors[currentRole as keyof typeof colors] || colors.user
     };
   }
 
@@ -150,12 +155,12 @@ export default function DashboardPage() {
           <Avatar className="h-16 w-16 border-2 border-primary/20 p-1 bg-black/40">
              <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.email}`} />
              <AvatarFallback className="bg-primary/10 text-primary font-bold">
-               {profile?.username?.charAt(0).toUpperCase() || 'U'}
+               {displayName.charAt(0).toUpperCase()}
              </AvatarFallback>
           </Avatar>
           <div className="space-y-1">
             <h1 className="text-3xl md:text-4xl font-headline font-bold text-white tracking-tight">
-              Halo, {profile?.username || 'Kreator'}! 👋
+              Halo, {displayName}! 👋
             </h1>
             <p className="text-muted-foreground text-sm max-w-md">
               Selamat datang di Nexvora Studio. Kelola seluruh layanan dalam satu dashboard profesional.
@@ -186,7 +191,9 @@ export default function DashboardPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <div className="text-4xl font-headline font-black text-white">{profile?.coins?.toLocaleString() || 0}</div>
+            <div className="text-4xl font-headline font-black text-white">
+              {Number(profile?.coins || 0).toLocaleString()}
+            </div>
             <Badge className="bg-green-500/10 text-green-500 border-none text-[9px] font-black uppercase tracking-tighter">
               {profile?.status?.toUpperCase() || 'AKTIF'} ✓
             </Badge>
@@ -304,8 +311,8 @@ export default function DashboardPage() {
                          </div>
                        </div>
                        <div className="text-right">
-                         <p className="text-[10px] text-muted-foreground font-bold uppercase">{new Date(act.createdAt?.toDate()).toLocaleDateString()}</p>
-                         <p className="text-[10px] text-white/40 font-medium">{new Date(act.createdAt?.toDate()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                         <p className="text-[10px] text-muted-foreground font-bold uppercase">{act.createdAt?.toDate?.().toLocaleDateString() || '-'}</p>
+                         <p className="text-[10px] text-white/40 font-medium">{act.createdAt?.toDate?.().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) || ''}</p>
                        </div>
                      </div>
                    ))
@@ -353,7 +360,7 @@ export default function DashboardPage() {
                       <span className="text-xs text-muted-foreground">Member Sejak</span>
                    </div>
                    <span className="text-sm font-bold text-white">
-                     {profile?.createdAt?.toDate().toLocaleDateString() || '-'}
+                     {profile?.createdAt?.toDate?.().toLocaleDateString() || '-'}
                    </span>
                 </div>
              </CardContent>
