@@ -4,7 +4,7 @@ import React from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { CheckCircle2, MessageCircle, Star, Sparkles, ShieldCheck, Zap } from "lucide-react"
+import { CheckCircle, MessageCircle, Star, Sparkles, ShieldCheck, Zap } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 const packages = [
@@ -96,7 +96,7 @@ export default function InfoKelasPage() {
                 {pkg.features.map((feature, fIdx) => (
                   <div key={fIdx} className="flex items-center gap-3">
                     <div className="h-5 w-5 rounded-full bg-green-500/10 flex items-center justify-center border border-green-500/20">
-                      <CheckCircle2 className="h-3 w-3 text-green-500" />
+                      <CheckCircle className="h-3 w-3 text-green-500" />
                     </div>
                     <span className="text-sm text-white/80 font-medium">{feature}</span>
                   </div>
