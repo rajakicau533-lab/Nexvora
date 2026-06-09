@@ -1,9 +1,11 @@
+
 "use client"
 
 import React, { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { Progress } from "@/components/ui/progress"
 import { 
   Wallet, 
   Crown, 
@@ -11,18 +13,21 @@ import {
   ShoppingBag, 
   Zap, 
   Users, 
-  MessageSquare, 
   PlayCircle, 
   TrendingUp, 
-  ShieldCheck, 
   Copy, 
   CheckCircle2, 
   ArrowRight,
-  Database,
-  Globe,
   Clock,
   ExternalLink,
-  Loader2
+  Loader2,
+  CreditCard,
+  ShoppingBasket,
+  History,
+  GraduationCap,
+  Music,
+  ArrowUpRight,
+  Calendar
 } from "lucide-react"
 import { useUser, useDoc, useFirestore, useCollection } from "@/firebase"
 import { doc, collection, query, where, orderBy, limit } from "firebase/firestore"
@@ -44,25 +49,56 @@ export default function DashboardPage() {
   }, [db, user?.uid]);
   const { data: profile, loading: profileLoading } = useDoc(userProfileQuery);
 
-  // Statistics Data
+  // Stats Collections
   const ordersQuery = React.useMemo(() => {
     if (!db || !user?.uid) return null;
     return query(collection(db, "traffic_orders"), where("userId", "==", user.uid));
   }, [db, user?.uid]);
   const { data: orders } = useCollection<any>(ordersQuery);
 
-  const productsQuery = React.useMemo(() => db ? collection(db, "marketplace_products") : null, [db]);
-  const { data: products } = useCollection<any>(productsQuery);
-
-  const materialsQuery = React.useMemo(() => db ? collection(db, "materials") : null, [db]);
-  const { data: materials } = useCollection<any>(materialsQuery);
-
-  // Recent Activity (Combined)
-  const recentOrdersQuery = React.useMemo(() => {
+  const topupsQuery = React.useMemo(() => {
     if (!db || !user?.uid) return null;
-    return query(collection(db, "traffic_orders"), where("userId", "==", user.uid), orderBy("createdAt", "desc"), limit(3));
+    return query(collection(db, "topup_requests"), where("userId", "==", user.uid));
   }, [db, user?.uid]);
-  const { data: recentOrders } = useCollection<any>(recentOrdersQuery);
+  const { data: topups } = useCollection<any>(topupsQuery);
+
+  const transactionsQuery = React.useMemo(() => {
+    if (!db || !user?.uid) return null;
+    return query(collection(db, "coin_transactions"), where("userId", "==", user.uid));
+  }, [db, user?.uid]);
+  const { data: transactions } = useCollection<any>(transactionsQuery);
+
+  const purchasesQuery = React.useMemo(() => {
+    if (!db || !user?.uid) return null;
+    return query(collection(db, "marketplace_purchases"), where("userId", "==", user.uid));
+  }, [db, user?.uid]);
+  const { data: purchases } = useCollection<any>(purchasesQuery);
+
+  // Combined Activities for "Aktivitas Terakhir"
+  const recentActivities = React.useMemo(() => {
+    if (!orders && !topups && !purchases) return [];
+    
+    const combined = [
+      ...(orders || []).map(o => ({ ...o, activityType: 'order', label: o.serviceLabel || 'Order Trafik' })),
+      ...(topups || []).map(t => ({ ...t, activityType: 'topup', label: 'Top Up Koin' })),
+      ...(purchases || []).map(p => ({ ...p, activityType: 'purchase', label: `Beli ${p.productName}` }))
+    ];
+
+    return combined
+      .sort((a, b) => {
+        const dateA = a.createdAt?.toDate?.().getTime() || 0;
+        const dateB = b.createdAt?.toDate?.().getTime() || 0;
+        return dateB - dateA;
+      })
+      .slice(0, 5);
+  }, [orders, topups, purchases]);
+
+  const totalSpending = React.useMemo(() => {
+    if (!transactions) return 0;
+    return transactions
+      .filter((tx: any) => tx.amount < 0)
+      .reduce((acc: number, tx: any) => acc + Math.abs(tx.amount), 0);
+  }, [transactions]);
 
   const copyReferral = () => {
     if (profile?.referralCode) {
@@ -73,241 +109,203 @@ export default function DashboardPage() {
     }
   }
 
-  const getLevelColor = (role: string) => {
-    switch (role?.toLowerCase()) {
-      case 'vip': return 'text-amber-400 bg-amber-400/10 border-amber-400/20';
-      case 'private': return 'text-blue-400 bg-blue-400/10 border-blue-400/20';
-      case 'premium': return 'text-purple-400 bg-purple-400/10 border-purple-400/20';
-      case 'mbah paijo': return 'text-primary bg-primary/10 border-primary/20 shadow-[0_0_15px_rgba(220,38,38,0.2)]';
-      default: return 'text-slate-400 bg-white/5 border-white/10';
-    }
+  const getLevelInfo = (role: string) => {
+    const roles = ['user', 'premium', 'private', 'vip', 'mbah paijo'];
+    const currentIdx = roles.indexOf(role?.toLowerCase() || 'user');
+    const nextRole = currentIdx < roles.length - 1 ? roles[currentIdx + 1] : null;
+    const progress = ((currentIdx + 1) / roles.length) * 100;
+
+    const colors = {
+      'user': 'text-slate-400 bg-white/5',
+      'premium': 'text-purple-400 bg-purple-400/10',
+      'private': 'text-blue-400 bg-blue-400/10',
+      'vip': 'text-amber-400 bg-amber-400/10',
+      'mbah paijo': 'text-primary bg-primary/10'
+    };
+
+    return { 
+      current: role || 'USER', 
+      next: nextRole?.toUpperCase() || 'MAX LEVEL',
+      progress,
+      color: colors[role?.toLowerCase() as keyof typeof colors] || colors.user
+    };
   }
 
   if (profileLoading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4">
         <Loader2 className="w-10 h-10 text-primary animate-spin" />
-        <p className="text-muted-foreground font-headline tracking-widest text-[10px] uppercase">Sinkronisasi Data...</p>
+        <p className="text-muted-foreground font-headline tracking-widest text-[10px] uppercase">Sinkronisasi Panel...</p>
       </div>
     )
   }
 
+  const level = getLevelInfo(profile?.role || 'USER');
+
   return (
-    <div className="space-y-10 max-w-[1400px] mx-auto pb-20">
+    <div className="space-y-8 max-w-[1400px] mx-auto pb-20">
       {/* Header Section */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-8">
-        <div className="space-y-2">
-          <div className="flex items-center gap-4">
-            <Avatar className="h-14 w-14 border-2 border-primary/20 p-0.5">
-               <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.email}`} />
-               <AvatarFallback className="bg-primary/10 text-primary font-bold">
-                 {profile?.username?.charAt(0).toUpperCase() || 'U'}
-               </AvatarFallback>
-            </Avatar>
-            <div>
-              <h1 className="text-3xl md:text-4xl font-headline font-bold text-white tracking-tight">
-                Halo, {profile?.username || 'Kreator'}! 👋
-              </h1>
-              <p className="text-muted-foreground text-sm md:text-base max-w-xl">
-                Selamat datang di Nexvora Studio. Kelola seluruh layanan, trafik, materi, marketplace, dan komunitas dalam satu dashboard profesional.
-              </p>
-            </div>
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+        <div className="flex items-center gap-5">
+          <Avatar className="h-16 w-16 border-2 border-primary/20 p-1 bg-black/40">
+             <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.email}`} />
+             <AvatarFallback className="bg-primary/10 text-primary font-bold">
+               {profile?.username?.charAt(0).toUpperCase() || 'U'}
+             </AvatarFallback>
+          </Avatar>
+          <div className="space-y-1">
+            <h1 className="text-3xl md:text-4xl font-headline font-bold text-white tracking-tight">
+              Halo, {profile?.username || 'Kreator'}! 👋
+            </h1>
+            <p className="text-muted-foreground text-sm max-w-md">
+              Selamat datang di Nexvora Studio. Kelola seluruh layanan dalam satu dashboard profesional.
+            </p>
           </div>
         </div>
 
-        {/* Quick Actions */}
-        <div className="flex flex-col sm:flex-row gap-4">
-          <Link href="/dashboard/info-admin/kelas" className="group">
-            <div className="flex items-center gap-4 p-4 rounded-2xl bg-gradient-to-br from-amber-500/20 to-transparent border border-amber-500/20 hover:border-amber-500/40 transition-all shadow-lg shadow-amber-500/5">
-               <div className="h-10 w-10 rounded-xl bg-amber-500/20 flex items-center justify-center text-amber-500 group-hover:scale-110 transition-transform">
-                 <Crown className="h-6 w-6" />
-               </div>
-               <div className="text-left">
-                 <p className="text-[10px] font-black text-amber-500 uppercase tracking-widest">Premium Access</p>
-                 <p className="text-sm font-bold text-white">Aktivasi VVIP</p>
-               </div>
-               <ArrowRight className="h-4 w-4 text-amber-500/50 group-hover:translate-x-1 transition-transform ml-2" />
-            </div>
-          </Link>
-          
-          <Link href="/dashboard/info-admin/forum" className="group">
-            <div className="flex items-center gap-4 p-4 rounded-2xl bg-gradient-to-br from-green-500/20 to-transparent border border-green-500/20 hover:border-green-500/40 transition-all shadow-lg shadow-green-500/5">
-               <div className="h-10 w-10 rounded-xl bg-green-500/20 flex items-center justify-center text-green-500 group-hover:scale-110 transition-transform">
-                 <Users className="h-6 w-6" />
-               </div>
-               <div className="text-left">
-                 <p className="text-[10px] font-black text-green-500 uppercase tracking-widest">Community</p>
-                 <p className="text-sm font-bold text-white">Gabung Grup</p>
-               </div>
-               <ArrowRight className="h-4 w-4 text-green-500/50 group-hover:translate-x-1 transition-transform ml-2" />
-            </div>
-          </Link>
+        <div className="flex flex-wrap gap-3">
+           <Button asChild className="h-12 px-6 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-500 hover:bg-amber-500/20 font-bold group">
+             <Link href="/dashboard/info-admin/kelas">
+               <Crown className="mr-2 h-4 w-4 group-hover:scale-110 transition-transform" /> Aktivasi VVIP
+             </Link>
+           </Button>
+           <Button asChild className="h-12 px-6 rounded-xl bg-green-500/10 border border-green-500/20 text-green-500 hover:bg-green-500/20 font-bold group">
+             <Link href="/dashboard/info-admin/forum">
+               <Users className="mr-2 h-4 w-4 group-hover:scale-110 transition-transform" /> Komunitas
+             </Link>
+           </Button>
         </div>
       </div>
 
       {/* Main Stats Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         <Card className="premium-card rounded-3xl bg-black/40 border-white/5 overflow-hidden group">
-          <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-            <Wallet className="h-16 w-16 text-primary" />
-          </div>
           <CardHeader className="pb-2">
-            <CardTitle className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] flex items-center gap-2">
+            <CardTitle className="text-[10px] font-black text-muted-foreground uppercase tracking-widest flex items-center gap-2">
               <Wallet className="h-3 w-3 text-primary" /> Saldo Koin
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-3">
             <div className="text-4xl font-headline font-black text-white">{profile?.coins?.toLocaleString() || 0}</div>
-            <div className="flex items-center justify-between border-t border-white/5 pt-3">
-               <span className="text-[10px] text-muted-foreground uppercase font-bold">Status Akun</span>
-               <Badge className="bg-green-500/10 text-green-500 border-none text-[9px] font-black uppercase">
-                 {profile?.status?.toUpperCase() || 'AKTIF'}
-               </Badge>
-            </div>
+            <Badge className="bg-green-500/10 text-green-500 border-none text-[9px] font-black uppercase tracking-tighter">
+              {profile?.status?.toUpperCase() || 'AKTIF'} ✓
+            </Badge>
           </CardContent>
         </Card>
 
         <Card className="premium-card rounded-3xl bg-black/40 border-white/5 overflow-hidden group">
-          <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-            <Crown className="h-16 w-16 text-primary" />
-          </div>
           <CardHeader className="pb-2">
-            <CardTitle className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] flex items-center gap-2">
+            <CardTitle className="text-[10px] font-black text-muted-foreground uppercase tracking-widest flex items-center gap-2">
               <Crown className="h-3 w-3 text-primary" /> Level Akun
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className={cn("text-3xl font-headline font-black uppercase tracking-tight", getLevelColor(profile?.role || 'USER').split(' ')[0])}>
-              {profile?.role || 'USER'}
+          <CardContent className="space-y-3">
+            <div className={cn("text-3xl font-headline font-black uppercase tracking-tight", level.color.split(' ')[0])}>
+              {level.current}
             </div>
-            <div className="flex items-center justify-between border-t border-white/5 pt-3">
-               <span className="text-[10px] text-muted-foreground uppercase font-bold">Privilege</span>
-               <span className="text-[9px] text-white/50 font-medium italic">Fitur Terbuka ✓</span>
+            <div className="flex items-center gap-2">
+               <span className="text-[9px] text-white/40 font-bold">Privilege Unlocked</span>
             </div>
           </CardContent>
         </Card>
 
         <Card className="premium-card rounded-3xl bg-black/40 border-white/5 overflow-hidden group">
           <CardHeader className="pb-2">
-            <CardTitle className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] flex items-center gap-2">
+            <CardTitle className="text-[10px] font-black text-muted-foreground uppercase tracking-widest flex items-center gap-2">
               <UserPlus className="h-3 w-3 text-primary" /> Referral Code
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-3">
             <div className="text-3xl font-headline font-black text-white tracking-widest">
               {profile?.referralCode || 'NXV-0000'}
             </div>
-            <div className="flex items-center justify-between border-t border-white/5 pt-3">
-               <button 
-                onClick={copyReferral}
-                className="flex items-center gap-1.5 text-[10px] text-primary font-black uppercase hover:opacity-80 transition-opacity"
-               >
-                 {isCopied ? <CheckCircle2 className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
-                 {isCopied ? 'Berhasil Salin' : 'Klik Salin Kode'}
-               </button>
-               <span className="text-[9px] text-muted-foreground font-bold">Bonus 10% 🪙</span>
-            </div>
+            <button onClick={copyReferral} className="flex items-center gap-1.5 text-[10px] text-primary font-black uppercase hover:opacity-80 transition-all">
+              {isCopied ? <CheckCircle2 className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+              {isCopied ? 'Berhasil Salin' : 'Salin Kode Referral'}
+            </button>
           </CardContent>
         </Card>
 
         <Card className="premium-card rounded-3xl bg-black/40 border-white/5 overflow-hidden group">
           <CardHeader className="pb-2">
-            <CardTitle className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] flex items-center gap-2">
+            <CardTitle className="text-[10px] font-black text-muted-foreground uppercase tracking-widest flex items-center gap-2">
               <ShoppingBag className="h-3 w-3 text-primary" /> Total Order
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-3">
             <div className="text-4xl font-headline font-black text-white">{orders?.length || 0}</div>
-            <div className="flex items-center justify-between border-t border-white/5 pt-3">
-               <span className="text-[10px] text-muted-foreground uppercase font-bold">Last Activity</span>
-               <span className="text-[10px] text-white font-medium">Realtime Monitor</span>
-            </div>
+            <span className="text-[10px] text-white/40 font-medium">Sistem Monitoring Aktif</span>
           </CardContent>
         </Card>
       </div>
 
-      {/* Middle Banner Section */}
-      <Card className="premium-card rounded-[2.5rem] overflow-hidden border-none relative min-h-[220px] flex items-center shadow-2xl">
-        <img 
-          src="https://images.unsplash.com/photo-1614850523296-d8c1af93d400?q=80&w=2070&auto=format&fit=crop" 
-          className="absolute inset-0 w-full h-full object-cover opacity-40"
-          alt="Academy"
-          data-ai-hint="dark abstract"
-        />
-        <div className="absolute inset-0 bg-gradient-to-r from-black via-black/80 to-transparent" />
-        <div className="relative z-10 p-8 md:p-12 space-y-6 max-w-2xl">
-          <div className="space-y-2">
-            <Badge className="luxury-gradient border-none text-[10px] font-black uppercase px-4 py-1">New Academy</Badge>
-            <h2 className="text-3xl md:text-5xl font-headline font-bold text-white leading-tight">Nexvora Academy</h2>
-            <p className="text-muted-foreground text-sm md:text-lg">Tingkatkan skill Shopee, TikTok, Live Streaming, dan Digital Marketing bersama mentor profesional.</p>
-          </div>
-          <div className="flex flex-wrap gap-4">
-            <Button asChild className="h-12 px-8 rounded-xl luxury-gradient font-bold shadow-xl shadow-primary/20">
-              <Link href="/dashboard/info-admin/kelas">Lihat Detail Kelas</Link>
-            </Button>
-            <Button asChild variant="outline" className="h-12 px-8 rounded-xl border-white/10 bg-white/5 backdrop-blur-md hover:bg-white/10">
-              <Link href="/dashboard/info-admin/forum">Gabung Komunitas</Link>
-            </Button>
-          </div>
-        </div>
-      </Card>
-
-      {/* Detailed Services & Activity */}
       <div className="grid lg:grid-cols-12 gap-8">
-        {/* Left Column: Services & History */}
+        {/* Left Column */}
         <div className="lg:col-span-8 space-y-8">
+          
+          {/* Progress Member */}
           <Card className="premium-card rounded-3xl bg-black/40 border-white/5 overflow-hidden">
-            <CardHeader className="bg-white/[0.02] border-b border-white/5 py-6">
-              <CardTitle className="text-xl flex items-center gap-3">
-                <TrendingUp className="h-5 w-5 text-primary" /> Trafik Services Statistics
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-               <div className="grid grid-cols-2 md:grid-cols-5 divide-x divide-white/5">
-                 {[
-                   { label: 'Shopee Trafik', key: 'shopee_view' },
-                   { label: 'Shopee Follow', key: 'shopee_follow' },
-                   { label: 'Shopee Like', key: 'shopee_like' },
-                   { label: 'TikTok View', key: 'tiktok_view' },
-                   { label: 'TikTok Saved', key: 'tiktok_saved' },
-                 ].map((svc, i) => (
-                   <div key={i} className="p-6 flex flex-col items-center text-center gap-2 hover:bg-white/[0.02] transition-colors">
-                     <span className="text-[9px] font-black uppercase text-muted-foreground tracking-tighter">{svc.label}</span>
-                     <span className="text-2xl font-headline font-black text-white">
-                        {orders?.filter((o: any) => o.platform?.toLowerCase() === (svc.key.includes('shopee') ? 'shopee' : 'tiktok')).length || 0}
-                     </span>
-                     <Badge variant="outline" className="text-[8px] border-primary/20 text-primary font-black py-0 h-4">ONLINE</Badge>
-                   </div>
-                 ))}
-               </div>
-            </CardContent>
+             <CardHeader className="py-6 px-8 border-b border-white/5">
+                <CardTitle className="text-lg flex items-center justify-between">
+                  <span className="flex items-center gap-2"><Crown className="h-5 w-5 text-primary" /> Progress Level Member</span>
+                  <span className="text-[10px] font-black text-muted-foreground uppercase">NEXT: {level.next}</span>
+                </CardTitle>
+             </CardHeader>
+             <CardContent className="p-8 space-y-4">
+                <div className="flex justify-between items-end mb-1">
+                   <span className="text-xs font-bold text-white/60">Level Saat Ini: <span className="text-primary">{level.current}</span></span>
+                   <span className="text-lg font-black text-white">{Math.round(level.progress)}%</span>
+                </div>
+                <Progress value={level.progress} className="h-3 bg-white/5 rounded-full" />
+                <div className="grid grid-cols-5 gap-2 pt-2">
+                   {['USER', 'PREMIUM', 'PRIVATE', 'VIP', 'PAIJO'].map((l, i) => (
+                     <div key={i} className="flex flex-col items-center gap-2">
+                        <div className={cn("h-1.5 w-full rounded-full", i <= ['user', 'premium', 'private', 'vip', 'mbah paijo'].indexOf(level.current.toLowerCase()) ? 'bg-primary' : 'bg-white/5')} />
+                        <span className="text-[8px] font-black text-muted-foreground">{l}</span>
+                     </div>
+                   ))}
+                </div>
+             </CardContent>
           </Card>
 
+          {/* Aktivitas Terakhir */}
           <Card className="premium-card rounded-3xl bg-black/40 border-white/5 overflow-hidden">
-            <CardHeader className="py-6">
-               <CardTitle className="text-xl flex items-center gap-3">
-                 <Clock className="h-5 w-5 text-primary" /> Aktivitas Terbaru
+            <CardHeader className="py-6 px-8 border-b border-white/5 flex flex-row items-center justify-between">
+               <CardTitle className="text-lg flex items-center gap-3">
+                 <History className="h-5 w-5 text-primary" /> Aktivitas Terakhir
                </CardTitle>
+               <Link href="/dashboard" className="text-[10px] font-black text-primary uppercase hover:underline">Refresh</Link>
             </CardHeader>
-            <CardContent className="px-6 pb-6">
-               <div className="space-y-4">
-                 {!recentOrders || recentOrders.length === 0 ? (
-                   <div className="py-10 text-center text-muted-foreground italic text-sm">Belum ada aktivitas baru.</div>
+            <CardContent className="p-0">
+               <div className="divide-y divide-white/5">
+                 {recentActivities.length === 0 ? (
+                   <div className="py-20 text-center text-muted-foreground italic text-sm">Belum ada aktivitas terbaru.</div>
                  ) : (
-                   recentOrders.map((order: any) => (
-                     <div key={order.id} className="flex items-center justify-between p-4 rounded-2xl bg-white/[0.03] border border-white/5 hover:bg-white/[0.05] transition-all">
+                   recentActivities.map((act: any, i) => (
+                     <div key={i} className="px-8 py-5 flex items-center justify-between hover:bg-white/[0.02] transition-colors">
                        <div className="flex items-center gap-4">
-                         <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
-                           <Zap className="h-5 w-5" />
+                         <div className={cn(
+                           "h-11 w-11 rounded-xl flex items-center justify-center border",
+                           act.activityType === 'order' ? 'bg-primary/10 border-primary/20 text-primary' :
+                           act.activityType === 'topup' ? 'bg-green-500/10 border-green-500/20 text-green-500' :
+                           'bg-blue-500/10 border-blue-500/20 text-blue-500'
+                         )}>
+                           {act.activityType === 'order' ? <Zap className="h-5 w-5" /> : 
+                            act.activityType === 'topup' ? <CreditCard className="h-5 w-5" /> : 
+                            <ShoppingBasket className="h-5 w-5" />}
                          </div>
                          <div>
-                           <p className="text-sm font-bold text-white">{order.serviceLabel || order.platform?.toUpperCase()}</p>
-                           <p className="text-[10px] text-muted-foreground uppercase font-black tracking-widest">{order.quantity?.toLocaleString()} Views • {order.status}</p>
+                           <p className="text-sm font-bold text-white">{act.label}</p>
+                           <p className="text-[10px] text-muted-foreground uppercase font-black tracking-widest">
+                             {act.quantity ? `${act.quantity.toLocaleString()} Item` : 
+                              act.idrAmount ? `Rp ${act.idrAmount.toLocaleString()}` : 
+                              act.amountCoins ? `${act.amountCoins} Koin` : 'Selesai'} • {act.status || 'Berhasil'}
+                           </p>
                          </div>
                        </div>
                        <div className="text-right">
-                         <p className="text-xs font-mono text-muted-foreground">{new Date(order.createdAt?.toDate()).toLocaleDateString()}</p>
-                         <p className="text-[9px] text-primary font-black">-{order.coinCost} 🪙</p>
+                         <p className="text-[10px] text-muted-foreground font-bold uppercase">{new Date(act.createdAt?.toDate()).toLocaleDateString()}</p>
+                         <p className="text-[10px] text-white/40 font-medium">{new Date(act.createdAt?.toDate()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
                        </div>
                      </div>
                    ))
@@ -317,70 +315,104 @@ export default function DashboardPage() {
           </Card>
         </div>
 
-        {/* Right Column: Mini Cards */}
-        <div className="lg:col-span-4 space-y-6">
+        {/* Right Column */}
+        <div className="lg:col-span-4 space-y-8">
+          
+          {/* Ringkasan Akun */}
           <Card className="premium-card rounded-3xl bg-black/40 border-white/5 overflow-hidden">
              <CardHeader className="pb-4">
                 <CardTitle className="text-base flex items-center gap-2">
-                  <ShoppingBag className="h-4 w-4 text-primary" /> Marketplace Digital
+                  <TrendingUp className="h-4 w-4 text-primary" /> Ringkasan Akun
                 </CardTitle>
              </CardHeader>
              <CardContent className="space-y-4">
                 <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/5 flex items-center justify-between">
-                   <span className="text-xs text-muted-foreground">Produk Tersedia</span>
-                   <span className="text-lg font-bold text-white">{products?.length || 0} Item</span>
+                   <div className="flex items-center gap-3">
+                      <ShoppingBag className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-xs text-muted-foreground">Total Pesanan</span>
+                   </div>
+                   <span className="text-sm font-bold text-white">{orders?.length || 0} Order</span>
                 </div>
-                <Button asChild className="w-full h-11 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-sm font-bold">
-                  <Link href="/dashboard/marketplace">Jelajahi Katalog <ExternalLink className="ml-2 h-4 w-4" /></Link>
-                </Button>
+                <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/5 flex items-center justify-between">
+                   <div className="flex items-center gap-3">
+                      <CreditCard className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-xs text-muted-foreground">Total Top Up</span>
+                   </div>
+                   <span className="text-sm font-bold text-white">{topups?.length || 0} Kali</span>
+                </div>
+                <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/5 flex items-center justify-between">
+                   <div className="flex items-center gap-3">
+                      <Zap className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-xs text-muted-foreground">Pengeluaran Koin</span>
+                   </div>
+                   <span className="text-sm font-bold text-primary">-{totalSpending.toLocaleString()} 🪙</span>
+                </div>
+                <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/5 flex items-center justify-between">
+                   <div className="flex items-center gap-3">
+                      <Calendar className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-xs text-muted-foreground">Member Sejak</span>
+                   </div>
+                   <span className="text-sm font-bold text-white">
+                     {profile?.createdAt?.toDate().toLocaleDateString() || '-'}
+                   </span>
+                </div>
              </CardContent>
           </Card>
 
+          {/* Shortcut Cepat */}
           <Card className="premium-card rounded-3xl bg-black/40 border-white/5 overflow-hidden">
              <CardHeader className="pb-4">
                 <CardTitle className="text-base flex items-center gap-2">
-                  <PlayCircle className="h-4 w-4 text-primary" /> Materi Gratis
+                  <ArrowUpRight className="h-4 w-4 text-primary" /> Shortcut Cepat
                 </CardTitle>
              </CardHeader>
-             <CardContent className="space-y-4">
-                <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/5 flex items-center justify-between">
-                   <span className="text-xs text-muted-foreground">Materi Belajar</span>
-                   <span className="text-lg font-bold text-white">{materials?.length || 0} Video</span>
-                </div>
-                <Button asChild className="w-full h-11 rounded-xl bg-primary/10 hover:bg-primary/20 border border-primary/20 text-primary text-sm font-bold">
-                  <Link href="/dashboard/materials">Mulai Belajar <ArrowRight className="ml-2 h-4 w-4" /></Link>
-                </Button>
-             </CardContent>
-          </Card>
-
-          <Card className="premium-card rounded-3xl bg-black/40 border-white/5 overflow-hidden">
-             <CardHeader className="pb-4">
-                <CardTitle className="text-base flex items-center gap-2 text-green-500">
-                  <ShieldCheck className="h-4 w-4" /> Status Sistem
-                </CardTitle>
-             </CardHeader>
-             <CardContent className="space-y-3">
+             <CardContent className="grid grid-cols-2 gap-3">
                 {[
-                  { name: 'Database Cloud', icon: Database },
-                  { name: 'API Services', icon: Globe },
-                  { name: 'Marketplace', icon: ShoppingBag },
-                  { name: 'Nexvora Academy', icon: PlayCircle },
-                ].map((stat, i) => (
-                  <div key={i} className="flex items-center justify-between py-1 px-1">
-                    <div className="flex items-center gap-3">
-                      <stat.icon className="h-3.5 w-3.5 text-muted-foreground" />
-                      <span className="text-xs text-white/70">{stat.name}</span>
+                  { label: 'Trafik Shopee', icon: ShoppingBag, href: '/dashboard/traffic/shopee' },
+                  { label: 'Followers', icon: UserPlus, href: '/dashboard/traffic/followers' },
+                  { label: 'VT View', icon: PlayCircle, href: '/dashboard/traffic/tiktok-view' },
+                  { label: 'Marketplace', icon: ShoppingBasket, href: '/dashboard/marketplace' },
+                  { label: 'Materi Gratis', icon: GraduationCap, href: '/dashboard/materials' },
+                  { label: 'Komunitas', icon: Users, href: '/dashboard/info-admin/forum' },
+                ].map((s, i) => (
+                  <Link key={i} href={s.href}>
+                    <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/5 flex flex-col items-center text-center gap-2 hover:bg-primary/5 hover:border-primary/20 transition-all group">
+                       <s.icon className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors" />
+                       <span className="text-[10px] font-bold text-white/70">{s.label}</span>
                     </div>
-                    <div className="flex items-center gap-1.5">
-                       <div className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />
-                       <span className="text-[9px] font-black text-green-500 uppercase tracking-widest">Normal</span>
-                    </div>
-                  </div>
+                  </Link>
                 ))}
              </CardContent>
           </Card>
         </div>
       </div>
+
+      {/* Banner Promosi */}
+      <Card className="premium-card rounded-[2.5rem] overflow-hidden border-none relative min-h-[260px] flex items-center shadow-2xl shadow-primary/10">
+        <img 
+          src="https://images.unsplash.com/photo-1614850523296-d8c1af93d400?q=80&w=2070&auto=format&fit=crop" 
+          className="absolute inset-0 w-full h-full object-cover opacity-30"
+          alt="Growth"
+        />
+        <div className="absolute inset-0 bg-gradient-to-r from-black via-black/90 to-transparent" />
+        <div className="relative z-10 p-8 md:p-14 space-y-6 max-w-3xl">
+          <div className="space-y-3">
+            <Badge className="luxury-gradient border-none text-[10px] font-black uppercase px-4 py-1.5 tracking-widest">Growth Engine</Badge>
+            <h2 className="text-3xl md:text-5xl font-headline font-bold text-white leading-tight">Tingkatkan Penjualan <br />Shopee & TikTok Anda</h2>
+            <p className="text-muted-foreground text-sm md:text-lg leading-relaxed max-w-xl">Gunakan layanan trafik, materi premium, tools, dan komunitas untuk mempercepat pertumbuhan akun bisnis Anda secara profesional.</p>
+          </div>
+          <div className="flex flex-wrap gap-4">
+            <Button asChild className="h-14 px-10 rounded-2xl luxury-gradient font-black text-lg shadow-2xl shadow-primary/30 group">
+              <Link href="/dashboard/info-admin/kelas">
+                Lihat Kelas <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
+              </Link>
+            </Button>
+            <Button asChild variant="outline" className="h-14 px-10 rounded-2xl border-white/10 bg-white/5 backdrop-blur-md hover:bg-white/10 text-lg font-bold">
+              <Link href="/dashboard/info-admin/forum">Gabung Komunitas</Link>
+            </Button>
+          </div>
+        </div>
+      </Card>
     </div>
   )
 }
