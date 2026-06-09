@@ -103,7 +103,7 @@ const processTrafficOrderFlow = ai.defineFlow(
       } catch (e) {
         return {
           success: false,
-          error: `Respon server provider tidak valid. Mohon coba beberapa saat lagi.`,
+          error: `Respon server provider tidak valid.`,
           rawResponse: responseText.slice(0, 1000)
         };
       }
@@ -115,26 +115,10 @@ const processTrafficOrderFlow = ai.defineFlow(
           rawResponse: data,
         };
       } else {
-        // If there's an error field in the JSON response
-        const rawError = (data.error || "").toLowerCase();
-        let errorMsg = data.error || 'Provider SMM menolak permintaan (Tanpa Pesan Error).';
-        
-        // Detailed Error Mapping - ONLY show "funds" error if explicitly stated
-        if (rawError.includes("not enough funds") || rawError.includes("insufficient balance")) {
-          errorMsg = "Saldo sistem (Provider) sedang tidak mencukupi untuk memproses pesanan ini. Mohon hubungi Admin.";
-        } else if (rawError.includes("invalid api key") || rawError.includes("key is invalid")) {
-          errorMsg = "Konfigurasi API Key sistem tidak valid. Hubungi Admin.";
-        } else if (rawError.includes("service not found") || rawError.includes("service invalid")) {
-          errorMsg = "Layanan (ID: " + serviceId + ") tidak tersedia di provider saat ini.";
-        } else if (rawError.includes("link") || rawError.includes("incorrect link") || rawError.includes("invalid link")) {
-          errorMsg = "Format link yang dimasukkan tidak sesuai dengan syarat layanan provider.";
-        } else if (rawError.includes("maintenance")) {
-          errorMsg = "Layanan provider sedang dalam pemeliharaan.";
-        }
-
+        // Return actual error message from provider as requested
         return {
           success: false,
-          error: errorMsg,
+          error: data.error || 'Provider menolak permintaan.',
           rawResponse: data,
         };
       }

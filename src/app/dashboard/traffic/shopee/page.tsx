@@ -118,23 +118,23 @@ export default function ShopeeTrafficPage() {
   const handleOrder = async () => {
     if (!db || !user?.uid || !profile) return
     
-    // Ensure settings are loaded
+    // Ensure basic settings are loaded
     if (!apiSettings || !apiSettings.apiUrl || !apiSettings.apiKey) {
       toast({ 
         variant: "destructive", 
-        title: "Konfigurasi Belum Siap", 
+        title: "Pesan Error", 
         description: "Gagal memuat pengaturan API. Mohon tunggu sejenak atau refresh halaman." 
       });
       return;
     }
 
     if (!url || url.trim().length < 5) {
-      toast({ variant: "destructive", title: "Link Wajib", description: "Masukkan link produk Shopee yang valid." });
+      toast({ variant: "destructive", title: "Input Salah", description: "Masukkan link produk Shopee yang valid." });
       return;
     }
 
     if (views < 1000) {
-      toast({ variant: "destructive", title: "Jumlah Minimal", description: "Minimal pesanan adalah 1.000 views." });
+      toast({ variant: "destructive", title: "Minimal Pesanan", description: "Minimal pesanan adalah 1.000 views." });
       return;
     }
     
@@ -170,10 +170,11 @@ export default function ShopeeTrafficPage() {
       });
 
       if (!apiResult.success) {
-        throw new Error(apiResult.error || "Gagal terhubung ke server layanan.");
+        // Show raw error from provider
+        throw new Error(apiResult.error || "Gagal membuat pesanan di server provider.");
       }
 
-      // Success Path
+      // Record Order in Firestore
       await addDoc(collection(db, "traffic_orders"), {
         userId: user.uid,
         platform: "shopee",
@@ -186,18 +187,19 @@ export default function ShopeeTrafficPage() {
         createdAt: serverTimestamp(),
       });
 
+      // Deduct coins only on success
       await updateDoc(profileRef!, { 
         coins: increment(-coinCost) 
       });
       
-      toast({ title: "Pesanan Diterima! 🚀", description: "Booster trafik Shopee Anda sedang diproses." });
+      toast({ title: "Pesanan Berhasil! 🚀", description: "Trafik sedang dikirim ke target Anda." });
       setUrl("");
       setOrderFeedback("success");
       setTimeout(() => setOrderFeedback("idle"), 3000);
-      setTimeout(syncStatus, 1500);
+      setTimeout(syncStatus, 1000);
     } catch (err: any) {
       setOrderFeedback("error");
-      toast({ variant: "destructive", title: "Pemesanan Gagal", description: err.message });
+      toast({ variant: "destructive", title: "Gagal Memproses", description: err.message });
       setTimeout(() => setOrderFeedback("idle"), 3000);
     } finally {
       setIsOrdering(false);
