@@ -11,7 +11,7 @@ export const CONTACT_INFO = {
 
 export const BANK_DETAILS = {
   bank_name: "Bank BRI",
-  account_number: "676210000757500",
+  account_number: "67621000757500",
   account_holder: "Thomas Ade Prabowo"
 };
 
