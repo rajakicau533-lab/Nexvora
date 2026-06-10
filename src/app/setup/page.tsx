@@ -125,12 +125,14 @@ export default function SetupPage() {
               </CardHeader>
               <CardContent className="text-sm text-muted-foreground space-y-4">
                 <ol className="list-decimal list-inside space-y-4">
-                  <li>Buka <a href="https://console.firebase.google.com/" target="_blank" className="text-primary font-bold hover:underline inline-flex items-center gap-1">Firebase Console <ExternalLink className="h-3 w-3" /></a></li>
-                  <li>Pilih project Anda > Project Settings > General.</li>
-                  <li>Scroll ke bawah ke bagian <b>"Your apps"</b>, pilih Web App.</li>
-                  <li>Salin nilai dari objek <code>firebaseConfig</code> ke file <code>.env</code> Anda.</li>
-                  <li><b>Penting:</b> Restart development server setelah mengedit file .env.</li>
-                </ol>
+  <li>
+  Buka <a href="https://console.firebase.google.com/" target="_blank" className="text-primary font-bold">Firebase Console</a>
+</li>
+  <li>Pilih project Anda &gt; Project Settings &gt; General.</li>
+  <li>Scroll ke bawah ke bagian <b>Your apps</b>, pilih Web App.</li>
+  <li>Salin nilai dari objek <code>firebaseConfig</code> ke file <code>.env</code> Anda.</li>
+  <li><b>Penting:</b> Restart development server setelah mengedit file .env.</li>
+</ol>
               </CardContent>
             </Card>
           </div>
