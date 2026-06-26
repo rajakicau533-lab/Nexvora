@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 
 /**
- * API Route for secure Apify product search using meavisai/shopee-crawler.
+ * API Route for secure Apify product search using meavisai/shopee-scraper.
  */
 export async function POST(request: Request) {
   const { keyword } = await request.json();
@@ -20,8 +20,8 @@ export async function POST(request: Request) {
   }
 
   try {
-    // Official Apify Synchronous Run Endpoint
-    const actorId = "meavisai~shopee-crawler";
+    // Correct Actor ID for Shopee Scraper
+    const actorId = "meavisai~shopee-scraper";
     const apifyUrl = `https://api.apify.com/v2/acts/${actorId}/run-sync-get-dataset-items?token=${APIFY_TOKEN}`;
 
     console.log(`--- APIFY REQUEST START: "${keyword}" ---`);
@@ -44,6 +44,9 @@ export async function POST(request: Request) {
       const errorBody = await response.text();
       console.error("Apify Error Detail:", errorBody);
       
+      if (status === 404) {
+        throw new Error("Actor Apify tidak ditemukan (404). Periksa Actor ID atau ketersediaan di Store.");
+      }
       if (status === 401) {
         throw new Error("Autentikasi Apify Gagal (401). Periksa validitas APIFY_TOKEN.");
       }
@@ -57,7 +60,7 @@ export async function POST(request: Request) {
       return NextResponse.json([]); // Return empty array if no results
     }
 
-    // Mapping real data from meavisai/shopee-crawler
+    // Mapping real data from meavisai/shopee-scraper
     const transformedData = rawData.slice(0, 5).map((item: any, index: number) => {
       // Logic for percentage calculation (simulated trend based on actual sold data for UI richness)
       const baseTrend = Math.floor(Math.random() * 15) + 5;
