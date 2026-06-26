@@ -34,6 +34,7 @@ export default function PremiumResearchPage() {
   const [isSearching, setIsSearching] = useState(false)
   const [products, setProducts] = useState<any[]>([])
   const [showUpgradeModal, setShowUpgradeModal] = useState(false)
+  const [hasSearched, setHasSearched] = useState(false)
 
   const profileRef = React.useMemo(() => (db && user?.uid ? doc(db, "users", user.uid) : null), [db, user?.uid])
   const { data: profile, loading: profileLoading } = useDoc(profileRef)
@@ -52,6 +53,7 @@ export default function PremiumResearchPage() {
     }
 
     setIsSearching(true)
+    setHasSearched(true)
     try {
       const res = await fetch('/api/premium/search', {
         method: 'POST',
@@ -59,8 +61,16 @@ export default function PremiumResearchPage() {
         body: JSON.stringify({ keyword: keyword.trim() })
       })
       const data = await res.json()
+      
       if (data.error) throw new Error(data.error)
+      
       setProducts(data)
+      
+      if (data.length === 0) {
+        toast({ title: "Pencarian Selesai", description: "Tidak ada data produk ditemukan untuk kata kunci ini." })
+      } else {
+        toast({ title: "Data Berhasil Dimuat", description: `Ditemukan ${data.length} produk teratas.` })
+      }
     } catch (err: any) {
       toast({ variant: "destructive", title: "Gagal Mencari", description: err.message })
     } finally {
@@ -120,7 +130,7 @@ export default function PremiumResearchPage() {
                <div className="relative flex-1">
                   <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                   <Input 
-                    placeholder="Contoh: Gamis, Mukena, Kemeja Pria..."
+                    placeholder="Contoh: Gamis, Mukena, Hijab, Daster, Sandal Wanita..."
                     value={keyword}
                     onChange={(e) => setKeyword(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
@@ -170,7 +180,14 @@ export default function PremiumResearchPage() {
                 </div>
               ))}
            </div>
-         ) : products.length === 0 ? (
+         ) : hasSearched && products.length === 0 ? (
+           <div className="p-20 text-center space-y-4 bg-black/20 rounded-[3rem] border border-dashed border-white/5">
+              <div className="w-20 h-20 bg-white/5 rounded-full flex items-center justify-center mx-auto opacity-20">
+                 <AlertCircle className="h-10 w-10" />
+              </div>
+              <p className="text-muted-foreground italic">Tidak ada data produk ditemukan.</p>
+           </div>
+         ) : !hasSearched ? (
            <div className="p-20 text-center space-y-4 bg-black/20 rounded-[3rem] border border-dashed border-white/5">
               <div className="w-20 h-20 bg-white/5 rounded-full flex items-center justify-center mx-auto opacity-20">
                  <ShoppingBag className="h-10 w-10" />
