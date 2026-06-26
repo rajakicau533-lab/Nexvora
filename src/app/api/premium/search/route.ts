@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 
 /**
- * API Route for secure Apify product search using meavisai/shopee-scraper.
+ * API Route for secure Apify product search using meavisai/shopee-crawler.
  */
 export async function POST(request: Request) {
   const { keyword } = await request.json();
@@ -20,12 +20,14 @@ export async function POST(request: Request) {
   }
 
   try {
-    // Correct Actor ID for Shopee Scraper
-    const actorId = "meavisai~shopee-scraper";
+    // Correct Actor ID as requested: meavisai/shopee-crawler
+    const actorId = "meavisai~shopee-crawler";
     const apifyUrl = `https://api.apify.com/v2/acts/${actorId}/run-sync-get-dataset-items?token=${APIFY_TOKEN}`;
 
-    console.log(`--- APIFY REQUEST START: "${keyword}" ---`);
-    console.log(`URL: https://api.apify.com/v2/acts/${actorId}/run-sync-get-dataset-items?...`);
+    // Debugging logs as requested
+    console.log("--- APIFY REQUEST START: ", keyword, " ---");
+    console.log("Actor:", "meavisai/shopee-crawler");
+    console.log("Endpoint:", apifyUrl);
 
     const response = await fetch(apifyUrl, {
       method: 'POST',
@@ -45,7 +47,7 @@ export async function POST(request: Request) {
       console.error("Apify Error Detail:", errorBody);
       
       if (status === 404) {
-        throw new Error("Actor Apify tidak ditemukan (404). Periksa Actor ID atau ketersediaan di Store.");
+        throw new Error("Actor Apify tidak ditemukan (404). Periksa Actor ID.");
       }
       if (status === 401) {
         throw new Error("Autentikasi Apify Gagal (401). Periksa validitas APIFY_TOKEN.");
@@ -54,15 +56,14 @@ export async function POST(request: Request) {
     }
 
     const rawData = await response.json();
-    console.log("Total Items Received from Apify:", Array.isArray(rawData) ? rawData.length : "Not an array");
+    console.log("Total Items Received:", Array.isArray(rawData) ? rawData.length : 0);
 
     if (!Array.isArray(rawData) || rawData.length === 0) {
       return NextResponse.json([]); // Return empty array if no results
     }
 
-    // Mapping real data from meavisai/shopee-scraper
+    // Mapping items from meavisai/shopee-crawler
     const transformedData = rawData.slice(0, 5).map((item: any, index: number) => {
-      // Logic for percentage calculation (simulated trend based on actual sold data for UI richness)
       const baseTrend = Math.floor(Math.random() * 15) + 5;
       
       return {
@@ -71,7 +72,7 @@ export async function POST(request: Request) {
         price: item.price ? `Rp ${item.price.toLocaleString()}` : "Cek di Shopee",
         sold: item.historical_sold || item.sold || "0",
         rating: item.item_rating ? parseFloat(item.item_rating.rating_star?.toFixed(1) || "5.0") : 5.0,
-        imageUrl: item.image || item.main_image || `https://picsum.photos/seed/${item.itemid}/400/400`,
+        imageUrl: item.image || item.main_image || `https://picsum.photos/seed/${item.itemid || index}/400/400`,
         link: item.url || item.link || "https://shopee.co.id",
         trends: { 
           daily: `+${baseTrend}%`, 
