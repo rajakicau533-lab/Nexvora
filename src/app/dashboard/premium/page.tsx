@@ -54,25 +54,31 @@ export default function PremiumResearchPage() {
 
     setIsSearching(true)
     setHasSearched(true)
+    setProducts([]) // Clear results before new search
+    
     try {
       const res = await fetch('/api/premium/search', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ keyword: keyword.trim() })
       })
+      
       const data = await res.json()
       
-      if (data.error) throw new Error(data.error)
+      if (data.error) {
+        throw new Error(data.error)
+      }
       
       setProducts(data)
       
       if (data.length === 0) {
         toast({ title: "Pencarian Selesai", description: "Tidak ada data produk ditemukan untuk kata kunci ini." })
       } else {
-        toast({ title: "Data Berhasil Dimuat", description: `Ditemukan ${data.length} produk teratas.` })
+        toast({ title: "Data Berhasil Dimuat", description: `Ditemukan ${data.length} produk teratas dari Shopee.` })
       }
     } catch (err: any) {
-      toast({ variant: "destructive", title: "Gagal Mencari", description: err.message })
+      console.error(err)
+      toast({ variant: "destructive", title: "Gagal Mencari", description: err.message || "Terjadi gangguan koneksi ke server Apify." })
     } finally {
       setIsSearching(false)
     }
@@ -151,7 +157,7 @@ export default function PremiumResearchPage() {
                {["Hijab", "Sandal Wanita", "Gamis", "Daster", "Celana"].map((k) => (
                  <button 
                   key={k} 
-                  onClick={() => setKeyword(k)}
+                  onClick={() => { setKeyword(k); setTimeout(() => handleSearch(), 100); }}
                   className="px-4 py-1.5 rounded-full bg-white/5 border border-white/5 text-[10px] font-bold text-white/60 hover:border-amber-500/50 hover:text-amber-500 transition-all"
                  >
                    {k}
@@ -212,7 +218,7 @@ export default function PremiumResearchPage() {
               </div>
               <div className="space-y-1">
                  <h4 className="text-lg font-bold text-white">Buka Seluruh Potensi Riset</h4>
-                 <p className="text-sm text-muted-foreground leading-relaxed">Dapatkan data penjualan real-time, tren harian, dan analisis kompetitor Shopee & TikTok dengan fitur Premium.</p>
+                 <p className="text-sm text-muted-foreground leading-relaxed">Dapatkan data penjualan real-time, tren harian, dan analisis kompetitor Shopee dengan fitur Premium.</p>
               </div>
            </div>
            <Button onClick={() => setShowUpgradeModal(true)} variant="outline" className="h-12 px-8 rounded-xl border-amber-500/30 text-amber-500 hover:bg-amber-500/10 font-black">
