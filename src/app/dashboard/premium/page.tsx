@@ -2,109 +2,87 @@
 
 import React, { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { Label } from "@/components/ui/label"
+import { Progress } from "@/components/ui/progress"
 import { 
-  Search, 
-  TrendingUp, 
-  Star, 
   BarChart3, 
-  Loader2, 
-  AlertCircle, 
+  Star, 
+  Rocket, 
+  CheckCircle2, 
+  Clock, 
+  Zap, 
+  Bell, 
   Sparkles,
+  ChevronRight,
+  ShieldCheck,
+  TrendingUp,
+  LineChart,
   ShoppingBag,
-  Info
+  Coins
 } from "lucide-react"
 import { useUser, useDoc, useFirestore } from "@/firebase"
 import { doc } from "firebase/firestore"
 import { PremiumStatusCard } from "@/components/premium/PremiumStatusCard"
-import { ProductTrendCard } from "@/components/premium/ProductTrendCard"
 import { PremiumUpgradeModal } from "@/components/premium/PremiumUpgradeModal"
 import { isPremiumActive } from "@/lib/premium-subscription-service"
 import { useToast } from "@/hooks/use-toast"
-import { Skeleton } from "@/components/ui/skeleton"
+import { Badge } from "@/components/ui/badge"
 
 export default function PremiumResearchPage() {
   const { user } = useUser()
   const db = useFirestore()
   const { toast } = useToast()
   
-  const [keyword, setKeyword] = useState("")
-  const [isSearching, setIsSearching] = useState(false)
-  const [products, setProducts] = useState<any[]>([])
   const [showUpgradeModal, setShowUpgradeModal] = useState(false)
-  const [hasSearched, setHasSearched] = useState(false)
+  const [isNotified, setIsNotified] = useState(false)
 
   const profileRef = React.useMemo(() => (db && user?.uid ? doc(db, "users", user.uid) : null), [db, user?.uid])
   const { data: profile, loading: profileLoading } = useDoc(profileRef)
 
   const isPremium = isPremiumActive(profile?.premiumSubscription)
 
-  const handleSearch = async () => {
-    if (!isPremium) {
-      setShowUpgradeModal(true)
-      return
-    }
-
-    if (!keyword || keyword.trim().length < 2) {
-      toast({ variant: "destructive", title: "Keyword Terlalu Pendek", description: "Masukkan minimal 2 karakter." })
-      return
-    }
-
-    setIsSearching(true)
-    setHasSearched(true)
-    setProducts([]) // Clear results before new search
-    
-    try {
-      const res = await fetch('/api/premium/search', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ keyword: keyword.trim() })
-      })
-      
-      const data = await res.json()
-      
-      if (data.error) {
-        throw new Error(data.error)
-      }
-      
-      setProducts(data)
-      
-      if (data.length === 0) {
-        toast({ title: "Pencarian Selesai", description: "Tidak ada data produk ditemukan untuk kata kunci ini." })
-      } else {
-        toast({ title: "Data Berhasil Dimuat", description: `Ditemukan ${data.length} produk teratas dari Shopee.` })
-      }
-    } catch (err: any) {
-      console.error(err)
-      toast({ variant: "destructive", title: "Gagal Mencari", description: err.message || "Terjadi gangguan koneksi ke server Apify." })
-    } finally {
-      setIsSearching(false)
-    }
+  const handleNotifyMe = () => {
+    setIsNotified(true)
+    toast({ 
+      title: "Notifikasi Diaktifkan! 🔔", 
+      description: "Anda akan mendapatkan notifikasi saat fitur ini tersedia." 
+    })
   }
 
   if (profileLoading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4">
-        <Loader2 className="w-10 h-10 text-amber-500 animate-spin" />
+        <div className="w-12 h-12 border-4 border-amber-500/20 border-t-amber-500 rounded-full animate-spin" />
         <p className="text-muted-foreground font-headline tracking-widest text-[10px] uppercase">Menyiapkan Ruang Premium...</p>
       </div>
     )
   }
 
+  const features = [
+    { label: "Analisis produk terlaris", icon: TrendingUp },
+    { label: "Estimasi penjualan harian", icon: Zap },
+    { label: "Estimasi penjualan mingguan", icon: LineChart },
+    { label: "Estimasi penjualan bulanan", icon: BarChart3 },
+    { label: "Analisis kompetitor", icon: ShieldCheck },
+    { label: "Analisis harga pasar", icon: Coins },
+    { label: "Analisis tren kategori", icon: Sparkles },
+    { label: "Gambar produk otomatis", icon: CheckCircle2 },
+    { label: "Data produk terjual", icon: ShoppingBag },
+    { label: "Skor peluang produk", icon: Star },
+  ]
+
   return (
-    <div className="space-y-10 max-w-[1400px] mx-auto pb-20">
+    <div className="space-y-10 max-w-[1400px] mx-auto pb-20 animate-in fade-in duration-700">
       {/* Hero Header */}
       <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-8">
         <div className="space-y-3">
           <div className="flex items-center gap-3">
-             <div className="w-14 h-14 rounded-[1.5rem] luxury-gradient flex items-center justify-center shadow-2xl shadow-amber-500/20">
+             <div className="w-14 h-14 rounded-[1.5rem] luxury-gradient flex items-center justify-center shadow-2xl shadow-amber-500/20 border border-amber-500/30">
                 <BarChart3 className="text-white h-7 w-7" />
              </div>
              <div>
-                <h2 className="text-4xl font-headline font-bold text-white tracking-tight">Reset Produk Premium 📈</h2>
-                <p className="text-muted-foreground text-lg">Analisis pasar Shopee & TikTok secara mendalam di seluruh Indonesia.</p>
+                <h2 className="text-4xl font-headline font-bold text-white tracking-tight">Riset Produk Premium 📈</h2>
+                <p className="text-muted-foreground text-lg">Gunakan algoritma Nexvora untuk memetakan produk terlaris di pasar.</p>
              </div>
           </div>
         </div>
@@ -123,111 +101,98 @@ export default function PremiumResearchPage() {
         )}
       </div>
 
-      {/* Search Section */}
-      <Card className="premium-card rounded-[2.5rem] bg-black/40 border-white/5 overflow-hidden shadow-2xl">
-         <CardHeader className="p-8 pb-4">
-            <CardTitle className="text-xl text-white flex items-center gap-2">
-               <Search className="h-5 w-5 text-amber-500" /> Reset Keyword Produk
-            </CardTitle>
-            <CardDescription>Cari tren penjualan tertinggi untuk strategi inventory Anda.</CardDescription>
-         </CardHeader>
-         <CardContent className="p-8 pt-0 space-y-6">
-            <div className="flex flex-col md:flex-row gap-4">
-               <div className="relative flex-1">
-                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                  <Input 
-                    placeholder="Contoh: Gamis, Mukena, Hijab, Daster, Sandal Wanita..."
-                    value={keyword}
-                    onChange={(e) => setKeyword(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                    className="bg-white/5 border-white/10 h-16 rounded-2xl pl-12 text-lg text-white focus:border-amber-500/50 focus:ring-amber-500/10"
-                  />
-               </div>
-               <Button 
-                onClick={handleSearch}
-                disabled={isSearching}
-                className="h-16 px-12 rounded-2xl bg-amber-500 hover:bg-amber-600 text-black font-black text-lg shadow-xl transition-all active:scale-95"
-               >
-                 {isSearching ? <Loader2 className="animate-spin" /> : "RISET SEKARANG"}
-               </Button>
-            </div>
+      {/* Main Coming Soon Container */}
+      <div className="grid lg:grid-cols-12 gap-8">
+        <div className="lg:col-span-8">
+          <Card className="premium-card rounded-[3rem] bg-black/60 border-amber-500/10 overflow-hidden relative shadow-2xl min-h-[600px] flex flex-col">
+             <div className="absolute top-0 right-0 p-8">
+                <Badge className="bg-amber-500 text-black font-black uppercase text-[10px] px-4 py-1.5 rounded-full shadow-lg shadow-amber-500/20">
+                  <Clock className="h-3 w-3 mr-2 inline" /> COMING SOON
+                </Badge>
+             </div>
 
-            <div className="flex flex-wrap gap-2">
-               <p className="text-[10px] font-black text-white/30 uppercase tracking-[0.2em] mr-2 flex items-center">Populer:</p>
-               {["Hijab", "Sandal Wanita", "Gamis", "Daster", "Celana"].map((k) => (
-                 <button 
-                  key={k} 
-                  onClick={() => { setKeyword(k); setTimeout(() => handleSearch(), 100); }}
-                  className="px-4 py-1.5 rounded-full bg-white/5 border border-white/5 text-[10px] font-bold text-white/60 hover:border-amber-500/50 hover:text-amber-500 transition-all"
-                 >
-                   {k}
-                 </button>
-               ))}
-            </div>
-         </CardContent>
-      </Card>
+             <div className="absolute inset-0 bg-gradient-to-br from-amber-500/5 via-transparent to-orange-600/5 pointer-events-none" />
 
-      {/* Results Section */}
-      <div className="space-y-6">
-         <div className="flex items-center justify-between px-2">
-            <h3 className="text-xl font-headline font-bold text-white flex items-center gap-3">
-               <TrendingUp className="h-6 w-6 text-green-500" /> Hasil Analisis Produk
-            </h3>
-            <p className="text-[10px] text-muted-foreground font-black uppercase tracking-widest">Menampilkan 5 Data Teratas</p>
-         </div>
-
-         {isSearching ? (
-           <div className="grid md:grid-cols-2 lg:grid-cols-5 gap-6">
-              {[...Array(5)].map((_, i) => (
-                <div key={i} className="space-y-4">
-                   <Skeleton className="aspect-square rounded-[2rem] bg-white/5" />
-                   <Skeleton className="h-4 w-3/4 bg-white/5" />
-                   <Skeleton className="h-10 w-full rounded-xl bg-white/5" />
+             <CardContent className="flex-1 flex flex-col items-center justify-center p-8 md:p-16 text-center space-y-8 relative z-10">
+                <div className="w-24 h-24 bg-amber-500/10 rounded-[2.5rem] flex items-center justify-center border border-amber-500/20 shadow-2xl shadow-amber-500/10 animate-bounce">
+                  <Rocket className="text-amber-500 h-12 w-12" />
                 </div>
-              ))}
-           </div>
-         ) : hasSearched && products.length === 0 ? (
-           <div className="p-20 text-center space-y-4 bg-black/20 rounded-[3rem] border border-dashed border-white/5">
-              <div className="w-20 h-20 bg-white/5 rounded-full flex items-center justify-center mx-auto opacity-20">
-                 <AlertCircle className="h-10 w-10" />
-              </div>
-              <p className="text-muted-foreground italic">Tidak ada data produk ditemukan.</p>
-           </div>
-         ) : !hasSearched ? (
-           <div className="p-20 text-center space-y-4 bg-black/20 rounded-[3rem] border border-dashed border-white/5">
-              <div className="w-20 h-20 bg-white/5 rounded-full flex items-center justify-center mx-auto opacity-20">
-                 <ShoppingBag className="h-10 w-10" />
-              </div>
-              <p className="text-muted-foreground italic">Gunakan riset keyword untuk menampilkan data tren penjualan.</p>
-           </div>
-         ) : (
-           <div className="grid md:grid-cols-2 lg:grid-cols-5 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
-              {products.map((p) => (
-                <ProductTrendCard key={p.id} product={p} />
-              ))}
-           </div>
-         )}
+                
+                <div className="space-y-3">
+                   <h3 className="text-3xl md:text-5xl font-headline font-black text-white tracking-tight">
+                     Riset Produk <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-orange-500">Premium</span>
+                   </h3>
+                   <p className="text-muted-foreground text-lg max-w-xl mx-auto leading-relaxed">
+                     Fitur analisis produk realtime sedang dalam tahap pengembangan intensif dan akan segera hadir untuk seluruh member premium.
+                   </p>
+                </div>
+
+                <div className="w-full max-w-md space-y-4">
+                   <div className="flex justify-between items-end mb-1">
+                      <span className="text-[10px] font-black text-amber-500 uppercase tracking-widest">Development Progress</span>
+                      <span className="text-lg font-headline font-black text-white">70%</span>
+                   </div>
+                   <Progress value={70} className="h-3 bg-white/5 rounded-full overflow-hidden">
+                      <div className="h-full bg-gradient-to-r from-amber-500 to-orange-600 rounded-full" />
+                   </Progress>
+                </div>
+
+                <div className="pt-6">
+                   <Button 
+                    onClick={handleNotifyMe}
+                    disabled={isNotified}
+                    className={cn(
+                      "h-16 px-12 rounded-2xl font-black text-lg shadow-2xl transition-all active:scale-95 group",
+                      isNotified ? "bg-green-500/10 text-green-500 border border-green-500/20" : "bg-white text-black hover:bg-white/90"
+                    )}
+                   >
+                     {isNotified ? (
+                       <><CheckCircle2 className="mr-2 h-6 w-6" /> BERHASIL DIDAFTARKAN</>
+                     ) : (
+                       <><Bell className="mr-2 h-6 w-6" /> BERI NOTIFIKASI SAAT RILIS</>
+                     )}
+                   </Button>
+                </div>
+             </CardContent>
+          </Card>
+        </div>
+
+        <div className="lg:col-span-4 space-y-6">
+          <Card className="premium-card rounded-[2.5rem] bg-black/60 border-white/5 overflow-hidden flex flex-col h-full">
+             <CardHeader className="p-8 border-b border-white/5">
+                <CardTitle className="text-lg text-white flex items-center gap-2">
+                   <Sparkles className="h-5 w-5 text-amber-500" /> Fitur yang Akan Hadir
+                </CardTitle>
+                <CardDescription>Semua yang Anda butuhkan untuk memenangkan pasar.</CardDescription>
+             </CardHeader>
+             <CardContent className="p-8 space-y-4 flex-1">
+                {features.map((f, i) => (
+                  <div key={i} className="flex items-center justify-between group">
+                     <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center group-hover:bg-amber-500/10 transition-colors">
+                           <f.icon className="h-5 w-5 text-muted-foreground group-hover:text-amber-500 transition-colors" />
+                        </div>
+                        <span className="text-sm font-bold text-white/70 group-hover:text-white transition-colors">{f.label}</span>
+                     </div>
+                     <CheckCircle2 className="h-4 w-4 text-amber-500/30 group-hover:text-amber-500 transition-colors" />
+                  </div>
+                ))}
+             </CardContent>
+             <div className="p-8 pt-0 mt-auto">
+                <div className="p-5 rounded-2xl bg-amber-500/5 border border-amber-500/10 flex items-start gap-4">
+                   <ShieldCheck className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
+                   <div className="space-y-1">
+                      <p className="text-[10px] font-black text-amber-500 uppercase">Jaminan Kualitas</p>
+                      <p className="text-[11px] text-muted-foreground leading-relaxed">
+                        Kami sedang menyempurnakan algoritma agar data yang ditampilkan 100% akurat dan anti-blokir.
+                      </p>
+                   </div>
+                </div>
+             </div>
+          </Card>
+        </div>
       </div>
 
-      {/* Info Warning */}
-      {!isPremium && (
-        <div className="p-8 rounded-[3rem] bg-amber-500/5 border border-amber-500/20 flex flex-col md:flex-row items-center justify-between gap-6">
-           <div className="flex items-start gap-4">
-              <div className="h-12 w-12 rounded-2xl bg-amber-500/10 flex items-center justify-center shrink-0">
-                 <Info className="h-6 w-6 text-amber-500" />
-              </div>
-              <div className="space-y-1">
-                 <h4 className="text-lg font-bold text-white">Buka Seluruh Potensi Riset</h4>
-                 <p className="text-sm text-muted-foreground leading-relaxed">Dapatkan data penjualan real-time, tren harian, dan analisis kompetitor Shopee dengan fitur Premium.</p>
-              </div>
-           </div>
-           <Button onClick={() => setShowUpgradeModal(true)} variant="outline" className="h-12 px-8 rounded-xl border-amber-500/30 text-amber-500 hover:bg-amber-500/10 font-black">
-              PELAJARI PAKET
-           </Button>
-        </div>
-      )}
-
-      {/* Upgrade Modal */}
       <PremiumUpgradeModal 
         open={showUpgradeModal} 
         onOpenChange={setShowUpgradeModal} 
