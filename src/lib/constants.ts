@@ -11,7 +11,7 @@ export const CONTACT_INFO = {
 
 export const BANK_DETAILS = {
   bank_name: "Bank BRI",
-  account_number: "676201000757500",
+  account_number: "676210000757500",
   account_holder: "Thomas Ade Prabowo"
 };
 
@@ -22,5 +22,12 @@ export const TRAFFIC_SERVICES = {
   TIKTOK_VIEW: { id: "8833", rate_view_per_coin: 1000, label: "TikTok VT View" },
   TIKTOK_SAVED: { id: "7990", rate_per_100: 2, label: "TikTok Saved" }
 };
+
+export const PREMIUM_PACKAGES = [
+  { id: "1_day", label: "1 Hari", cost: 4, days: 1 },
+  { id: "1_week", label: "1 Minggu", cost: 7, days: 7 },
+  { id: "2_weeks", label: "2 Minggu", cost: 14, days: 14 },
+  { id: "1_month", label: "1 Bulan", cost: 28, days: 30 },
+];
 
 export const COIN_PRICE_IDR = 3000;
