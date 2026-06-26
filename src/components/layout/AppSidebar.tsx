@@ -20,7 +20,10 @@ import {
   ChevronDown,
   BookOpen,
   Users,
-  Trophy
+  Trophy,
+  Rocket,
+  Star,
+  BarChart3
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { APP_NAME, CONTACT_INFO } from "@/lib/constants"
@@ -208,6 +211,27 @@ export function AppSidebar() {
                         <SidebarMenuSubItem>
                           <SidebarMenuSubButton asChild isActive={pathname === "/dashboard/traffic/tiktok-saved"}>
                             <Link href="/dashboard/traffic/tiktok-saved" onClick={handleLinkClick}>TikTok Saved</Link>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                      </SidebarMenuSub>
+                    </CollapsibleContent>
+                  </SidebarMenuItem>
+                </Collapsible>
+
+                <Collapsible defaultOpen={pathname.startsWith('/dashboard/premium')} className="group/collapsible">
+                  <SidebarMenuItem>
+                    <CollapsibleTrigger asChild>
+                      <SidebarMenuButton className="hover:bg-primary/10 hover:text-primary transition-all duration-200">
+                        <Star className="h-4 w-4 text-amber-500" />
+                        <span className="font-medium">Premium</span>
+                        <ChevronDown className="ml-auto h-4 w-4 transition-transform group-data-[state=open]/collapsible:rotate-180" />
+                      </SidebarMenuButton>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <SidebarMenuSub>
+                        <SidebarMenuSubItem>
+                          <SidebarMenuSubButton asChild isActive={pathname === "/dashboard/premium"}>
+                            <Link href="/dashboard/premium" onClick={handleLinkClick}>📈 Reset Produk</Link>
                           </SidebarMenuSubButton>
                         </SidebarMenuSubItem>
                       </SidebarMenuSub>
