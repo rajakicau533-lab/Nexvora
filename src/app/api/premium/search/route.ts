@@ -1,34 +1,35 @@
 import { NextResponse } from 'next/server';
 
 /**
- * API Route for secure Apify product search using meavisai/shopee-crawler.
+ * API Route for secure Apify product search.
+ * Uses exact Actor ID from Apify Store configuration.
  */
 export async function POST(request: Request) {
   const { keyword } = await request.json();
   const APIFY_TOKEN = process.env.APIFY_TOKEN;
 
-  // Debugging log for environment configuration
-  console.log("--- APIFY AUTH CHECK ---");
-  console.log("Token configured:", !!APIFY_TOKEN);
-
   if (!APIFY_TOKEN) {
-    return NextResponse.json({ error: "APIFY_TOKEN not configured in server environment." }, { status: 500 });
+    return NextResponse.json({ 
+      error: "APIFY_TOKEN not configured in server environment.",
+      debug: { token_status: "missing" }
+    }, { status: 500 });
   }
 
   if (!keyword || keyword.trim().length < 2) {
     return NextResponse.json({ error: "Keyword too short" }, { status: 400 });
   }
 
+  // Exact Actor ID structure (username~actor-name)
+  // This must match exactly what appears in your Apify Console under API -> Run Actor
+  const actorId = "meavisai~shopee-crawler";
+  const apifyUrl = `https://api.apify.com/v2/acts/${actorId}/run-sync-get-dataset-items?token=${APIFY_TOKEN}`;
+
+  console.log("--- APIFY REQUEST START ---");
+  console.log("Keyword:", keyword);
+  console.log("Actor ID:", actorId);
+  console.log("Endpoint Target:", apifyUrl.split('?')[0]); // Hide token in logs
+
   try {
-    // Correct Actor ID as requested: meavisai/shopee-crawler
-    const actorId = "meavisai~shopee-crawler";
-    const apifyUrl = `https://api.apify.com/v2/acts/${actorId}/run-sync-get-dataset-items?token=${APIFY_TOKEN}`;
-
-    // Debugging logs as requested
-    console.log("--- APIFY REQUEST START: ", keyword, " ---");
-    console.log("Actor:", "meavisai/shopee-crawler");
-    console.log("Endpoint:", apifyUrl);
-
     const response = await fetch(apifyUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -40,29 +41,40 @@ export async function POST(request: Request) {
     });
 
     const status = response.status;
-    console.log("Apify Response Status:", status);
+    const responseBody = await response.text();
 
     if (!response.ok) {
-      const errorBody = await response.text();
-      console.error("Apify Error Detail:", errorBody);
-      
-      if (status === 404) {
-        throw new Error("Actor Apify tidak ditemukan (404). Periksa Actor ID.");
-      }
-      if (status === 401) {
-        throw new Error("Autentikasi Apify Gagal (401). Periksa validitas APIFY_TOKEN.");
-      }
-      throw new Error(`Apify server error (${status}): ${errorBody.slice(0, 100)}`);
+      console.error("--- APIFY ERROR ---");
+      console.error("Status:", status);
+      console.error("Body:", responseBody);
+
+      // Return debug info to frontend so user can check if Actor ID is correct
+      return NextResponse.json({ 
+        error: `Apify server error (${status})`,
+        message: "Actor mungkin tidak ditemukan atau token tidak memiliki izin.",
+        debug: {
+          usedActorId: actorId,
+          usedEndpoint: apifyUrl.split('?')[0],
+          httpStatus: status,
+          apifyResponse: responseBody.slice(0, 500)
+        }
+      }, { status: status });
     }
 
-    const rawData = await response.json();
+    let rawData;
+    try {
+      rawData = JSON.parse(responseBody);
+    } catch (e) {
+      throw new Error("Respon dari Apify bukan merupakan JSON yang valid.");
+    }
+
     console.log("Total Items Received:", Array.isArray(rawData) ? rawData.length : 0);
 
     if (!Array.isArray(rawData) || rawData.length === 0) {
       return NextResponse.json([]); // Return empty array if no results
     }
 
-    // Mapping items from meavisai/shopee-crawler
+    // Mapping items based on Shopee Crawler schema
     const transformedData = rawData.slice(0, 5).map((item: any, index: number) => {
       const baseTrend = Math.floor(Math.random() * 15) + 5;
       
@@ -72,7 +84,7 @@ export async function POST(request: Request) {
         price: item.price ? `Rp ${item.price.toLocaleString()}` : "Cek di Shopee",
         sold: item.historical_sold || item.sold || "0",
         rating: item.item_rating ? parseFloat(item.item_rating.rating_star?.toFixed(1) || "5.0") : 5.0,
-        imageUrl: item.image || item.main_image || `https://picsum.photos/seed/${item.itemid || index}/400/400`,
+        imageUrl: item.image || item.main_image || `https://picsum.photos/seed/${index}/400/400`,
         link: item.url || item.link || "https://shopee.co.id",
         trends: { 
           daily: `+${baseTrend}%`, 
@@ -84,7 +96,14 @@ export async function POST(request: Request) {
 
     return NextResponse.json(transformedData);
   } catch (error: any) {
-    console.error("Critical Error in Search Route:", error.message);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error("--- CRITICAL SEARCH ERROR ---");
+    console.error(error.message);
+    return NextResponse.json({ 
+      error: error.message,
+      debug: {
+        actorId,
+        status: "exception_caught"
+      }
+    }, { status: 500 });
   }
 }
