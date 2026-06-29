@@ -189,11 +189,6 @@ export function AppSidebar() {
                     <CollapsibleContent>
                       <SidebarMenuSub>
                         <SidebarMenuSubItem>
-                          <SidebarMenuSubButton asChild isActive={pathname === "/dashboard/traffic/shopee"}>
-                            <Link href="/dashboard/traffic/shopee" onClick={handleLinkClick}>Trafik Shopee</Link>
-                          </SidebarMenuSubButton>
-                        </SidebarMenuSubItem>
-                        <SidebarMenuSubItem>
                           <SidebarMenuSubButton asChild isActive={pathname === "/dashboard/traffic/followers"}>
                             <Link href="/dashboard/traffic/followers" onClick={handleLinkClick}>Shopee Followers</Link>
                           </SidebarMenuSubButton>
@@ -201,6 +196,16 @@ export function AppSidebar() {
                         <SidebarMenuSubItem>
                           <SidebarMenuSubButton asChild isActive={pathname === "/dashboard/traffic/likes"}>
                             <Link href="/dashboard/traffic/likes" onClick={handleLinkClick}>Shopee Like</Link>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                        <SidebarMenuSubItem>
+                          <SidebarMenuSubButton asChild isActive={pathname === "/dashboard/traffic/shopee"}>
+                            <Link href="/dashboard/traffic/shopee" onClick={handleLinkClick}>Trafik Shopee</Link>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                        <SidebarMenuSubItem>
+                          <SidebarMenuSubButton asChild isActive={pathname === "/dashboard/traffic/shopee-comment"}>
+                            <Link href="/dashboard/traffic/shopee-comment" onClick={handleLinkClick}>Shopee Comment</Link>
                           </SidebarMenuSubButton>
                         </SidebarMenuSubItem>
                         <SidebarMenuSubItem>
