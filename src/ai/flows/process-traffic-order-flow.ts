@@ -17,6 +17,7 @@ const OrderInputSchema = z.object({
   serviceId: z.string(),
   link: z.string(),
   quantity: z.number(),
+  comments: z.string().optional(),
 });
 
 const ConnectionInputSchema = z.object({
@@ -58,7 +59,7 @@ const processTrafficOrderFlow = ai.defineFlow(
     }),
   },
   async (input) => {
-    const { apiUrl, apiKey, serviceId, link, quantity } = input;
+    const { apiUrl, apiKey, serviceId, link, quantity, comments } = input;
     
     if (!apiUrl || !apiKey || apiKey.trim() === "") {
       return {
@@ -76,6 +77,11 @@ const processTrafficOrderFlow = ai.defineFlow(
       params.append('service', serviceId.trim());
       params.append('link', link.trim());
       params.append('quantity', quantity.toString());
+      
+      // Support for custom comments services (Service ID 855 etc)
+      if (comments) {
+        params.append('comments', comments);
+      }
 
       const response = await fetch(endpoint, {
         method: 'POST',
