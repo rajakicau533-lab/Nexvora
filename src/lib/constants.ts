@@ -19,6 +19,7 @@ export const TRAFFIC_SERVICES = {
   SHOPEE_VIEW: { id: "8402", rate_view_per_coin: 1000, label: "Trafik Shopee" },
   SHOPEE_FOLLOWERS: { id: "7040", rate_per_100: 3, label: "Shopee Followers" },
   SHOPEE_LIKE: { id: "6897", rate_per_100: 2, label: "Shopee Like" },
+  SHOPEE_COMMENT: { id: "4239", rate_per_comment: 1, label: "Shopee Comment" },
   TIKTOK_VIEW: { id: "8833", rate_view_per_coin: 1000, label: "TikTok VT View" },
   TIKTOK_SAVED: { id: "7990", rate_per_100: 2, label: "TikTok Saved" },
   TIKTOK_COMMENT: { id: "855", rate_per_comment: 1, label: "TikTok Comment" }
