@@ -213,6 +213,11 @@ export function AppSidebar() {
                             <Link href="/dashboard/traffic/tiktok-saved" onClick={handleLinkClick}>TikTok Saved</Link>
                           </SidebarMenuSubButton>
                         </SidebarMenuSubItem>
+                        <SidebarMenuSubItem>
+                          <SidebarMenuSubButton asChild isActive={pathname === "/dashboard/traffic/tiktok-comment"}>
+                            <Link href="/dashboard/traffic/tiktok-comment" onClick={handleLinkClick}>TikTok Comment</Link>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
                       </SidebarMenuSub>
                     </CollapsibleContent>
                   </SidebarMenuItem>
