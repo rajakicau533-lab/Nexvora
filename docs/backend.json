@@ -68,6 +68,24 @@
         "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
         "createdAt": { "type": "string", "format": "date-time" }
       }
+    },
+    "ScheduledComment": {
+      "title": "Scheduled Shopee Comment",
+      "description": "Queued comment order to be executed later.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "userEmail": { "type": "string" },
+        "videoLink": { "type": "string" },
+        "commentText": { "type": "string" },
+        "quantity": { "type": "number" },
+        "coinUsed": { "type": "number" },
+        "scheduledAt": { "type": "string", "format": "date-time" },
+        "status": { "type": "string", "enum": ["scheduled", "processing", "completed", "failed"] },
+        "providerOrderId": { "type": "string" },
+        "executedAt": { "type": "string", "format": "date-time" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      }
     }
   },
   "auth": {
@@ -93,6 +111,10 @@
     "/topup_requests/{requestId}": {
       "schema": "#/entities/TopUpRequest",
       "description": "Manual coin top-up requests"
+    },
+    "/scheduled_comments/{commentId}": {
+      "schema": "#/entities/ScheduledComment",
+      "description": "Queue for scheduled shopee comments"
     }
   }
 }
