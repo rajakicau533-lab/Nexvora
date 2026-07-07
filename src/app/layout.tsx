@@ -37,13 +37,55 @@ export default function RootLayout({
     }
   }, [pathname, router]);
 
+  // Structured Data for SEO
+  const structuredData = {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "name": "Nexvora Studio",
+    "url": "https://nexvora.com",
+    "logo": "https://nexvora.com/logo.png",
+    "description": "Platform digital untuk membantu creator, affiliate, seller dan pebisnis online meningkatkan performa akun dan penjualan dengan berbagai tools otomatis.",
+    "sameAs": [
+      "https://facebook.com/nexvorastudio",
+      "https://instagram.com/nexvorastudio",
+      "https://tiktok.com/@nexvorastudio"
+    ]
+  };
+
   return (
-    <html lang="en">
+    <html lang="id">
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
-        <title>Nexvora Studio - Professional AI & Digital Growth Platform</title>
+        
+        {/* SEO Metadata */}
+        <title>Nexvora Studio - Platform Tools Affiliate dan Trafik Digital</title>
+        <meta name="description" content="Nexvora Studio menyediakan layanan trafik digital, tools affiliate, komunitas belajar dan berbagai fitur untuk membantu creator dan seller berkembang." />
+        <meta name="keywords" content="booster shopee, trafik tiktok, tools affiliate, nexvora studio, digital marketing indonesia, jasa followers shopee, koin nexvora" />
+        <link rel="canonical" href="https://nexvora.com" />
+        
+        {/* Open Graph / Facebook */}
+        <meta property="og:type" content="website" />
+        <meta property="og:url" content="https://nexvora.com" />
+        <meta property="og:title" content="Nexvora Studio - Platform Tools Affiliate dan Trafik Digital" />
+        <meta property="og:description" content="Tingkatkan performa akun Shopee & TikTok Anda dengan sistem otomatis Nexvora Studio." />
+        <meta property="og:image" content="https://picsum.photos/seed/nexvora-seo/1200/630" />
+
+        {/* Twitter */}
+        <meta property="twitter:card" content="summary_large_image" />
+        <meta property="twitter:url" content="https://nexvora.com" />
+        <meta property="twitter:title" content="Nexvora Studio - Platform Tools Affiliate dan Trafik Digital" />
+        <meta property="twitter:description" content="Platform tools digital terbaik untuk kreator & seller Indonesia." />
+        <meta property="twitter:image" content="https://picsum.photos/seed/nexvora-seo/1200/630" />
+
+        {/* Search Engine Robots */}
+        <meta name="robots" content="index, follow" />
+        
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
+        />
       </head>
       <body className="font-body antialiased bg-background text-foreground selection:bg-primary selection:text-primary-foreground">
         <Suspense fallback={null}>
