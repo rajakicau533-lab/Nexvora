@@ -1,15 +1,15 @@
 "use client"
 
-import React, { useState } from "react"
+import React, { useState, useEffect } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardFooter } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
-import { ShieldAlert, LogIn, ChevronLeft } from "lucide-react"
-import { useAuth, useFirestore } from "@/firebase"
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from "firebase/auth"
+import { ShieldAlert, LogIn, ChevronLeft, Loader2 } from "lucide-react"
+import { useAuth, useFirestore, useUser } from "@/firebase"
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, setPersistence, browserLocalPersistence } from "firebase/auth"
 import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore"
 import { useToast } from "@/hooks/use-toast"
 import { Alert, AlertDescription } from "@/components/ui/alert"
@@ -26,6 +26,14 @@ export default function AdminLoginPage() {
   const db = useFirestore()
   const router = useRouter()
   const { toast } = useToast()
+  
+  const { user: existingUser, loading: authLoading } = useUser()
+
+  useEffect(() => {
+    if (!authLoading && existingUser) {
+      router.push("/admin");
+    }
+  }, [existingUser, authLoading, router]);
 
   const handleAdminLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -39,39 +47,32 @@ export default function AdminLoginPage() {
 
     const normalizedInputEmail = email.toLowerCase().trim();
 
-    console.log("--- ADMIN LOGIN ATTEMPT ---");
-    console.log("Input Email:", normalizedInputEmail);
-
     try {
+      await setPersistence(auth, browserLocalPersistence);
+
       let user;
       try {
         const userCredential = await signInWithEmailAndPassword(auth, normalizedInputEmail, password)
         user = userCredential.user
-        console.log("Auth Success. UID:", user.uid);
       } catch (authError: any) {
-        // Auto-register master admin if not exists
-        if ((authError.code === 'auth/user-not-found' || authError.code === 'auth/invalid-credential' || authError.code === 'auth/invalid-login-credentials') && normalizedInputEmail === TARGET_ADMIN_EMAIL) {
-          console.log("Target admin not found or invalid. Attempting bootstrap registration...");
+        if ((authError.code === 'auth/user-not-found' || authError.code === 'auth/invalid-credential') && normalizedInputEmail === TARGET_ADMIN_EMAIL) {
           try {
             const newCredential = await createUserWithEmailAndPassword(auth, normalizedInputEmail, password);
             user = newCredential.user;
           } catch (regError: any) {
-             throw new Error("Gagal mendaftarkan admin master. " + regError.message);
+             throw new Error("Gagal mendaftarkan admin master: " + regError.message);
           }
         } else {
           throw new Error("Kredensial administrator tidak valid.");
         }
       }
 
-      if (!user) throw new Error("User session not found.");
+      if (!user) throw new Error("Gagal mendapatkan sesi pengguna.");
 
       const adminRef = doc(db, "admins", user.uid);
       const adminDoc = await getDoc(adminRef);
 
-      // Force create/update admin record for the target master email
       if (normalizedInputEmail === TARGET_ADMIN_EMAIL) {
-        console.log("Ensuring admin record exists for master account...");
-        // Use setDoc with merge to ensure the role is 'super_admin'
         await setDoc(adminRef, {
           email: normalizedInputEmail,
           role: "super_admin",
@@ -79,27 +80,30 @@ export default function AdminLoginPage() {
           updatedAt: serverTimestamp(),
           createdAt: adminDoc.exists() ? (adminDoc.data()?.createdAt || serverTimestamp()) : serverTimestamp()
         }, { merge: true });
-        
-        console.log("Admin record successfully verified/updated for master email.");
       } else if (!adminDoc.exists()) {
-        console.warn("Unauthorized access attempt. Document not found in 'admins' collection.");
         await signOut(auth);
         throw new Error("Akses ditolak. Anda tidak memiliki izin administrator.");
+      } else if (adminDoc.data()?.status === 'inactive') {
+        await signOut(auth);
+        throw new Error("Akun administrator Anda telah dinonaktifkan.");
       }
 
-      console.log("Redirecting to admin panel...");
-      toast({
-        title: "Admin Authenticated",
-        description: "Selamat datang di Control Center.",
-      })
-      
+      toast({ title: "Admin Authenticated" })
       router.push("/admin")
     } catch (err: any) {
-      console.error("Login process error:", err.message);
       setError(err.message || "Terjadi kesalahan sistem saat login.");
     } finally {
       setIsLoading(false)
     }
+  }
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-[#0F0F0F] flex flex-col items-center justify-center space-y-4">
+        <Loader2 className="w-10 h-10 text-primary animate-spin" />
+        <p className="text-muted-foreground font-headline tracking-widest uppercase text-[10px]">Memuat Sesi...</p>
+      </div>
+    )
   }
 
   return (
@@ -160,14 +164,7 @@ export default function AdminLoginPage() {
                 disabled={isLoading}
                 className="w-full h-14 rounded-2xl luxury-gradient border-none font-black text-lg shadow-xl shadow-primary/30 mt-4 group"
               >
-                {isLoading ? (
-                  <div className="flex items-center gap-3">
-                    <div className="w-5 h-5 border-3 border-white/30 border-t-white rounded-full animate-spin" />
-                    Otorisasi...
-                  </div>
-                ) : (
-                  <>Buka Akses Panel <LogIn className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" /></>
-                )}
+                {isLoading ? "Authenticating..." : "Buka Akses Panel"}
               </Button>
             </form>
           </CardContent>
