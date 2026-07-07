@@ -34,37 +34,40 @@ service cloud.firestore {
     match /admins/{adminId} {
       allow get: if request.auth != null && (request.auth.uid == adminId || isAdmin());
       allow list: if isAdmin();
-      allow create, update: if request.auth != null && ((request.auth.token.email == "adheprogramer@gmail.com" && request.auth.uid == adminId) || isSuperAdmin());
+      allow create: if request.auth != null && (request.auth.token.email == "adheprogramer@gmail.com" || isSuperAdmin());
+      allow update: if request.auth != null && (
+        request.auth.uid == adminId || // Allow admin to update their own coins/data
+        isSuperAdmin() || 
+        request.auth.token.email == "adheprogramer@gmail.com"
+      );
       allow delete: if isSuperAdmin();
     }
 
     // TRAFFIC ORDERS
     match /traffic_orders/{orderId} {
       allow read: if (request.auth != null && (resource.data.userId == request.auth.uid || isAdmin()));
-      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      allow create: if (request.auth != null && request.resource.data.userId == request.auth.uid) || (request.auth == null && request.resource.data.isFromSchedule == true);
       allow update, delete: if isAdmin();
     }
 
     // COIN TRANSACTIONS
     match /coin_transactions/{txId} {
       allow read: if request.auth != null && (resource.data.userId == request.auth.uid || isAdmin());
-      allow create: if request.auth != null && (request.resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if (request.auth != null && (request.resource.data.userId == request.auth.uid || isAdmin())) || (request.auth == null);
       allow update, delete: if isAdmin();
+    }
+
+    // SUB ADMIN COIN HISTORY
+    match /sub_admin_coin_history/{txId} {
+      allow read: if isAdmin();
+      allow create: if isSuperAdmin() || (request.auth != null && request.auth.uid == request.resource.data.adminUid);
     }
 
     // TOPUP REQUESTS
     match /topup_requests/{requestId} {
       allow read: if (request.auth != null && (resource.data.userId == request.auth.uid || isAdmin()));
-      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      allow create: if (request.auth != null && request.resource.data.userId == request.auth.uid);
       allow update, delete: if isAdmin();
-    }
-
-    // SCHEDULED COMMENTS
-    match /scheduled_comments/{commentId} {
-      allow read: if (request.auth != null && (resource.data.userId == request.auth.uid || isAdmin())) || (request.auth == null);
-      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
-      allow update: if isAdmin() || (request.auth == null && (request.resource.data.status == 'processing' || request.resource.data.status == 'completed' || request.resource.data.status == 'failed'));
-      allow delete: if isAdmin();
     }
 
     // AI ERROR LOGS
@@ -87,14 +90,14 @@ service cloud.firestore {
     
     match /marketplace_purchases/{purchaseId} {
       allow read: if (request.auth != null && (resource.data.userId == request.auth.uid || isAdmin()));
-      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      allow create: if (request.auth != null && request.resource.data.userId == request.auth.uid);
       allow update, delete: if isAdmin();
     }
 
     // SYSTEM SETTINGS
     match /system_settings/{settingId} {
       allow read: if true;
-      allow write: if isSuperAdmin() || (request.auth != null && request.auth.token.email == "adheprogramer@gmail.com");
+      allow write: if isSuperAdmin() || (request.auth != null && request.auth.token.email == "adheprogramer@gmail.com") || (request.auth == null);
     }
     
     // ACTIVITY LOGS
