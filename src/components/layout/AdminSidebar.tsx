@@ -1,4 +1,3 @@
-
 "use client"
 
 import React from "react"
@@ -10,15 +9,13 @@ import {
   Users, 
   TrendingUp, 
   ShoppingBag, 
-  CreditCard,
   LogOut,
   ShieldCheck,
   BookOpen,
   Activity,
   UserCog,
   FileText,
-  Wallet,
-  Clock
+  Wallet
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import {
@@ -46,7 +43,6 @@ const adminItems = [
   { label: "Marketplace", icon: ShoppingBag, href: "/admin/marketplace" },
   { label: "Learning Materials", icon: BookOpen, href: "/admin/materials" },
   { label: "System Activity", icon: Activity, href: "/admin/activity" },
-  { label: "Cron Configuration", icon: Clock, href: "/admin/cron" },
 ]
 
 export function AdminSidebar() {
