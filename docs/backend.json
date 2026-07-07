@@ -23,9 +23,24 @@
       "properties": {
         "email": { "type": "string", "format": "email" },
         "role": { "type": "string", "enum": ["super_admin", "assistant_admin", "admin"] },
+        "coins": { "type": "number", "description": "Balance for Sub Admin operation" },
+        "status": { "type": "string", "enum": ["active", "inactive"] },
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["email", "role"]
+    },
+    "SubAdminCoinHistory": {
+      "title": "Sub Admin Coin History",
+      "description": "Log of coin transfers between Master and Sub Admins.",
+      "type": "object",
+      "properties": {
+        "adminUid": { "type": "string" },
+        "adminEmail": { "type": "string" },
+        "amount": { "type": "number" },
+        "type": { "type": "string", "enum": ["add", "sub"] },
+        "processedBy": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      }
     },
     "TrafficOrder": {
       "title": "Traffic Order",
@@ -68,24 +83,6 @@
         "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
         "createdAt": { "type": "string", "format": "date-time" }
       }
-    },
-    "ScheduledComment": {
-      "title": "Scheduled Shopee Comment",
-      "description": "Queued comment order to be executed later.",
-      "type": "object",
-      "properties": {
-        "userId": { "type": "string" },
-        "userEmail": { "type": "string" },
-        "videoLink": { "type": "string" },
-        "commentText": { "type": "string" },
-        "quantity": { "type": "number" },
-        "coinUsed": { "type": "number" },
-        "scheduledAt": { "type": "string", "format": "date-time" },
-        "status": { "type": "string", "enum": ["scheduled", "processing", "completed", "failed"] },
-        "providerOrderId": { "type": "string" },
-        "executedAt": { "type": "string", "format": "date-time" },
-        "createdAt": { "type": "string", "format": "date-time" }
-      }
     }
   },
   "auth": {
@@ -112,9 +109,9 @@
       "schema": "#/entities/TopUpRequest",
       "description": "Manual coin top-up requests"
     },
-    "/scheduled_comments/{commentId}": {
-      "schema": "#/entities/ScheduledComment",
-      "description": "Queue for scheduled shopee comments"
+    "/sub_admin_coin_history/{txId}": {
+      "schema": "#/entities/SubAdminCoinHistory",
+      "description": "History of sub-admin balance changes"
     }
   }
 }
