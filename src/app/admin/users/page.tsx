@@ -1,7 +1,8 @@
+
 "use client"
 
 import React, { useState, useEffect } from "react"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -17,13 +18,13 @@ import {
   Loader2,
   ChevronLeft,
   ChevronRight,
-  Filter,
   CheckCircle2,
   XCircle,
   ShieldCheck,
   ShieldX,
   Crown,
-  Star
+  Star,
+  AlertCircle
 } from "lucide-react"
 import { useFirestore, useCollection, useUser, useDoc } from "@/firebase"
 import { 
@@ -38,7 +39,8 @@ import {
   getDocs,
   where,
   writeBatch,
-  deleteDoc
+  deleteDoc,
+  runTransaction
 } from "firebase/firestore"
 import { 
   DropdownMenu, 
@@ -58,8 +60,6 @@ import {
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
-import { errorEmitter } from '@/firebase/error-emitter'
-import { FirestorePermissionError, type SecurityRuleContext } from '@/firebase/errors'
 
 const ITEMS_PER_PAGE = 10
 
@@ -76,15 +76,10 @@ export default function ManageUsersPage() {
   const [coinAmount, setCoinAmount] = useState(0)
   const [isProcessing, setIsProcessing] = useState(false)
 
-  // Get current admin role
-  const adminProfileRef = React.useMemo(() => {
-    if (!db || !currentUser?.uid) return null;
-    return doc(db, 'admins', currentUser.uid);
-  }, [db, currentUser?.uid]);
+  const adminProfileRef = React.useMemo(() => (db && currentUser?.uid ? doc(db, "admins", currentUser.uid) : null), [db, currentUser?.uid]);
   const { data: adminData } = useDoc(adminProfileRef);
   
-  const isAssistant = adminData?.role === 'assistant_admin';
-  const isSuper = adminData?.role === 'super_admin' || currentUser?.email === 'adheprogramer@gmail.com';
+  const isMaster = adminData?.role === 'super_admin' || currentUser?.email === 'adheprogramer@gmail.com';
 
   const usersQuery = React.useMemo(() => {
     if (!db) return null
@@ -93,7 +88,6 @@ export default function ManageUsersPage() {
 
   const { data: users, loading } = useCollection<any>(usersQuery)
 
-  // Reset page on search or filter change
   useEffect(() => {
     setCurrentPage(1)
   }, [searchTerm, statusFilter])
@@ -120,181 +114,139 @@ export default function ManageUsersPage() {
   }, [filteredUsers, currentPage])
 
   const handleUpdateCoins = async () => {
-    if (!db || !selectedUser || !coinAction) return
-    if (isAssistant) return
-
+    if (!db || !selectedUser || !coinAction || !currentUser) return
     setIsProcessing(true)
 
+    const amount = coinAction === "add" ? coinAmount : -coinAmount
+    const isAdding = amount > 0;
+    
+    const userRef = doc(db, "users", selectedUser.uid)
+    const adminRef = doc(db, "admins", currentUser.uid)
+
     try {
-      const amount = coinAction === "add" ? coinAmount : -coinAmount
-      const userRef = doc(db, "users", selectedUser.uid)
-      
-      updateDoc(userRef, {
-        coins: increment(amount)
-      }).catch(async (err) => {
-        errorEmitter.emit('permission-error', new FirestorePermissionError({
-          path: userRef.path,
-          operation: 'update',
-          requestResourceData: { coins: increment(amount) }
-        } satisfies SecurityRuleContext));
+      await runTransaction(db, async (transaction) => {
+        const adminDoc = await transaction.get(adminRef);
+        const targetUserDoc = await transaction.get(userRef);
+
+        if (!adminDoc.exists()) throw new Error("Profil admin Anda tidak ditemukan.");
+        if (!targetUserDoc.exists()) throw new Error("User tidak ditemukan.");
+
+        // 1. Validasi Saldo untuk Sub Admin
+        if (!isMaster && isAdding) {
+          const currentAdminBalance = adminDoc.data()?.coins || 0;
+          if (currentAdminBalance < coinAmount) {
+            throw new Error("Saldo koin Sub Admin tidak mencukupi untuk transaksi ini.");
+          }
+          // Kurangi saldo Sub Admin
+          transaction.update(adminRef, { coins: increment(-coinAmount) });
+        }
+
+        // 2. Tambah/Kurang Saldo User
+        transaction.update(userRef, { 
+          coins: increment(amount),
+          updatedAt: serverTimestamp()
+        });
+
+        // 3. Log Transaksi Koin User
+        const coinTxRef = doc(collection(db, "coin_transactions"));
+        transaction.set(coinTxRef, {
+          userId: selectedUser.uid,
+          amount: amount,
+          type: isAdding ? "topup" : "purchase",
+          description: `Admin Adjustment: ${currentUser?.email}`,
+          createdAt: serverTimestamp()
+        });
+
+        // 4. Log Aktivitas Admin
+        const logRef = doc(collection(db, "activity_logs"));
+        const logData: any = {
+          type: "admin",
+          action: isAdding ? "SUB_ADMIN_ADD_COINS" : "SUB_ADMIN_SUB_COINS",
+          userId: currentUser.uid,
+          userEmail: currentUser.email,
+          targetUser: selectedUser.email,
+          targetUserId: selectedUser.uid,
+          amount: Math.abs(amount),
+          timestamp: serverTimestamp()
+        };
+
+        if (!isMaster) {
+          logData.subAdminBalanceBefore = adminDoc.data()?.coins || 0;
+          logData.subAdminBalanceAfter = (adminDoc.data()?.coins || 0) - (isAdding ? coinAmount : 0);
+        }
+
+        transaction.set(logRef, logData);
       });
 
-      addDoc(collection(db, "coin_transactions"), {
-        userId: selectedUser.uid,
-        amount: amount,
-        type: amount > 0 ? "topup" : "purchase",
-        description: `Admin Adjustment by ${currentUser?.email}`,
-        createdAt: serverTimestamp()
-      }).catch(async (err) => {
-         errorEmitter.emit('permission-error', new FirestorePermissionError({
-          path: 'coin_transactions',
-          operation: 'create',
-        } satisfies SecurityRuleContext));
-      });
-
-      toast({ title: "Koin Berhasil Diperbarui" })
+      toast({ title: "Saldo Berhasil Diperbarui" })
       setCoinAction(null);
-      setTimeout(() => {
-        setSelectedUser(null);
-        setCoinAmount(0);
-        setIsProcessing(false);
-      }, 200);
-
+      setSelectedUser(null);
+      setCoinAmount(0);
     } catch (err: any) {
-      setIsProcessing(false)
+      toast({ 
+        variant: "destructive", 
+        title: "Transaksi Gagal", 
+        description: err.message 
+      });
+    } finally {
+      setIsProcessing(false);
     }
   }
 
   const toggleAdminVerify = async (user: any) => {
-    if (!db || isAssistant) return;
+    if (!db || !currentUser) return;
     const currentStatus = user.adminVerified ?? false;
     const userRef = doc(db, "users", user.uid);
     
-    updateDoc(userRef, { 
-      adminVerified: !currentStatus,
-      updatedAt: serverTimestamp()
-    }).then(() => {
-      toast({ 
-        title: !currentStatus ? "User Diverifikasi" : "Verifikasi Dicabut", 
-        description: `Status akses ${user.username} telah diperbarui.` 
-      });
-    }).catch(async (err) => {
-      errorEmitter.emit('permission-error', new FirestorePermissionError({
-        path: userRef.path,
-        operation: 'update',
-      } satisfies SecurityRuleContext));
+    await updateDoc(userRef, { adminVerified: !currentStatus, updatedAt: serverTimestamp() });
+    
+    await addDoc(collection(db, "activity_logs"), {
+      userId: currentUser.uid,
+      userEmail: currentUser.email,
+      action: "VERIFY_ACCOUNT",
+      details: `${!currentStatus ? 'Verified' : 'Unverified'} user ${user.email}`,
+      timestamp: serverTimestamp()
     });
+
+    toast({ title: !currentStatus ? "User Diverifikasi" : "Verifikasi Dicabut" });
   }
 
   const togglePremiumBadge = async (user: any) => {
-    if (!db || isAssistant) return;
+    if (!db || !currentUser) return;
     const currentStatus = user.premiumBadge ?? false;
     const userRef = doc(db, "users", user.uid);
     
-    updateDoc(userRef, { 
-      premiumBadge: !currentStatus,
-      updatedAt: serverTimestamp()
-    }).then(() => {
-      toast({ 
-        title: !currentStatus ? "Lencana Premium Diberikan" : "Lencana Premium Dicabut", 
-        description: `Status premium ${user.username} telah diperbarui.` 
-      });
-    }).catch(async (err) => {
-      errorEmitter.emit('permission-error', new FirestorePermissionError({
-        path: userRef.path,
-        operation: 'update',
-      } satisfies SecurityRuleContext));
-    });
-  }
-
-  const toggleUserStatus = async (user: any) => {
-    if (!db || isAssistant) return;
-    const newStatus = user.status === "active" ? "suspended" : "active";
-    const userRef = doc(db, "users", user.uid);
+    await updateDoc(userRef, { premiumBadge: !currentStatus, updatedAt: serverTimestamp() });
     
-    updateDoc(userRef, { status: newStatus })
-      .then(() => {
-        toast({ title: "Status Diperbarui", description: `Akun ${user.username} sekarang ${newStatus}.` })
-      })
-      .catch(async (err) => {
-        errorEmitter.emit('permission-error', new FirestorePermissionError({
-          path: userRef.path,
-          operation: 'update',
-        } satisfies SecurityRuleContext));
-      });
+    await addDoc(collection(db, "activity_logs"), {
+      userId: currentUser.uid,
+      userEmail: currentUser.email,
+      action: "GRANT_PREMIUM",
+      details: `${!currentStatus ? 'Granted' : 'Revoked'} premium for ${user.email}`,
+      timestamp: serverTimestamp()
+    });
+
+    toast({ title: !currentStatus ? "Lencana Premium Diberikan" : "Lencana Premium Dicabut" });
   }
 
   const handleDeleteUser = async (userToDelete: any) => {
-    if (!db || !isSuper) return;
-    
-    if (!confirm(`Yakin ingin menghapus user "${userToDelete.username}" secara permanen? Tindakan ini akan menghapus seluruh data Firestore dan memblokir akses login.`)) return
+    if (!db || !isMaster || !currentUser) return;
+    if (!confirm(`Hapus permanen ${userToDelete.username}? Tindakan ini tidak dapat dibatalkan.`)) return
     
     setIsProcessing(true);
-    console.log("--- STARTING PERMANENT DELETE ---");
-    console.log("Target UID:", userToDelete.uid);
-
     try {
-      const userRef = doc(db, "users", userToDelete.uid);
-      const adminRef = doc(db, "admins", userToDelete.uid);
-
-      // 1. Delete primary user profile
-      deleteDoc(userRef)
-        .then(() => {
-          console.log("Firestore: Profile document deleted.");
-          toast({ title: "User Berhasil Dihapus", description: "Profil utama dan akses login telah diblokir." });
-          
-          // Log deletion activity
-          addDoc(collection(db, "activity_logs"), {
-            type: "admin",
-            action: "PERMANENT_DELETE",
-            userId: currentUser?.uid,
-            userEmail: currentUser?.email,
-            details: `Permanently deleted user: ${userToDelete.email}`,
-            timestamp: serverTimestamp()
-          });
-        })
-        .catch(async (serverError) => {
-          console.error("Firestore: Failed to delete profile doc", serverError);
-          errorEmitter.emit('permission-error', new FirestorePermissionError({
-            path: userRef.path,
-            operation: 'delete',
-          } satisfies SecurityRuleContext));
-        })
-        .finally(() => {
-          setIsProcessing(false);
-          console.log("--- DELETE PROCESS COMPLETED ---");
-        });
-
-      // 2. Background cleanup of related collections
-      const relatedCollections = [
-        "traffic_orders",
-        "coin_transactions",
-        "topup_requests",
-        "marketplace_purchases",
-        "activity_logs",
-        "profile_traffic_campaigns",
-        "api_logs"
-      ];
-
-      relatedCollections.forEach(async (colName) => {
-        try {
-          const q = query(collection(db, colName), where("userId", "==", userToDelete.uid));
-          const snap = await getDocs(q);
-          if (!snap.empty) {
-            const batch = writeBatch(db);
-            snap.docs.forEach(d => batch.delete(d.ref));
-            await batch.commit();
-            console.log(`Firestore: Cleaned up ${snap.size} records from ${colName}`);
-          }
-        } catch (e) {
-          console.warn(`Firestore: Cleanup skip for ${colName}`, e);
-        }
+      await deleteDoc(doc(db, "users", userToDelete.uid));
+      
+      await addDoc(collection(db, "activity_logs"), {
+        userId: currentUser.uid,
+        userEmail: currentUser.email,
+        action: "DELETE_USER",
+        details: `Permanently deleted user ${userToDelete.email}`,
+        timestamp: serverTimestamp()
       });
 
-      deleteDoc(adminRef).catch(() => {});
-
-    } catch (err: any) {
-      console.error("Critical error in delete handler:", err);
+      toast({ title: "User Berhasil Dihapus" });
+    } finally {
       setIsProcessing(false);
     }
   }
@@ -304,36 +256,23 @@ export default function ManageUsersPage() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h2 className="text-3xl font-headline font-bold text-white">Manage Users</h2>
-          <p className="text-muted-foreground">Monitor and control Nexvora members.</p>
+          <p className="text-muted-foreground">Monitor and manage Nexvora members.</p>
         </div>
         <div className="flex flex-col sm:flex-row gap-3">
-          <div className="flex bg-black/40 border border-white/10 p-1 rounded-xl overflow-x-auto no-scrollbar">
-             {[
-               { id: 'all', label: 'ALL USERS' },
-               { id: 'verified', label: 'VERIFIED' },
-               { id: 'unverified', label: 'PENDING' },
-               { id: 'premium', label: 'PREMIUM' }
-             ].map((f) => (
-               <button
-                 key={f.id}
-                 onClick={() => setStatusFilter(f.id as any)}
-                 className={cn(
-                   "px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap",
-                   statusFilter === f.id ? "bg-primary text-white shadow-lg shadow-primary/20" : "text-muted-foreground hover:text-white"
+          <div className="flex bg-black/40 border border-white/10 p-1 rounded-xl">
+             {['all', 'verified', 'unverified', 'premium'].map((f) => (
+               <button key={f} onClick={() => setStatusFilter(f as any)}
+                 className={cn("px-4 py-1.5 rounded-lg text-[9px] font-black uppercase transition-all",
+                   statusFilter === f ? "bg-primary text-white" : "text-muted-foreground hover:text-white"
                  )}
                >
-                 {f.label}
+                 {f}
                </button>
              ))}
           </div>
           <div className="relative w-full md:w-64">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input 
-              placeholder="Search user..." 
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 bg-white/5 border-white/10 rounded-xl h-10"
-            />
+            <Input placeholder="Cari user..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10 bg-white/5 border-white/10 rounded-xl h-10" />
           </div>
         </div>
       </div>
@@ -344,21 +283,14 @@ export default function ManageUsersPage() {
             <TableRow className="border-white/5">
               <TableHead className="text-white font-bold">User / Email</TableHead>
               <TableHead className="text-white font-bold">Balance</TableHead>
-              <TableHead className="text-white font-bold">Admin Status</TableHead>
-              <TableHead className="text-white font-bold">Premium</TableHead>
-              <TableHead className="text-white font-bold">Joined</TableHead>
+              <TableHead className="text-white font-bold">Status</TableHead>
+              <TableHead className="text-white font-bold">Role</TableHead>
               <TableHead className="text-right text-white font-bold">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
-              <TableRow>
-                <TableCell colSpan={6} className="text-center py-20"><Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" /></TableCell>
-              </TableRow>
-            ) : filteredUsers.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={6} className="text-center py-20 text-muted-foreground">No users found.</TableCell>
-              </TableRow>
+              <TableRow><TableCell colSpan={5} className="text-center py-20"><Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" /></TableCell></TableRow>
             ) : (
               paginatedUsers.map((u) => (
                 <TableRow key={u.uid} className="border-white/5 hover:bg-white/5 transition-colors">
@@ -377,64 +309,39 @@ export default function ManageUsersPage() {
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    {u.adminVerified ? (
-                      <Badge className="bg-green-500/10 text-green-500 border-none text-[9px] font-black uppercase flex w-fit items-center gap-1">
-                        <CheckCircle2 className="h-3 w-3" /> Verified
-                      </Badge>
-                    ) : (
-                      <Badge className="bg-red-500/10 text-red-500 border-none text-[9px] font-black uppercase flex w-fit items-center gap-1 text-nowrap">
-                        <XCircle className="h-3 w-3" /> Not Verified
-                      </Badge>
-                    )}
+                    {u.adminVerified ? <Badge className="bg-green-500/10 text-green-500 border-none text-[9px] font-black uppercase">Verified</Badge> : <Badge className="bg-red-500/10 text-red-500 border-none text-[9px] font-black uppercase">Pending</Badge>}
                   </TableCell>
                   <TableCell>
-                    {u.premiumBadge ? (
-                      <Badge className="bg-amber-500 text-black border-none text-[8px] font-black uppercase flex w-fit items-center gap-1">
-                        👑 PREMIUM
-                      </Badge>
-                    ) : (
-                      <Badge variant="outline" className="text-white/20 border-white/5 text-[8px] font-black uppercase">
-                        REGULAR
-                      </Badge>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-xs text-muted-foreground uppercase font-bold text-nowrap">
-                    {u.createdAt?.toDate?.().toLocaleDateString() || '-'}
+                    <span className="text-[10px] font-black uppercase text-white/40">{u.role}</span>
                   </TableCell>
                   <TableCell className="text-right">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-white">
-                          <MoreVertical className="h-4 w-4" />
-                        </Button>
+                        <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-white"><MoreVertical className="h-4 w-4" /></Button>
                       </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="bg-black/90 border-white/10 text-white rounded-xl backdrop-blur-xl">
-                        {!isAssistant && (
+                      <DropdownMenuContent align="end" className="bg-black/95 border-white/10 text-white rounded-xl backdrop-blur-xl">
+                        <DropdownMenuItem onClick={() => { setSelectedUser(u); setCoinAction("add"); }} className="flex items-center gap-2 cursor-pointer">
+                          <Plus className="h-4 w-4 text-green-500" /> Add Koin
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => { setSelectedUser(u); setCoinAction("sub"); }} className="flex items-center gap-2 cursor-pointer">
+                          <Minus className="h-4 w-4 text-red-500" /> Subtract Koin
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator className="bg-white/5" />
+                        <DropdownMenuItem onClick={() => toggleAdminVerify(u)} className="flex items-center gap-2 cursor-pointer">
+                           {u.adminVerified ? <ShieldX className="h-4 w-4 text-red-400" /> : <ShieldCheck className="h-4 w-4 text-emerald-400" />}
+                           {u.adminVerified ? 'Unverify Account' : 'Verify Account'}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => togglePremiumBadge(u)} className="flex items-center gap-2 cursor-pointer">
+                           <Star className={cn("h-4 w-4", u.premiumBadge ? "text-slate-400" : "text-amber-400")} />
+                           {u.premiumBadge ? 'Remove Premium' : 'Grant Premium'}
+                        </DropdownMenuItem>
+                        {isMaster && (
                           <>
-                            <DropdownMenuItem onClick={() => { setSelectedUser(u); setCoinAction("add"); }} className="flex items-center gap-2 cursor-pointer">
-                              <Plus className="h-4 w-4 text-green-500" /> Add Koin
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => { setSelectedUser(u); setCoinAction("sub"); }} className="flex items-center gap-2 cursor-pointer">
-                              <Minus className="h-4 w-4 text-red-500" /> Subtract Koin
-                            </DropdownMenuItem>
                             <DropdownMenuSeparator className="bg-white/5" />
-                            <DropdownMenuItem onClick={() => toggleAdminVerify(u)} className="flex items-center gap-2 cursor-pointer">
-                               {u.adminVerified ? <ShieldX className="h-4 w-4 text-red-400" /> : <ShieldCheck className="h-4 w-4 text-emerald-400" />}
-                               {u.adminVerified ? 'Unverify Account' : 'Verify Account'}
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => togglePremiumBadge(u)} className="flex items-center gap-2 cursor-pointer">
-                               <Star className={cn("h-4 w-4", u.premiumBadge ? "text-slate-400" : "text-amber-400")} />
-                               {u.premiumBadge ? 'Remove Premium Badge' : 'Grant Premium Badge'}
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => toggleUserStatus(u)} className="flex items-center gap-2 cursor-pointer">
-                              <UserX className="h-4 w-4" /> {u.status === 'active' ? 'Suspend Account' : 'Activate Account'}
+                            <DropdownMenuItem onClick={() => handleDeleteUser(u)} className="flex items-center gap-2 text-red-500 cursor-pointer">
+                              <Trash2 className="h-4 w-4" /> Delete Permanently
                             </DropdownMenuItem>
                           </>
-                        )}
-                        {isSuper && (
-                          <DropdownMenuItem onClick={() => handleDeleteUser(u)} className="flex items-center gap-2 text-destructive cursor-pointer">
-                            <Trash2 className="h-4 w-4" /> Delete Permanently
-                          </DropdownMenuItem>
                         )}
                       </DropdownMenuContent>
                     </DropdownMenu>
@@ -445,48 +352,42 @@ export default function ManageUsersPage() {
           </TableBody>
         </Table>
 
-        {/* Pagination Controls */}
         {totalPages > 1 && (
-          <div className="flex items-center justify-between p-6 bg-white/5 border-t border-white/5">
+          <div className="flex items-center justify-between p-6 border-t border-white/5">
             <p className="text-[10px] font-black uppercase text-muted-foreground">Page {currentPage} of {totalPages}</p>
             <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="rounded-xl border-white/10 h-10 px-4">
-                <ChevronLeft className="h-4 w-4 mr-2" /> Prev
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} className="rounded-xl border-white/10 h-10 px-4">
-                Next <ChevronRight className="h-4 w-4 ml-2" />
-              </Button>
+              <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="rounded-xl border-white/10 h-10 px-4"><ChevronLeft className="h-4 w-4" /></Button>
+              <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} className="rounded-xl border-white/10 h-10 px-4"><ChevronRight className="h-4 w-4" /></Button>
             </div>
           </div>
         )}
       </Card>
 
-      {/* Coin Adjustment Dialog */}
-      <Dialog 
-        open={!!coinAction} 
-        onOpenChange={(open) => {
-          if (isProcessing) return;
-          if (!open) { setCoinAction(null); setSelectedUser(null); setCoinAmount(0); }
-        }}
-      >
+      <Dialog open={!!coinAction} onOpenChange={(open) => { if (!open) setCoinAction(null); }}>
         <DialogContent className="bg-black/95 border-white/10 text-white rounded-[2rem]">
           <DialogHeader>
             <DialogTitle className="text-2xl font-headline font-bold flex items-center gap-2">
               <Coins className={cn("h-6 w-6", coinAction === 'add' ? 'text-green-500' : 'text-red-500')} />
-              {coinAction === 'add' ? 'Tambah Koin User' : 'Kurangi Koin User'}
+              {coinAction === 'add' ? 'Tambah Koin' : 'Kurangi Koin'}
             </DialogTitle>
             <DialogDescription>User: <span className="text-white font-bold">{selectedUser?.username}</span></DialogDescription>
           </DialogHeader>
           <div className="py-6 space-y-4">
             <div className="space-y-2">
-              <Label className="text-xs font-black uppercase text-muted-foreground tracking-widest">Jumlah Koin</Label>
+              <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Jumlah Koin</Label>
               <Input type="number" value={coinAmount} onChange={(e) => setCoinAmount(parseInt(e.target.value) || 0)} className="bg-white/5 border-white/10 h-14 text-2xl font-bold rounded-2xl" />
             </div>
+            {!isMaster && coinAction === 'add' && (
+              <div className="p-3 rounded-xl bg-primary/10 border border-primary/20 flex items-center gap-3">
+                 <AlertCircle className="h-4 w-4 text-primary" />
+                 <p className="text-[10px] text-white/70 font-medium">Saldo Anda akan dipotong sesuai jumlah koin yang diberikan.</p>
+              </div>
+            )}
           </div>
           <DialogFooter>
-            <Button variant="ghost" disabled={isProcessing} onClick={() => setCoinAction(null)} className="rounded-xl">Batal</Button>
+            <Button variant="ghost" disabled={isProcessing} onClick={() => setCoinAction(null)}>Batal</Button>
             <Button onClick={handleUpdateCoins} disabled={isProcessing || coinAmount <= 0} className={cn("rounded-xl px-8 font-bold", coinAction === 'add' ? "bg-green-600" : "bg-red-600")}>
-              {isProcessing ? <Loader2 className="animate-spin" /> : "Confirm Update"}
+              {isProcessing ? <Loader2 className="animate-spin" /> : "Confirm"}
             </Button>
           </DialogFooter>
         </DialogContent>
