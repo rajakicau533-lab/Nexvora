@@ -55,6 +55,7 @@
         "status": { "type": "string", "enum": ["PENDING", "PROCESSING", "COMPLETED", "PARTIAL", "CANCELLED", "FAILED"] },
         "providerOrderId": { "type": "string" },
         "serviceLabel": { "type": "string" },
+        "completedAt": { "type": "string", "format": "date-time" },
         "updatedAt": { "type": "string", "format": "date-time" },
         "createdAt": { "type": "string", "format": "date-time" }
       }
