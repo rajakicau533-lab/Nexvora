@@ -71,7 +71,7 @@ export default function ShopeeTrafficPage() {
   const syncStatus = useCallback(async () => {
     if (!db || !apiSettings || !history || history.length === 0 || isSyncing) return;
     
-    const activeOrders = history.filter(o => ["PENDING", "PROCESSING", "Pending", "Processing"].includes(o.status));
+    const activeOrders = history.filter(o => ["PENDING", "PROCESSING"].includes(o.status?.toUpperCase()));
     if (activeOrders.length === 0) return;
 
     setIsSyncing(true);
@@ -87,9 +87,10 @@ export default function ShopeeTrafficPage() {
 
         if (result.success && result.status) {
           const rawStatus = result.status.toLowerCase();
-          let mappedStatus = "PENDING";
+          let mappedStatus = order.status;
 
-          if (["processing", "in progress", "in_progress"].includes(rawStatus)) mappedStatus = "PROCESSING";
+          if (["pending"].includes(rawStatus)) mappedStatus = "PENDING";
+          else if (["processing", "in progress", "in_progress"].includes(rawStatus)) mappedStatus = "PROCESSING";
           else if (["completed", "success", "finished"].includes(rawStatus)) mappedStatus = "COMPLETED";
           else if (["partial"].includes(rawStatus)) mappedStatus = "PARTIAL";
           else if (["cancelled", "canceled", "failed"].includes(rawStatus)) mappedStatus = "CANCELLED";
@@ -110,7 +111,7 @@ export default function ShopeeTrafficPage() {
   }, [db, apiSettings, history, isSyncing]);
 
   useEffect(() => {
-    const interval = setInterval(syncStatus, 60000);
+    const interval = setInterval(syncStatus, 45000);
     syncStatus();
     return () => clearInterval(interval);
   }, [syncStatus]);
@@ -118,7 +119,6 @@ export default function ShopeeTrafficPage() {
   const handleOrder = async () => {
     if (!db || !user?.uid || !profile) return
     
-    // Ensure basic settings are loaded
     if (!apiSettings || !apiSettings.apiUrl || !apiSettings.apiKey) {
       toast({ 
         variant: "destructive", 
@@ -147,7 +147,6 @@ export default function ShopeeTrafficPage() {
     setOrderFeedback("processing");
 
     try {
-      // Prioritize service ID from settings page, fallback to constant
       const activeServiceId = apiSettings.serviceId || serviceConfig.id;
 
       const apiResult = await processTrafficOrder({
@@ -158,27 +157,13 @@ export default function ShopeeTrafficPage() {
         quantity: views
       });
 
-      // Technical logging for auditing
-      await addDoc(collection(db, "api_logs"), {
-        userId: user.uid,
-        userEmail: user.email,
-        timestamp: serverTimestamp(),
-        provider: "SMM.ID",
-        link: url.trim(),
-        quantity: views,
-        serviceId: activeServiceId,
-        status: apiResult.success ? "success" : "failed",
-        responseBody: apiResult.rawResponse ? (typeof apiResult.rawResponse === 'object' ? JSON.stringify(apiResult.rawResponse) : apiResult.rawResponse) : "No Response Content",
-        errorMessage: apiResult.error || null
-      });
-
       if (!apiResult.success) {
         throw new Error(apiResult.error || "Gagal membuat pesanan di server provider.");
       }
 
-      // Record Order in Firestore
       await addDoc(collection(db, "traffic_orders"), {
         userId: user.uid,
+        userEmail: user.email,
         platform: "shopee",
         serviceLabel: serviceConfig.label,
         targetLink: url.trim(),
@@ -189,7 +174,6 @@ export default function ShopeeTrafficPage() {
         createdAt: serverTimestamp(),
       });
 
-      // Deduct coins only on success
       await updateDoc(profileRef!, { 
         coins: increment(-coinCost) 
       });
@@ -198,7 +182,7 @@ export default function ShopeeTrafficPage() {
       setUrl("");
       setOrderFeedback("success");
       setTimeout(() => setOrderFeedback("idle"), 3000);
-      setTimeout(syncStatus, 1000);
+      setTimeout(syncStatus, 1500);
     } catch (err: any) {
       setOrderFeedback("error");
       toast({ variant: "destructive", title: "Gagal Memproses", description: err.message });
@@ -322,9 +306,10 @@ export default function ShopeeTrafficPage() {
                       <TableCell>
                         <Badge className={cn(
                             "font-black text-[9px] px-2 py-0.5 uppercase",
-                            row.status === "COMPLETED" ? "bg-green-500" : 
-                            row.status === "PROCESSING" ? "bg-blue-600 animate-pulse" :
-                            row.status === "CANCELLED" || row.status === "FAILED" ? "bg-red-500" : "bg-amber-500"
+                            ["COMPLETED", "SUCCESS"].includes(row.status?.toUpperCase()) ? "bg-green-500" : 
+                            ["PROCESSING"].includes(row.status?.toUpperCase()) ? "bg-blue-600 animate-pulse" :
+                            ["PARTIAL"].includes(row.status?.toUpperCase()) ? "bg-orange-500" :
+                            ["CANCELLED", "FAILED"].includes(row.status?.toUpperCase()) ? "bg-red-500" : "bg-amber-500"
                         )}>{row.status || "PENDING"}</Badge>
                       </TableCell>
                       <TableCell className="text-right text-[10px] text-muted-foreground font-mono">
