@@ -35,16 +35,6 @@ import { signOut } from "firebase/auth"
 import { useToast } from "@/hooks/use-toast"
 import { doc } from "firebase/firestore"
 
-const adminItems = [
-  { label: "Overview", icon: LayoutDashboard, href: "/admin" },
-  { label: "Manage Users", icon: Users, href: "/admin/users" },
-  { label: "Topup Monitor", icon: Wallet, href: "/admin/topup-monitor" },
-  { label: "Traffic Control", icon: TrendingUp, href: "/admin/traffic" },
-  { label: "Marketplace", icon: ShoppingBag, href: "/admin/marketplace" },
-  { label: "Learning Materials", icon: BookOpen, href: "/admin/materials" },
-  { label: "System Activity", icon: Activity, href: "/admin/activity" },
-]
-
 export function AdminSidebar() {
   const pathname = usePathname()
   const router = useRouter()
@@ -59,6 +49,8 @@ export function AdminSidebar() {
   }, [db, user?.uid]);
 
   const { data: adminData } = useDoc(adminProfileRef);
+
+  const isMaster = adminData?.role === 'super_admin' || user?.email === "adheprogramer@gmail.com";
 
   const handleAdminLogout = async () => {
     if (!auth) return
@@ -83,7 +75,7 @@ export function AdminSidebar() {
           </div>
           <div className="flex flex-col">
             <span className="text-lg font-headline font-bold text-white tracking-tight uppercase">Nexvora</span>
-            <span className="text-[10px] font-black text-primary uppercase tracking-[0.3em]">{adminData?.role || 'Admin'}</span>
+            <span className="text-[10px] font-black text-primary uppercase tracking-[0.3em]">{adminData?.role === 'super_admin' ? 'MASTER' : 'SUB ADMIN'}</span>
           </div>
         </Link>
       </SidebarHeader>
@@ -92,61 +84,93 @@ export function AdminSidebar() {
         <SidebarGroup>
           <SidebarGroupLabel className="text-primary/50 px-3 uppercase text-[9px] tracking-[0.2em] font-black">Management</SidebarGroupLabel>
           <SidebarMenu>
-            {adminItems.map((item) => (
-              <SidebarMenuItem key={item.label}>
-                <SidebarMenuButton 
-                  asChild 
-                  isActive={pathname === item.href}
-                  className={cn(
-                    "h-12 rounded-xl hover:bg-primary/10 hover:text-primary transition-all duration-300",
-                    pathname === item.href && "bg-primary/15 text-primary border border-primary/20 shadow-lg shadow-primary/5"
-                  )}
-                >
-                  <Link href={item.href} className="flex items-center gap-4">
-                    <item.icon className="h-4 w-4" />
-                    <span className="font-bold tracking-tight">{item.label}</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            ))}
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild isActive={pathname === "/admin"} className={cn("h-12 rounded-xl", pathname === "/admin" && "bg-primary/15 text-primary")}>
+                <Link href="/admin" className="flex items-center gap-4">
+                  <LayoutDashboard className="h-4 w-4" />
+                  <span className="font-bold">Overview</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+            
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild isActive={pathname === "/admin/users"} className={cn("h-12 rounded-xl", pathname === "/admin/users" && "bg-primary/15 text-primary")}>
+                <Link href="/admin/users" className="flex items-center gap-4">
+                  <Users className="h-4 w-4" />
+                  <span className="font-bold">Manage Users</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild isActive={pathname === "/admin/traffic"} className={cn("h-12 rounded-xl", pathname === "/admin/traffic" && "bg-primary/15 text-primary")}>
+                <Link href="/admin/traffic" className="flex items-center gap-4">
+                  <TrendingUp className="h-4 w-4" />
+                  <span className="font-bold">Traffic Control</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+
+            {isMaster && (
+              <>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild isActive={pathname === "/admin/topup-monitor"} className={cn("h-12 rounded-xl", pathname === "/admin/topup-monitor" && "bg-primary/15 text-primary")}>
+                    <Link href="/admin/topup-monitor" className="flex items-center gap-4">
+                      <Wallet className="h-4 w-4" />
+                      <span className="font-bold">Topup Monitor</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild isActive={pathname === "/admin/marketplace"} className={cn("h-12 rounded-xl", pathname === "/admin/marketplace" && "bg-primary/15 text-primary")}>
+                    <Link href="/admin/marketplace" className="flex items-center gap-4">
+                      <ShoppingBag className="h-4 w-4" />
+                      <span className="font-bold">Marketplace Admin</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild isActive={pathname === "/admin/materials"} className={cn("h-12 rounded-xl", pathname === "/admin/materials" && "bg-primary/15 text-primary")}>
+                    <Link href="/admin/materials" className="flex items-center gap-4">
+                      <BookOpen className="h-4 w-4" />
+                      <span className="font-bold">Materials Admin</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </>
+            )}
           </SidebarMenu>
         </SidebarGroup>
         
-        <SidebarGroup>
-          <SidebarGroupLabel className="text-primary/50 px-3 uppercase text-[9px] tracking-[0.2em] font-black">Logs & Reports</SidebarGroupLabel>
-          <SidebarMenu>
-             <SidebarMenuItem>
-                <SidebarMenuButton asChild isActive={pathname === "/admin/traffic/logs"} className="h-12 rounded-xl">
-                  <Link href="/admin/traffic/logs" className="flex items-center gap-4">
-                    <FileText className="h-4 w-4" />
-                    <span className="font-bold">Traffic API Logs</span>
-                  </Link>
-                </SidebarMenuButton>
-             </SidebarMenuItem>
-          </SidebarMenu>
-        </SidebarGroup>
-        
-        {adminData?.role === 'super_admin' && (
+        {isMaster && (
           <SidebarGroup>
-            <SidebarGroupLabel className="text-primary/50 px-3 uppercase text-[9px] tracking-[0.2em] font-black">System Controls</SidebarGroupLabel>
+            <SidebarGroupLabel className="text-primary/50 px-3 uppercase text-[9px] tracking-[0.2em] font-black">Administration</SidebarGroupLabel>
             <SidebarMenu>
               <SidebarMenuItem>
-                <SidebarMenuButton 
-                  asChild 
-                  isActive={pathname === "/admin/admins"}
-                  className={cn("h-12 rounded-xl", pathname === "/admin/admins" && "bg-primary/15 text-primary border border-primary/20")}
-                >
+                <SidebarMenuButton asChild isActive={pathname === "/admin/admins"} className={cn("h-12 rounded-xl", pathname === "/admin/admins" && "bg-primary/15 text-primary")}>
                   <Link href="/admin/admins">
                     <UserCog className="h-4 w-4" />
-                    <span className="font-bold">Team Management</span>
+                    <span className="font-bold">Admin Management</span>
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
+              
               <SidebarMenuItem>
-                <SidebarMenuButton asChild isActive={pathname === "/admin/settings"}>
+                <SidebarMenuButton asChild isActive={pathname === "/admin/activity"} className={cn("h-12 rounded-xl", pathname === "/admin/activity" && "bg-primary/15 text-primary")}>
+                  <Link href="/admin/activity">
+                    <Activity className="h-4 w-4" />
+                    <span className="font-bold">Audit Activities</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild isActive={pathname === "/admin/settings"} className={cn("h-12 rounded-xl", pathname === "/admin/settings" && "bg-primary/15 text-primary")}>
                   <Link href="/admin/settings">
                     <Settings className="h-4 w-4" />
-                    <span className="font-bold">Global Settings</span>
+                    <span className="font-bold">System Settings</span>
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
@@ -164,7 +188,7 @@ export function AdminSidebar() {
                 className="h-12 rounded-xl hover:text-primary hover:bg-primary/10 transition-colors w-full"
               >
                 <LogOut className="h-4 w-4" />
-                <span className="font-bold">Secure Logout</span>
+                <span className="font-bold">Logout Admin</span>
               </SidebarMenuButton>
             </SidebarMenuItem>
           </SidebarMenu>
@@ -173,7 +197,7 @@ export function AdminSidebar() {
 
       <SidebarFooter className="p-6">
         <div className="rounded-2xl bg-white/5 p-4 border border-white/5">
-          <p className="text-[10px] text-muted-foreground uppercase font-black mb-1">Authenticated as</p>
+          <p className="text-[10px] text-muted-foreground uppercase font-black mb-1">Signed in as</p>
           <p className="text-xs font-bold text-white truncate">{user?.email}</p>
         </div>
       </SidebarFooter>
