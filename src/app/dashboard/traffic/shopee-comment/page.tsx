@@ -1,19 +1,19 @@
 "use client"
 
-import React, { useState, useMemo } from "react"
+import React, { useState, useMemo, useEffect, useCallback } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { Clock, ExternalLink, Loader2, Info, AlertCircle, MessageSquare, FileText, Send, History } from "lucide-react"
+import { Clock, ExternalLink, Loader2, Info, AlertCircle, RefreshCw, Send, History, FileText } from "lucide-react"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { useFirestore, useUser, useCollection, useDoc } from "@/firebase"
 import { collection, doc, updateDoc, increment, serverTimestamp, query, where, addDoc } from "firebase/firestore"
 import { useToast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
-import { processTrafficOrder } from "@/ai/flows/process-traffic-order-flow"
+import { processTrafficOrder, checkOrderStatus } from "@/ai/flows/process-traffic-order-flow"
 import { TRAFFIC_SERVICES } from "@/lib/constants"
 
 const TEMPLATE_COMMENTS = [
@@ -33,6 +33,7 @@ export default function ShopeeCommentPage() {
   const [url, setUrl] = useState("")
   const [commentsText, setCommentsText] = useState("")
   const [isOrdering, setIsOrdering] = useState(false)
+  const [isSyncing, setIsSyncing] = useState(false)
 
   const { user } = useUser()
   const db = useFirestore()
@@ -71,12 +72,64 @@ export default function ShopeeCommentPage() {
 
   const history = useMemo(() => {
     if (!allHistory) return []
-    return [...allHistory].sort((a, b) => {
-      const timeA = a.createdAt?.seconds || 0;
-      const timeB = b.createdAt?.seconds || 0;
-      return timeB - timeA;
-    });
+    const threeDaysAgo = new Date()
+    threeDaysAgo.setDate(threeDaysAgo.getDate() - 3)
+    return [...allHistory]
+      .filter(o => (o.createdAt?.toDate?.() || new Date()) >= threeDaysAgo)
+      .sort((a, b) => {
+        const timeA = a.createdAt?.toDate?.()?.getTime() || 0;
+        const timeB = b.createdAt?.toDate?.()?.getTime() || 0;
+        return timeB - timeA;
+      });
   }, [allHistory]);
+
+  const syncStatus = useCallback(async () => {
+    if (!db || !apiSettings || !history || history.length === 0 || isSyncing) return;
+    
+    const activeOrders = history.filter(o => ["PENDING", "PROCESSING"].includes(o.status?.toUpperCase()));
+    if (activeOrders.length === 0) return;
+
+    setIsSyncing(true);
+    try {
+      for (const order of activeOrders) {
+        if (!order.providerOrderId) continue;
+
+        const result = await checkOrderStatus({
+          apiUrl: apiSettings.apiUrl,
+          apiKey: apiSettings.apiKey,
+          orderId: order.providerOrderId
+        });
+
+        if (result.success && result.status) {
+          const rawStatus = result.status.toLowerCase();
+          let mappedStatus = order.status;
+
+          if (["pending"].includes(rawStatus)) mappedStatus = "PENDING";
+          else if (["processing", "in progress", "in_progress"].includes(rawStatus)) mappedStatus = "PROCESSING";
+          else if (["completed", "success", "finished"].includes(rawStatus)) mappedStatus = "COMPLETED";
+          else if (["partial"].includes(rawStatus)) mappedStatus = "PARTIAL";
+          else if (["cancelled", "canceled", "failed"].includes(rawStatus)) mappedStatus = "CANCELLED";
+
+          if (mappedStatus !== order.status) {
+            updateDoc(doc(db, "traffic_orders", order.id), {
+              status: mappedStatus,
+              updatedAt: serverTimestamp()
+            });
+          }
+        }
+      }
+    } catch (err) {
+      console.error("Sync error:", err);
+    } finally {
+      setIsSyncing(false);
+    }
+  }, [db, apiSettings, history, isSyncing]);
+
+  useEffect(() => {
+    const interval = setInterval(syncStatus, 60000);
+    syncStatus();
+    return () => clearInterval(interval);
+  }, [syncStatus]);
 
   const handleUseTemplate = () => {
     setCommentsText(TEMPLATE_COMMENTS.join('\n'));
@@ -100,29 +153,17 @@ export default function ShopeeCommentPage() {
         comments: finalCommentsPayload
       });
 
-      await addDoc(collection(db, "api_logs"), {
-        userId: user.uid,
-        userEmail: user.email,
-        timestamp: serverTimestamp(),
-        provider: "SMM.ID",
-        link: url.trim(),
-        quantity: quantity,
-        serviceId: serviceConfig.id,
-        status: apiResult.success ? "success" : "failed",
-        errorMessage: apiResult.error || null,
-        rawResponse: apiResult.rawResponse || "No Data"
-      });
-
       if (!apiResult.success) throw new Error(apiResult.error);
 
       await addDoc(collection(db, "traffic_orders"), {
         userId: user.uid,
+        userEmail: user.email,
         platform: "shopee",
         serviceLabel: serviceConfig.label,
         targetLink: url.trim(),
         quantity,
         coinCost,
-        status: "COMPLETED",
+        status: "PENDING",
         providerOrderId: apiResult.orderId,
         createdAt: serverTimestamp(),
       });
@@ -130,6 +171,7 @@ export default function ShopeeCommentPage() {
       await updateDoc(profileRef!, { coins: increment(-coinCost) });
       toast({ title: "Pesanan Sukses! 🚀", description: "Komentar sedang dalam proses pengiriman." });
       setUrl(""); setCommentsText("");
+      setTimeout(syncStatus, 1500);
     } catch (err: any) {
       toast({ variant: "destructive", title: "Gagal", description: err.message });
     } finally {
@@ -144,9 +186,10 @@ export default function ShopeeCommentPage() {
           <h2 className="text-3xl font-headline font-bold text-white">Shopee Comment 💬</h2>
           <p className="text-muted-foreground text-sm">Berikan komentar kustom pada video/produk Shopee Anda secara instan.</p>
         </div>
-        <div className="bg-primary/10 border border-primary/20 px-6 py-2.5 rounded-2xl text-primary font-bold shadow-lg shadow-primary/5">
-          Saldo: {profile?.coins || 0} 🪙
-        </div>
+        <Button variant="ghost" size="sm" onClick={() => syncStatus()} disabled={isSyncing} className="text-[10px] font-black uppercase text-primary">
+          {isSyncing ? <Loader2 className="h-3 w-3 animate-spin mr-2" /> : <RefreshCw className="h-3 w-3 mr-2" />}
+          Update Status
+        </Button>
       </div>
 
       <div className="grid lg:grid-cols-12 gap-8">
@@ -210,7 +253,7 @@ export default function ShopeeCommentPage() {
               <div className="space-y-2">
                 <p>• Tarif: <strong>1 Komentar = 1 Koin</strong>.</p>
                 <p>• Maksimal: <strong>100 komentar</strong> per order.</p>
-                <p>• Proses pengiriman biasanya berlangsung dalam 5-60 menit.</p>
+                <p>• Status mengikuti integrasi realtime dengan provider.</p>
               </div>
               <div className="p-4 rounded-2xl bg-primary/5 border border-primary/10 flex gap-3">
                  <AlertCircle className="h-4 w-4 text-primary shrink-0 mt-0.5" />
@@ -255,9 +298,10 @@ export default function ShopeeCommentPage() {
                     <TableCell>
                       <Badge className={cn(
                           "font-black text-[9px] px-2 py-0.5 uppercase border-none",
-                          ["COMPLETED", "SELESAI", "success"].includes(row.status) ? "bg-green-500" : 
-                          ["PROCESSING", "processing", "in progress"].includes(row.status) ? "bg-blue-600 animate-pulse" :
-                          ["CANCELLED", "FAILED", "failed"].includes(row.status) ? "bg-red-500" : "bg-amber-500"
+                          ["COMPLETED", "SUCCESS"].includes(row.status?.toUpperCase()) ? "bg-green-500" : 
+                          ["PROCESSING"].includes(row.status?.toUpperCase()) ? "bg-blue-600 animate-pulse" :
+                          ["PARTIAL"].includes(row.status?.toUpperCase()) ? "bg-orange-500" :
+                          ["CANCELLED", "FAILED"].includes(row.status?.toUpperCase()) ? "bg-red-500" : "bg-amber-500"
                       )}>{row.status || "PENDING"}</Badge>
                     </TableCell>
                   </TableRow>
