@@ -1,12 +1,12 @@
 "use client"
 
 import React, { useState, useEffect, useCallback } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { Clock, ExternalLink, Loader2, Info, AlertCircle, RefreshCw, MessageSquare, FileText } from "lucide-react"
+import { Clock, ExternalLink, Loader2, Info, AlertCircle, RefreshCw, Send, History, MessageSquare, FileText } from "lucide-react"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { useFirestore, useUser, useCollection, useDoc } from "@/firebase"
@@ -42,7 +42,6 @@ export default function TikTokCommentPage() {
 
   const serviceConfig = TRAFFIC_SERVICES.TIKTOK_COMMENT
   
-  // Count non-empty lines
   const commentsArray = commentsText.split('\n').map(c => c.trim()).filter(c => c.length > 0);
   const quantity = commentsArray.length;
   const coinCost = quantity * serviceConfig.rate_per_comment;
@@ -81,7 +80,7 @@ export default function TikTokCommentPage() {
   const syncStatus = useCallback(async () => {
     if (!db || !apiSettings || !history || history.length === 0 || isSyncing) return;
     
-    const activeOrders = history.filter(o => ["PENDING", "PROCESSING", "Pending", "Processing"].includes(o.status));
+    const activeOrders = history.filter(o => ["PENDING", "PROCESSING"].includes(o.status?.toUpperCase()));
     if (activeOrders.length === 0) return;
 
     setIsSyncing(true);
@@ -97,9 +96,10 @@ export default function TikTokCommentPage() {
 
         if (result.success && result.status) {
           const rawStatus = result.status.toLowerCase();
-          let mappedStatus = "PENDING";
+          let mappedStatus = order.status;
 
-          if (["processing", "in progress", "in_progress"].includes(rawStatus)) mappedStatus = "PROCESSING";
+          if (["pending"].includes(rawStatus)) mappedStatus = "PENDING";
+          else if (["processing", "in progress", "in_progress"].includes(rawStatus)) mappedStatus = "PROCESSING";
           else if (["completed", "success", "finished"].includes(rawStatus)) mappedStatus = "COMPLETED";
           else if (["partial"].includes(rawStatus)) mappedStatus = "PARTIAL";
           else if (["cancelled", "canceled", "failed"].includes(rawStatus)) mappedStatus = "CANCELLED";
@@ -158,25 +158,11 @@ export default function TikTokCommentPage() {
         comments: commentsText.trim()
       });
 
-      // technical auditing log
-      await addDoc(collection(db, "api_logs"), {
-        userId: user.uid,
-        userEmail: user.email,
-        timestamp: serverTimestamp(),
-        provider: "SMM.ID",
-        link: url,
-        quantity: quantity,
-        serviceId: serviceConfig.id,
-        status: apiResult.success ? "success" : "failed",
-        responseBody: apiResult.rawResponse ? (typeof apiResult.rawResponse === 'object' ? JSON.stringify(apiResult.rawResponse) : apiResult.rawResponse) : "No Response Content",
-        errorMessage: apiResult.error || null
-      });
-
       if (!apiResult.success) throw new Error(apiResult.error);
 
-      // ONLY RECORD AND DEDUCT ON SUCCESS
       await addDoc(collection(db, "traffic_orders"), {
         userId: user.uid,
+        userEmail: user.email,
         platform: "tiktok",
         serviceLabel: serviceConfig.label,
         targetLink: url,
@@ -194,7 +180,7 @@ export default function TikTokCommentPage() {
       setCommentsText("");
       setOrderFeedback("success");
       setTimeout(() => setOrderFeedback("idle"), 3000);
-      setTimeout(syncStatus, 2000);
+      setTimeout(syncStatus, 1500);
     } catch (err: any) {
       setOrderFeedback("error");
       toast({ variant: "destructive", title: "Gagal", description: err.message });
@@ -282,7 +268,7 @@ export default function TikTokCommentPage() {
               <Button 
                 onClick={handleOrder}
                 disabled={isOrdering || !url || !isValidQuantity}
-                className="w-full h-14 rounded-xl luxury-gradient border-none font-black text-lg shadow-xl shadow-primary/20 group"
+                className="w-full h-14 rounded-2xl luxury-gradient border-none font-black text-lg shadow-xl shadow-primary/20 group"
               >
                 {isOrdering ? (
                    <div className="flex items-center gap-3">
@@ -313,16 +299,8 @@ export default function TikTokCommentPage() {
                   <li className="flex items-start gap-2">• Minimal order adalah <strong>10 komentar</strong>.</li>
                   <li className="flex items-start gap-2">• Tarif: <strong>1 Komentar = 1 Koin</strong>.</li>
                   <li className="flex items-start gap-2">• Tulis komentar Anda baris per baris.</li>
-                  <li className="flex items-start gap-2">• Gunakan bahasa yang sopan dan sesuai aturan TikTok.</li>
+                  <li className="flex items-start gap-2">• Status disinkronkan secara realtime dengan server provider.</li>
                </ul>
-            </div>
-            
-            <div className="p-3 rounded-lg bg-primary/5 border border-primary/10">
-               <div className="flex items-center gap-2 text-primary mb-1">
-                 <AlertCircle className="h-3 w-3" />
-                 <span className="text-[9px] font-black uppercase">Tips</span>
-               </div>
-               <p className="text-[10px]">Gunakan fitur template jika ingin hasil yang cepat dan natural untuk promosi produk affiliate.</p>
             </div>
           </CardContent>
         </Card>
@@ -349,7 +327,7 @@ export default function TikTokCommentPage() {
                 {historyLoading ? (
                   <TableRow><TableCell colSpan={5} className="text-center py-10 text-xs text-muted-foreground"><Loader2 className="animate-spin mx-auto h-5 w-5" /></TableCell></TableRow>
                 ) : history.length === 0 ? (
-                  <TableRow><TableCell colSpan={5} className="text-center py-12 text-xs text-muted-foreground italic">Belum ada riwayat TikTok Comment.</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={5} className="text-center py-12 text-xs text-muted-foreground italic">Tidak ada riwayat TikTok Comment.</TableCell></TableRow>
                 ) : (
                   history.map((row: any) => (
                     <TableRow key={row.id} className="border-white/5 hover:bg-white/[0.02] transition-colors">
@@ -363,9 +341,10 @@ export default function TikTokCommentPage() {
                       <TableCell>
                         <Badge className={cn(
                             "font-black text-[9px] px-2 py-0.5 uppercase border-none",
-                            row.status === "COMPLETED" ? "bg-green-500" : 
-                            row.status === "PROCESSING" ? "bg-blue-600 animate-pulse" :
-                            row.status === "CANCELLED" || row.status === "FAILED" ? "bg-red-500" : "bg-amber-500"
+                            ["COMPLETED", "SUCCESS"].includes(row.status?.toUpperCase()) ? "bg-green-500" : 
+                            ["PROCESSING"].includes(row.status?.toUpperCase()) ? "bg-blue-600 animate-pulse" :
+                            ["PARTIAL"].includes(row.status?.toUpperCase()) ? "bg-orange-500" :
+                            ["CANCELLED", "FAILED"].includes(row.status?.toUpperCase()) ? "bg-red-500" : "bg-amber-500"
                         )}>{row.status || "PENDING"}</Badge>
                       </TableCell>
                       <TableCell className="text-right text-[10px] text-muted-foreground font-bold uppercase">
