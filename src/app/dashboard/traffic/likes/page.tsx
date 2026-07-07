@@ -69,7 +69,7 @@ export default function ShopeeLikesPage() {
   const syncStatus = useCallback(async () => {
     if (!db || !apiSettings || !history || history.length === 0 || isSyncing) return;
     
-    const activeOrders = history.filter(o => ["PENDING", "PROCESSING", "Pending", "Processing"].includes(o.status));
+    const activeOrders = history.filter(o => ["PENDING", "PROCESSING"].includes(o.status?.toUpperCase()));
     if (activeOrders.length === 0) return;
 
     setIsSyncing(true);
@@ -85,9 +85,10 @@ export default function ShopeeLikesPage() {
 
         if (result.success && result.status) {
           const rawStatus = result.status.toLowerCase();
-          let mappedStatus = "PENDING";
+          let mappedStatus = order.status;
 
-          if (["processing", "in progress", "in_progress"].includes(rawStatus)) mappedStatus = "PROCESSING";
+          if (["pending"].includes(rawStatus)) mappedStatus = "PENDING";
+          else if (["processing", "in progress", "in_progress"].includes(rawStatus)) mappedStatus = "PROCESSING";
           else if (["completed", "success", "finished"].includes(rawStatus)) mappedStatus = "COMPLETED";
           else if (["partial"].includes(rawStatus)) mappedStatus = "PARTIAL";
           else if (["cancelled", "canceled", "failed"].includes(rawStatus)) mappedStatus = "CANCELLED";
@@ -108,7 +109,7 @@ export default function ShopeeLikesPage() {
   }, [db, apiSettings, history, isSyncing]);
 
   useEffect(() => {
-    const interval = setInterval(syncStatus, 60000);
+    const interval = setInterval(syncStatus, 45000);
     syncStatus();
     return () => clearInterval(interval);
   }, [syncStatus]);
@@ -140,25 +141,11 @@ export default function ShopeeLikesPage() {
         quantity: quantity
       });
 
-      // technical auditing log
-      await addDoc(collection(db, "api_logs"), {
-        userId: user.uid,
-        userEmail: user.email,
-        timestamp: serverTimestamp(),
-        provider: "SMM.ID",
-        link: url,
-        quantity: quantity,
-        serviceId: serviceConfig.id,
-        status: apiResult.success ? "success" : "failed",
-        responseBody: apiResult.rawResponse ? (typeof apiResult.rawResponse === 'object' ? JSON.stringify(apiResult.rawResponse) : apiResult.rawResponse) : "No Response Content",
-        errorMessage: apiResult.error || null
-      });
-
       if (!apiResult.success) throw new Error(apiResult.error);
 
-      // ONLY DEDUCT COINS IF API SUCCESS
       await addDoc(collection(db, "traffic_orders"), {
         userId: user.uid,
+        userEmail: user.email,
         platform: "shopee",
         serviceLabel: serviceConfig.label,
         targetLink: url,
@@ -175,7 +162,7 @@ export default function ShopeeLikesPage() {
       setUrl("");
       setOrderFeedback("success");
       setTimeout(() => setOrderFeedback("idle"), 3000);
-      setTimeout(syncStatus, 2000);
+      setTimeout(syncStatus, 1500);
     } catch (err: any) {
       setOrderFeedback("error");
       toast({ variant: "destructive", title: "Gagal", description: err.message });
@@ -194,7 +181,7 @@ export default function ShopeeLikesPage() {
         </div>
         <Button variant="ghost" size="sm" onClick={() => syncStatus()} disabled={isSyncing} className="text-[10px] font-black uppercase text-primary">
           {isSyncing ? <Loader2 className="h-3 w-3 animate-spin mr-2" /> : <RefreshCw className="h-3 w-3 mr-2" />}
-          Sync Status
+          Update Status
         </Button>
       </div>
 
@@ -244,7 +231,7 @@ export default function ShopeeLikesPage() {
                 className="w-full h-12 rounded-xl luxury-gradient font-bold text-sm shadow-xl"
               >
                 {isOrdering ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                {orderFeedback === 'success' ? "Like Dikirim!" : isOrdering ? "Memproses..." : "Beli Like Sekarang"}
+                {orderFeedback === 'success' ? "Berhasil Dipesan!" : isOrdering ? "Memproses..." : "Beli Like Sekarang"}
               </Button>
             </CardContent>
           </Card>
@@ -304,10 +291,10 @@ export default function ShopeeLikesPage() {
                       <TableCell>
                         <Badge className={cn(
                             "font-black text-[9px] px-2 py-0.5 uppercase",
-                            row.status === "COMPLETED" ? "bg-green-500" : 
-                            row.status === "PROCESSING" ? "bg-blue-600 animate-pulse" :
-                            row.status === "PARTIAL" ? "bg-orange-500" :
-                            row.status === "CANCELLED" || row.status === "FAILED" ? "bg-red-500" : "bg-amber-500"
+                            ["COMPLETED", "SUCCESS"].includes(row.status?.toUpperCase()) ? "bg-green-500" : 
+                            ["PROCESSING"].includes(row.status?.toUpperCase()) ? "bg-blue-600 animate-pulse" :
+                            ["PARTIAL"].includes(row.status?.toUpperCase()) ? "bg-orange-500" :
+                            ["CANCELLED", "FAILED"].includes(row.status?.toUpperCase()) ? "bg-red-500" : "bg-amber-500"
                         )}>{row.status || "PENDING"}</Badge>
                       </TableCell>
                     </TableRow>
