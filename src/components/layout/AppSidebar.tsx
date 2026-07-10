@@ -187,42 +187,83 @@ export function AppSidebar() {
                       </SidebarMenuButton>
                     </CollapsibleTrigger>
                     <CollapsibleContent>
-                      <SidebarMenuSub>
-                        <SidebarMenuSubItem>
-                          <SidebarMenuSubButton asChild isActive={pathname === "/dashboard/traffic/followers"}>
-                            <Link href="/dashboard/traffic/followers" onClick={handleLinkClick}>Shopee Followers</Link>
-                          </SidebarMenuSubButton>
-                        </SidebarMenuSubItem>
-                        <SidebarMenuSubItem>
-                          <SidebarMenuSubButton asChild isActive={pathname === "/dashboard/traffic/likes"}>
-                            <Link href="/dashboard/traffic/likes" onClick={handleLinkClick}>Shopee Like</Link>
-                          </SidebarMenuSubButton>
-                        </SidebarMenuSubItem>
-                        <SidebarMenuSubItem>
-                          <SidebarMenuSubButton asChild isActive={pathname === "/dashboard/traffic/shopee"}>
-                            <Link href="/dashboard/traffic/shopee" onClick={handleLinkClick}>Trafik Shopee</Link>
-                          </SidebarMenuSubButton>
-                        </SidebarMenuSubItem>
-                        <SidebarMenuSubItem>
-                          <SidebarMenuSubButton asChild isActive={pathname === "/dashboard/traffic/shopee-comment"}>
-                            <Link href="/dashboard/traffic/shopee-comment" onClick={handleLinkClick}>Shopee Comment</Link>
-                          </SidebarMenuSubButton>
-                        </SidebarMenuSubItem>
-                        <SidebarMenuSubItem>
-                          <SidebarMenuSubButton asChild isActive={pathname === "/dashboard/traffic/tiktok-view"}>
-                            <Link href="/dashboard/traffic/tiktok-view" onClick={handleLinkClick}>TikTok VT View</Link>
-                          </SidebarMenuSubButton>
-                        </SidebarMenuSubItem>
-                        <SidebarMenuSubItem>
-                          <SidebarMenuSubButton asChild isActive={pathname === "/dashboard/traffic/tiktok-saved"}>
-                            <Link href="/dashboard/traffic/tiktok-saved" onClick={handleLinkClick}>TikTok Saved</Link>
-                          </SidebarMenuSubButton>
-                        </SidebarMenuSubItem>
-                        <SidebarMenuSubItem>
-                          <SidebarMenuSubButton asChild isActive={pathname === "/dashboard/traffic/tiktok-comment"}>
-                            <Link href="/dashboard/traffic/tiktok-comment" onClick={handleLinkClick}>TikTok Comment</Link>
-                          </SidebarMenuSubButton>
-                        </SidebarMenuSubItem>
+                      <SidebarMenuSub className="pr-0">
+                        {/* Group: Shopee */}
+                        <Collapsible 
+                          defaultOpen={
+                            pathname.includes('/shopee') || 
+                            pathname.includes('/followers') || 
+                            pathname.includes('/likes')
+                          } 
+                          className="group/shopee-collapsible"
+                        >
+                          <SidebarMenuSubItem>
+                            <CollapsibleTrigger asChild>
+                              <SidebarMenuSubButton className="hover:text-primary transition-colors cursor-pointer pr-4">
+                                <span className="font-bold">Shopee</span>
+                                <ChevronDown className="ml-auto h-3 w-3 transition-transform group-data-[state=open]/shopee-collapsible:rotate-180" />
+                              </SidebarMenuSubButton>
+                            </CollapsibleTrigger>
+                            <CollapsibleContent>
+                              <SidebarMenuSub className="ml-2 border-l-0 border-white/5 bg-white/[0.03] rounded-lg mt-1 overflow-hidden">
+                                <SidebarMenuSubItem>
+                                  <SidebarMenuSubButton asChild isActive={pathname === "/dashboard/traffic/followers"}>
+                                    <Link href="/dashboard/traffic/followers" onClick={handleLinkClick}>Shopee Followers</Link>
+                                  </SidebarMenuSubButton>
+                                </SidebarMenuSubItem>
+                                <SidebarMenuSubItem>
+                                  <SidebarMenuSubButton asChild isActive={pathname === "/dashboard/traffic/likes"}>
+                                    <Link href="/dashboard/traffic/likes" onClick={handleLinkClick}>Shopee Like</Link>
+                                  </SidebarMenuSubButton>
+                                </SidebarMenuSubItem>
+                                <SidebarMenuSubItem>
+                                  <SidebarMenuSubButton asChild isActive={pathname === "/dashboard/traffic/shopee"}>
+                                    <Link href="/dashboard/traffic/shopee" onClick={handleLinkClick}>Trafik Shopee</Link>
+                                  </SidebarMenuSubButton>
+                                </SidebarMenuSubItem>
+                                <SidebarMenuSubItem>
+                                  <SidebarMenuSubButton asChild isActive={pathname === "/dashboard/traffic/shopee-comment"}>
+                                    <Link href="/dashboard/traffic/shopee-comment" onClick={handleLinkClick}>Shopee Comment</Link>
+                                  </SidebarMenuSubButton>
+                                </SidebarMenuSubItem>
+                              </SidebarMenuSub>
+                            </CollapsibleContent>
+                          </SidebarMenuSubItem>
+                        </Collapsible>
+
+                        {/* Group: TikTok */}
+                        <Collapsible 
+                          defaultOpen={pathname.includes('/tiktok')} 
+                          className="group/tiktok-collapsible mt-1"
+                        >
+                          <SidebarMenuSubItem>
+                            <CollapsibleTrigger asChild>
+                              <SidebarMenuSubButton className="hover:text-primary transition-colors cursor-pointer pr-4">
+                                <span className="font-bold">TikTok</span>
+                                <ChevronDown className="ml-auto h-3 w-3 transition-transform group-data-[state=open]/tiktok-collapsible:rotate-180" />
+                              </SidebarMenuSubButton>
+                            </CollapsibleTrigger>
+                            <CollapsibleContent>
+                              <SidebarMenuSub className="ml-2 border-l-0 border-white/5 bg-white/[0.03] rounded-lg mt-1 overflow-hidden">
+                                <SidebarMenuSubItem>
+                                  <SidebarMenuSubButton asChild isActive={pathname === "/dashboard/traffic/tiktok-view"}>
+                                    <Link href="/dashboard/traffic/tiktok-view" onClick={handleLinkClick}>TikTok VT View</Link>
+                                  </SidebarMenuSubButton>
+                                </SidebarMenuSubItem>
+                                <SidebarMenuSubItem>
+                                  <SidebarMenuSubButton asChild isActive={pathname === "/dashboard/traffic/tiktok-saved"}>
+                                    <Link href="/dashboard/traffic/tiktok-saved" onClick={handleLinkClick}>TikTok Saved</Link>
+                                  </SidebarMenuSubButton>
+                                </SidebarMenuSubItem>
+                                <SidebarMenuSubItem>
+                                  <SidebarMenuSubButton asChild isActive={pathname === "/dashboard/traffic/tiktok-comment"}>
+                                    <Link href="/dashboard/traffic/tiktok-comment" onClick={handleLinkClick}>TikTok Comment</Link>
+                                  </SidebarMenuSubButton>
+                                </SidebarMenuSubItem>
+                              </SidebarMenuSub>
+                            </CollapsibleContent>
+                          </SidebarMenuSubItem>
+                        </Collapsible>
                       </SidebarMenuSub>
                     </CollapsibleContent>
                   </SidebarMenuItem>
