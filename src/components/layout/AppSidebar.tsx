@@ -23,7 +23,9 @@ import {
   Trophy,
   Rocket,
   Star,
-  BarChart3
+  BarChart3,
+  Facebook,
+  Instagram
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { APP_NAME, CONTACT_INFO } from "@/lib/constants"
@@ -258,6 +260,64 @@ export function AppSidebar() {
                                 <SidebarMenuSubItem>
                                   <SidebarMenuSubButton asChild isActive={pathname === "/dashboard/traffic/tiktok-comment"}>
                                     <Link href="/dashboard/traffic/tiktok-comment" onClick={handleLinkClick}>TikTok Comment</Link>
+                                  </SidebarMenuSubButton>
+                                </SidebarMenuSubItem>
+                              </SidebarMenuSub>
+                            </CollapsibleContent>
+                          </SidebarMenuSubItem>
+                        </Collapsible>
+
+                        {/* Group: Facebook */}
+                        <Collapsible 
+                          defaultOpen={pathname.includes('/fb-')} 
+                          className="group/fb-collapsible mt-1"
+                        >
+                          <SidebarMenuSubItem>
+                            <CollapsibleTrigger asChild>
+                              <SidebarMenuSubButton className="hover:text-primary transition-colors cursor-pointer pr-4">
+                                <span className="font-bold">Facebook</span>
+                                <ChevronDown className="ml-auto h-3 w-3 transition-transform group-data-[state=open]/fb-collapsible:rotate-180" />
+                              </SidebarMenuSubButton>
+                            </CollapsibleTrigger>
+                            <CollapsibleContent>
+                              <SidebarMenuSub className="ml-2 border-l-0 border-white/5 bg-white/[0.03] rounded-lg mt-1 overflow-hidden">
+                                <SidebarMenuSubItem>
+                                  <SidebarMenuSubButton asChild isActive={pathname === "/dashboard/traffic/fb-comment"}>
+                                    <Link href="/dashboard/traffic/fb-comment" onClick={handleLinkClick}>Komentar FB</Link>
+                                  </SidebarMenuSubButton>
+                                </SidebarMenuSubItem>
+                                <SidebarMenuSubItem>
+                                  <SidebarMenuSubButton asChild isActive={pathname === "/dashboard/traffic/fb-traffic"}>
+                                    <Link href="/dashboard/traffic/fb-traffic" onClick={handleLinkClick}>Trafik FB</Link>
+                                  </SidebarMenuSubButton>
+                                </SidebarMenuSubItem>
+                              </SidebarMenuSub>
+                            </CollapsibleContent>
+                          </SidebarMenuSubItem>
+                        </Collapsible>
+
+                        {/* Group: Instagram */}
+                        <Collapsible 
+                          defaultOpen={pathname.includes('/ig-')} 
+                          className="group/ig-collapsible mt-1"
+                        >
+                          <SidebarMenuSubItem>
+                            <CollapsibleTrigger asChild>
+                              <SidebarMenuSubButton className="hover:text-primary transition-colors cursor-pointer pr-4">
+                                <span className="font-bold">Instagram</span>
+                                <ChevronDown className="ml-auto h-3 w-3 transition-transform group-data-[state=open]/ig-collapsible:rotate-180" />
+                              </SidebarMenuSubButton>
+                            </CollapsibleTrigger>
+                            <CollapsibleContent>
+                              <SidebarMenuSub className="ml-2 border-l-0 border-white/5 bg-white/[0.03] rounded-lg mt-1 overflow-hidden">
+                                <SidebarMenuSubItem>
+                                  <SidebarMenuSubButton asChild isActive={pathname === "/dashboard/traffic/ig-comment"}>
+                                    <Link href="/dashboard/traffic/ig-comment" onClick={handleLinkClick}>Komentar IG</Link>
+                                  </SidebarMenuSubButton>
+                                </SidebarMenuSubItem>
+                                <SidebarMenuSubItem>
+                                  <SidebarMenuSubButton asChild isActive={pathname === "/dashboard/traffic/ig-traffic"}>
+                                    <Link href="/dashboard/traffic/ig-traffic" onClick={handleLinkClick}>Trafik IG</Link>
                                   </SidebarMenuSubButton>
                                 </SidebarMenuSubItem>
                               </SidebarMenuSub>
