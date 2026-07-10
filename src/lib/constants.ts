@@ -22,7 +22,11 @@ export const TRAFFIC_SERVICES = {
   SHOPEE_COMMENT: { id: "4239", rate_per_comment: 1, label: "Shopee Comment" },
   TIKTOK_VIEW: { id: "8833", rate_view_per_coin: 1000, label: "TikTok VT View" },
   TIKTOK_SAVED: { id: "7990", rate_per_100: 2, label: "TikTok Saved" },
-  TIKTOK_COMMENT: { id: "855", rate_per_comment: 1, label: "TikTok Comment" }
+  TIKTOK_COMMENT: { id: "855", rate_per_comment: 1, label: "TikTok Comment" },
+  FB_COMMENT: { id: "856", rate_per_2_comments: 1, label: "Komentar FB" },
+  FB_TRAFFIC: { id: "8712", rate_view_per_coin: 1000, label: "Trafik FB" },
+  IG_COMMENT: { id: "854", rate_per_2_comments: 1, label: "Komentar IG" },
+  IG_TRAFFIC: { id: "4932", rate_view_per_coin: 1000, label: "Trafik IG" }
 };
 
 export const PREMIUM_PACKAGES = [
