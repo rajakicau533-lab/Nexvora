@@ -1,3 +1,4 @@
+
 "use client"
 
 import React, { useEffect } from "react"
@@ -25,7 +26,8 @@ import {
   Star,
   BarChart3,
   Facebook,
-  Instagram
+  Instagram,
+  Search
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { APP_NAME, CONTACT_INFO } from "@/lib/constants"
@@ -324,6 +326,30 @@ export function AppSidebar() {
                             </CollapsibleContent>
                           </SidebarMenuSubItem>
                         </Collapsible>
+                      </SidebarMenuSub>
+                    </CollapsibleContent>
+                  </SidebarMenuItem>
+                </Collapsible>
+
+                <Collapsible defaultOpen={pathname.startsWith('/dashboard/nextitle')} className="group/collapsible">
+                  <SidebarMenuItem>
+                    <CollapsibleTrigger asChild>
+                      <SidebarMenuButton className="hover:bg-primary/10 hover:text-primary transition-all duration-200">
+                        <Sparkles className="h-4 w-4" />
+                        <span className="font-medium">NexTitle Pro</span>
+                        <ChevronDown className="ml-auto h-4 w-4 transition-transform group-data-[state=open]/collapsible:rotate-180" />
+                      </SidebarMenuButton>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <SidebarMenuSub>
+                        <SidebarMenuSubItem>
+                          <SidebarMenuSubButton asChild isActive={pathname === "/dashboard/nextitle/seo"}>
+                            <Link href="/dashboard/nextitle/seo" onClick={handleLinkClick}>
+                              <Search className="h-3 w-3 mr-2" />
+                              SEO
+                            </Link>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
                       </SidebarMenuSub>
                     </CollapsibleContent>
                   </SidebarMenuItem>
