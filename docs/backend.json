@@ -84,6 +84,23 @@
         "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
         "createdAt": { "type": "string", "format": "date-time" }
       }
+    },
+    "NexTitleProHistory": {
+      "title": "NexTitle Pro History",
+      "description": "History of AI SEO generations.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "username": { "type": "string" },
+        "judul": { "type": "string" },
+        "bahan": { "type": "string" },
+        "hook": { "type": "string" },
+        "captions": { "type": "array", "items": { "type": "string" } },
+        "hashtags": { "type": "string" },
+        "hookPros": { "type": "array", "items": { "type": "string" } },
+        "coinUsed": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      }
     }
   },
   "auth": {
@@ -113,6 +130,10 @@
     "/sub_admin_coin_history/{txId}": {
       "schema": "#/entities/SubAdminCoinHistory",
       "description": "History of sub-admin balance changes"
+    },
+    "/nextitle_history/{historyId}": {
+      "schema": "#/entities/NexTitleProHistory",
+      "description": "History of AI SEO generations"
     }
   }
 }
