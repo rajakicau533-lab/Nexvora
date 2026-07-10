@@ -70,6 +70,12 @@ service cloud.firestore {
       allow update, delete: if isAdmin();
     }
 
+    // NEXTITLE PRO HISTORY
+    match /nextitle_history/{historyId} {
+      allow read, delete: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+    }
+
     // AI ERROR LOGS
     match /ai_error_logs/{logId} {
       allow read: if isAdmin();
