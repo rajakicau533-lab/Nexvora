@@ -1,3 +1,4 @@
+
 "use client"
 
 import React from "react"
@@ -15,7 +16,8 @@ import {
   Activity,
   UserCog,
   FileText,
-  Wallet
+  Wallet,
+  Trophy
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import {
@@ -118,6 +120,15 @@ export function AdminSidebar() {
                     <Link href="/admin/topup-monitor" className="flex items-center gap-4">
                       <Wallet className="h-4 w-4" />
                       <span className="font-bold">Topup Monitor</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild isActive={pathname === "/admin/referrals"} className={cn("h-12 rounded-xl", pathname === "/admin/referrals" && "bg-primary/15 text-primary")}>
+                    <Link href="/admin/referrals" className="flex items-center gap-4">
+                      <Trophy className="h-4 w-4" />
+                      <span className="font-bold">Referral Management</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
