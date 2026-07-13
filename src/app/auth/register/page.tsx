@@ -1,13 +1,14 @@
+
 "use client"
 
-import React, { useState } from "react"
+import React, { useState, useEffect } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardFooter } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
-import { UserPlus, Sparkles, AlertCircle, CheckCircle2, ChevronLeft } from "lucide-react"
+import { UserPlus, Sparkles, AlertCircle, CheckCircle2, ChevronLeft, Users } from "lucide-react"
 import { useAuth, useFirestore } from "@/firebase"
 import { createUserWithEmailAndPassword, sendEmailVerification, signOut } from "firebase/auth"
 import { doc, setDoc, serverTimestamp, getDocs, collection, query, where, limit } from "firebase/firestore"
@@ -18,6 +19,7 @@ export default function RegisterPage() {
   const [username, setUsername] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+  const [referralInput, setReferralInput] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isSuccess, setIsSuccess] = useState(false)
@@ -25,6 +27,14 @@ export default function RegisterPage() {
   const auth = useAuth()
   const db = useFirestore()
   const { toast } = useToast()
+
+  // Auto-fill referral from sessionStorage if available
+  useEffect(() => {
+    const storedRef = typeof window !== 'undefined' ? sessionStorage.getItem('nexvora_ref') : null
+    if (storedRef) {
+      setReferralInput(storedRef)
+    }
+  }, [])
 
   const generateReferralCode = () => {
     return Math.random().toString(36).substring(2, 8).toUpperCase()
@@ -44,7 +54,7 @@ export default function RegisterPage() {
       const usersRef = collection(db, "users")
       const cleanUsername = username.toLowerCase().trim().replace(/\s/g, '')
 
-      // 1. Validasi Username Unik (Guest Query - Limit 1)
+      // 1. Validasi Username Unik
       const usernameQuery = query(usersRef, where("username", "==", cleanUsername), limit(1))
       const usernameSnapshot = await getDocs(usernameQuery)
       
@@ -52,15 +62,20 @@ export default function RegisterPage() {
         throw new Error("Username '" + cleanUsername + "' sudah digunakan. Pilih yang lain.")
       }
 
-      // 2. Cari UID Pengundang (Guest Query - Limit 1)
+      // 2. Cari UID Pengundang (Jika ada input)
       let referredByUid = null
-      const storedRefCode = typeof window !== 'undefined' ? sessionStorage.getItem('nexvora_ref') : null
-      
-      if (storedRefCode && storedRefCode.trim().length > 0) {
-        const refQuery = query(usersRef, where("referralCode", "==", storedRefCode.trim().toUpperCase()), limit(1))
+      let ownerEmail = null
+      let ownerCode = null
+      if (referralInput.trim().length > 0) {
+        const refQuery = query(usersRef, where("referralCode", "==", referralInput.trim().toUpperCase()), limit(1))
         const refSnapshot = await getDocs(refQuery)
         if (!refSnapshot.empty) {
-          referredByUid = refSnapshot.docs[0].id
+          const ownerDoc = refSnapshot.docs[0]
+          referredByUid = ownerDoc.id
+          ownerEmail = ownerDoc.data().email
+          ownerCode = ownerDoc.data().referralCode
+        } else {
+          console.warn("Referral code not found:", referralInput)
         }
       }
 
@@ -77,16 +92,30 @@ export default function RegisterPage() {
         status: "active",
         role: "user",
         emailVerified: false,
-        adminVerified: false, // Default: FALSE, needs admin approval
+        adminVerified: false,
         referralCode: generateReferralCode(),
         referredBy: referredByUid,
         createdAt: serverTimestamp(),
       })
 
-      // 5. Kirim Email Verifikasi
+      // 5. Simpan Log Referral jika ada pengundang
+      if (referredByUid) {
+        await setDoc(doc(db, "referral_history", user.uid), {
+          referralOwnerId: referredByUid,
+          referralOwnerEmail: ownerEmail,
+          referralCode: ownerCode,
+          referredUserId: user.uid,
+          referredUsername: cleanUsername,
+          referredEmail: email.toLowerCase().trim(),
+          createdAt: serverTimestamp(),
+          status: "Berhasil"
+        })
+      }
+
+      // 6. Kirim Email Verifikasi
       await sendEmailVerification(user)
       
-      // 6. Bersihkan Session & Sign out (Force verification)
+      // 7. Bersihkan Session & Sign out
       if (typeof window !== 'undefined') {
         sessionStorage.removeItem('nexvora_ref')
       }
@@ -104,7 +133,6 @@ export default function RegisterPage() {
       if (err.code === 'auth/email-already-in-use') displayError = "Email ini sudah terdaftar."
       else if (err.code === 'auth/invalid-email') displayError = "Format email tidak valid."
       else if (err.code === 'auth/weak-password') displayError = "Password terlalu lemah (min. 6 karakter)."
-      else if (err.code === 'permission-denied') displayError = "Gagal melakukan verifikasi data ke database. Silakan coba lagi."
       else if (err.message) displayError = err.message
 
       setError(displayError)
@@ -199,6 +227,19 @@ export default function RegisterPage() {
                   minLength={6}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
+                  className="bg-white/10 border-white/20 rounded-2xl h-14 text-white placeholder:text-white/40 focus:border-primary/50 text-lg px-6"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="referral" className="text-white text-sm font-black ml-1 uppercase tracking-tight flex items-center gap-2">
+                  <Users className="h-3 w-3 text-primary" /> Kode Referral (Opsional)
+                </Label>
+                <Input 
+                  id="referral" 
+                  placeholder="Contoh: NEXV01" 
+                  value={referralInput}
+                  onChange={(e) => setReferralInput(e.target.value.toUpperCase())}
                   className="bg-white/10 border-white/20 rounded-2xl h-14 text-white placeholder:text-white/40 focus:border-primary/50 text-lg px-6"
                 />
               </div>
