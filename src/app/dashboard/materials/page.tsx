@@ -1,3 +1,4 @@
+
 "use client"
 
 import React, { useState } from "react"
@@ -102,7 +103,7 @@ export default function MaterialsPage() {
     <div className="space-y-8 max-w-6xl mx-auto pb-20">
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div className="space-y-2">
-          <h2 className="text-4xl font-headline font-bold text-white">Free Materi 📚</h2>
+          <h2 className="text-4xl font-headline font-bold text-white">Tutorial 📚</h2>
           <p className="text-muted-foreground text-lg">Akses video edukasi eksklusif untuk meningkatkan pertumbuhan digital Anda.</p>
         </div>
         <div className="bg-white/5 border border-white/10 px-5 py-2.5 rounded-2xl flex items-center gap-3 backdrop-blur-xl">
