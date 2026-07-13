@@ -76,6 +76,14 @@ service cloud.firestore {
       allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
     }
 
+    // REFERRAL HISTORY
+    match /referral_history/{recordId} {
+      allow read: if request.auth != null && (resource.data.referralOwnerId == request.auth.uid || isAdmin());
+      allow create: if request.auth != null && request.auth.uid == recordId;
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
     // AI ERROR LOGS
     match /ai_error_logs/{logId} {
       allow read: if isAdmin();
