@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useMemo } from "react"
+import React, { useMemo, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -20,7 +20,7 @@ import {
   Gift
 } from "lucide-react"
 import { useFirestore, useUser, useDoc, useCollection } from "@/firebase"
-import { doc, collection, query, where, or } from "firebase/firestore"
+import { doc, collection, query, where, or, updateDoc, serverTimestamp } from "firebase/firestore"
 import { useToast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -139,7 +139,25 @@ export default function ReferralRewardPage() {
   const userProfileRef = useMemo(() => (db && user?.uid ? doc(db, "users", user.uid) : null), [db, user?.uid])
   const { data: profile, loading: profileLoading } = useDoc(userProfileRef)
 
-  // 2. Fetch history: Persistent data directly from referral_history collection
+  // 2. Auto-repair missing referral code
+  useEffect(() => {
+    if (profile && !profile.referralCode && db && user?.uid) {
+      const generateNewCode = () => Math.random().toString(36).substring(2, 8).toUpperCase();
+      const newCode = generateNewCode();
+      const userRef = doc(db, "users", user.uid);
+      
+      updateDoc(userRef, {
+        referralCode: newCode,
+        updatedAt: serverTimestamp()
+      }).then(() => {
+        toast({ title: "Kode Referral Dibuat ✨", description: "Akun Anda kini memiliki kode referral unik." });
+      }).catch(err => {
+        console.error("Failed to generate missing referral code:", err);
+      });
+    }
+  }, [profile, db, user?.uid, toast]);
+
+  // 3. Fetch history: Persistent data directly from referral_history collection
   const invitedUsersQuery = useMemo(() => {
     if (!db || !user?.uid) return null
     return query(
@@ -154,7 +172,7 @@ export default function ReferralRewardPage() {
 
   const { data: rawHistory, loading: historyLoading } = useCollection<any>(invitedUsersQuery)
 
-  // 3. Process and sort history client-side for consistent ordering
+  // 4. Process and sort history client-side for consistent ordering
   const history = useMemo(() => {
     if (!rawHistory) return []
     return [...rawHistory].sort((a, b) => {
@@ -293,9 +311,9 @@ export default function ReferralRewardPage() {
              <div className="flex items-start gap-3">
                 <AlertCircle className="h-4 w-4 md:h-6 md:w-6 text-primary shrink-0 mt-0.5" />
                 <div className="space-y-1">
-                   <p className="text-xs md:text-sm font-bold text-white">Ketentuan Pencairan</p>
+                   <p className="text-xs md:text-sm font-bold text-white">Informasi Verifikasi</p>
                    <p className="text-[9px] md:text-[11px] text-muted-foreground leading-relaxed">
-                      Referral dianggap valid jika pengguna yang diundang memiliki saldo koin &gt; 0. Admin akan mengirimkan reward setelah verifikasi manual dilakukan.
+                      Referral dianggap valid dan dapat diklaim jika pengguna yang diundang telah melakukan pengisian koin (saldo &gt; 0). Sistem kami akan memvalidasi setiap klaim secara manual untuk mencegah penyalahgunaan.
                    </p>
                 </div>
              </div>
