@@ -12,9 +12,26 @@
         "coins": { "type": "number" },
         "status": { "type": "string", "enum": ["active", "suspended"] },
         "role": { "type": "string", "enum": ["user", "admin", "premium", "private", "vip", "mbah paijo"] },
+        "referralCode": { "type": "string", "description": "Unique code for inviting others" },
+        "referredBy": { "type": "string", "description": "UID of the user who invited this person" },
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["uid", "username", "email", "coins", "role"]
+    },
+    "ReferralRecord": {
+      "title": "Referral Record",
+      "description": "Log of successful user invitations.",
+      "type": "object",
+      "properties": {
+        "referralOwnerId": { "type": "string" },
+        "referralOwnerEmail": { "type": "string" },
+        "referralCode": { "type": "string" },
+        "referredUserId": { "type": "string" },
+        "referredUsername": { "type": "string" },
+        "referredEmail": { "type": "string" },
+        "status": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      }
     },
     "Admin": {
       "title": "Admin Account",
@@ -134,6 +151,10 @@
     "/nextitle_history/{historyId}": {
       "schema": "#/entities/NexTitleProHistory",
       "description": "History of AI SEO generations"
+    },
+    "/referral_history/{recordId}": {
+      "schema": "#/entities/ReferralRecord",
+      "description": "History of successful referrals"
     }
   }
 }
