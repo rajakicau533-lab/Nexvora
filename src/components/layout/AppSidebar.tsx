@@ -24,7 +24,6 @@ import {
   Trophy,
   Rocket,
   Star,
-  BarChart3,
   Facebook,
   Instagram,
   Search
@@ -192,15 +191,8 @@ export function AppSidebar() {
                     </CollapsibleTrigger>
                     <CollapsibleContent>
                       <SidebarMenuSub className="pr-0">
-                        {/* Group: Shopee */}
-                        <Collapsible 
-                          defaultOpen={
-                            pathname.includes('/shopee') || 
-                            pathname.includes('/followers') || 
-                            pathname.includes('/likes')
-                          } 
-                          className="group/shopee-collapsible"
-                        >
+                        {/* Shopee Section */}
+                        <Collapsible defaultOpen={pathname.includes('/shopee')} className="group/shopee-collapsible">
                           <SidebarMenuSubItem>
                             <CollapsibleTrigger asChild>
                               <SidebarMenuSubButton className="hover:text-primary transition-colors cursor-pointer pr-4">
@@ -235,11 +227,8 @@ export function AppSidebar() {
                           </SidebarMenuSubItem>
                         </Collapsible>
 
-                        {/* Group: TikTok */}
-                        <Collapsible 
-                          defaultOpen={pathname.includes('/tiktok')} 
-                          className="group/tiktok-collapsible mt-1"
-                        >
+                        {/* TikTok Section */}
+                        <Collapsible defaultOpen={pathname.includes('/tiktok')} className="group/tiktok-collapsible mt-1">
                           <SidebarMenuSubItem>
                             <CollapsibleTrigger asChild>
                               <SidebarMenuSubButton className="hover:text-primary transition-colors cursor-pointer pr-4">
@@ -269,11 +258,8 @@ export function AppSidebar() {
                           </SidebarMenuSubItem>
                         </Collapsible>
 
-                        {/* Group: Facebook */}
-                        <Collapsible 
-                          defaultOpen={pathname.includes('/fb-')} 
-                          className="group/fb-collapsible mt-1"
-                        >
+                        {/* Facebook Section */}
+                        <Collapsible defaultOpen={pathname.includes('/fb-')} className="group/fb-collapsible mt-1">
                           <SidebarMenuSubItem>
                             <CollapsibleTrigger asChild>
                               <SidebarMenuSubButton className="hover:text-primary transition-colors cursor-pointer pr-4">
@@ -284,13 +270,13 @@ export function AppSidebar() {
                             <CollapsibleContent>
                               <SidebarMenuSub className="ml-2 border-l-0 border-white/5 bg-white/[0.03] rounded-lg mt-1 overflow-hidden">
                                 <SidebarMenuSubItem>
-                                  <SidebarMenuSubButton asChild isActive={pathname === "/dashboard/traffic/fb-comment"}>
-                                    <Link href="/dashboard/traffic/fb-comment" onClick={handleLinkClick}>Komentar FB</Link>
+                                  <SidebarMenuSubButton asChild isActive={pathname === "/dashboard/traffic/fb-traffic"}>
+                                    <Link href="/dashboard/traffic/fb-traffic" onClick={handleLinkClick}>Trafik FB</Link>
                                   </SidebarMenuSubButton>
                                 </SidebarMenuSubItem>
                                 <SidebarMenuSubItem>
-                                  <SidebarMenuSubButton asChild isActive={pathname === "/dashboard/traffic/fb-traffic"}>
-                                    <Link href="/dashboard/traffic/fb-traffic" onClick={handleLinkClick}>Trafik FB</Link>
+                                  <SidebarMenuSubButton asChild isActive={pathname === "/dashboard/traffic/fb-comment"}>
+                                    <Link href="/dashboard/traffic/fb-comment" onClick={handleLinkClick}>Komentar FB</Link>
                                   </SidebarMenuSubButton>
                                 </SidebarMenuSubItem>
                               </SidebarMenuSub>
@@ -298,11 +284,8 @@ export function AppSidebar() {
                           </SidebarMenuSubItem>
                         </Collapsible>
 
-                        {/* Group: Instagram */}
-                        <Collapsible 
-                          defaultOpen={pathname.includes('/ig-')} 
-                          className="group/ig-collapsible mt-1"
-                        >
+                        {/* Instagram Section */}
+                        <Collapsible defaultOpen={pathname.includes('/ig-')} className="group/ig-collapsible mt-1">
                           <SidebarMenuSubItem>
                             <CollapsibleTrigger asChild>
                               <SidebarMenuSubButton className="hover:text-primary transition-colors cursor-pointer pr-4">
@@ -313,13 +296,13 @@ export function AppSidebar() {
                             <CollapsibleContent>
                               <SidebarMenuSub className="ml-2 border-l-0 border-white/5 bg-white/[0.03] rounded-lg mt-1 overflow-hidden">
                                 <SidebarMenuSubItem>
-                                  <SidebarMenuSubButton asChild isActive={pathname === "/dashboard/traffic/ig-comment"}>
-                                    <Link href="/dashboard/traffic/ig-comment" onClick={handleLinkClick}>Komentar IG</Link>
+                                  <SidebarMenuSubButton asChild isActive={pathname === "/dashboard/traffic/ig-traffic"}>
+                                    <Link href="/dashboard/traffic/ig-traffic" onClick={handleLinkClick}>Trafik IG</Link>
                                   </SidebarMenuSubButton>
                                 </SidebarMenuSubItem>
                                 <SidebarMenuSubItem>
-                                  <SidebarMenuSubButton asChild isActive={pathname === "/dashboard/traffic/ig-traffic"}>
-                                    <Link href="/dashboard/traffic/ig-traffic" onClick={handleLinkClick}>Trafik IG</Link>
+                                  <SidebarMenuSubButton asChild isActive={pathname === "/dashboard/traffic/ig-comment"}>
+                                    <Link href="/dashboard/traffic/ig-comment" onClick={handleLinkClick}>Komentar IG</Link>
                                   </SidebarMenuSubButton>
                                 </SidebarMenuSubItem>
                               </SidebarMenuSub>
@@ -330,93 +313,6 @@ export function AppSidebar() {
                     </CollapsibleContent>
                   </SidebarMenuItem>
                 </Collapsible>
-
-                <Collapsible defaultOpen={pathname.startsWith('/dashboard/nextitle')} className="group/collapsible">
-                  <SidebarMenuItem>
-                    <CollapsibleTrigger asChild>
-                      <SidebarMenuButton className="hover:bg-primary/10 hover:text-primary transition-all duration-200">
-                        <Sparkles className="h-4 w-4" />
-                        <span className="font-medium">NexTitle Pro</span>
-                        <ChevronDown className="ml-auto h-4 w-4 transition-transform group-data-[state=open]/collapsible:rotate-180" />
-                      </SidebarMenuButton>
-                    </CollapsibleTrigger>
-                    <CollapsibleContent>
-                      <SidebarMenuSub>
-                        <SidebarMenuSubItem>
-                          <SidebarMenuSubButton asChild isActive={pathname === "/dashboard/nextitle/seo"}>
-                            <Link href="/dashboard/nextitle/seo" onClick={handleLinkClick}>
-                              <Search className="h-3 w-3 mr-2" />
-                              SEO
-                            </Link>
-                          </SidebarMenuSubButton>
-                        </SidebarMenuSubItem>
-                      </SidebarMenuSub>
-                    </CollapsibleContent>
-                  </SidebarMenuItem>
-                </Collapsible>
-
-                <Collapsible defaultOpen={pathname.startsWith('/dashboard/premium')} className="group/collapsible">
-                  <SidebarMenuItem>
-                    <CollapsibleTrigger asChild>
-                      <SidebarMenuButton className="hover:bg-primary/10 hover:text-primary transition-all duration-200">
-                        <Star className="h-4 w-4 text-amber-500" />
-                        <span className="font-medium">Premium</span>
-                        <ChevronDown className="ml-auto h-4 w-4 transition-transform group-data-[state=open]/collapsible:rotate-180" />
-                      </SidebarMenuButton>
-                    </CollapsibleTrigger>
-                    <CollapsibleContent>
-                      <SidebarMenuSub>
-                        <SidebarMenuSubItem>
-                          <SidebarMenuSubButton asChild isActive={pathname === "/dashboard/premium"}>
-                            <Link href="/dashboard/premium" onClick={handleLinkClick}>📈 Reset Produk</Link>
-                          </SidebarMenuSubButton>
-                        </SidebarMenuSubItem>
-                      </SidebarMenuSub>
-                    </CollapsibleContent>
-                  </SidebarMenuItem>
-                </Collapsible>
-
-                <Collapsible defaultOpen={pathname.startsWith('/dashboard/info-admin')} className="group/collapsible">
-                  <SidebarMenuItem>
-                    <CollapsibleTrigger asChild>
-                      <SidebarMenuButton className="hover:bg-primary/10 hover:text-primary transition-all duration-200">
-                        <Info className="h-4 w-4" />
-                        <span className="font-medium">Info Admin</span>
-                        <ChevronDown className="ml-auto h-4 w-4 transition-transform group-data-[state=open]/collapsible:rotate-180" />
-                      </SidebarMenuButton>
-                    </CollapsibleTrigger>
-                    <CollapsibleContent>
-                      <SidebarMenuSub>
-                        <SidebarMenuSubItem>
-                          <SidebarMenuSubButton asChild isActive={pathname === "/dashboard/info-admin/kelas"}>
-                            <Link href="/dashboard/info-admin/kelas" onClick={handleLinkClick}>Info Kelas</Link>
-                          </SidebarMenuSubButton>
-                        </SidebarMenuSubItem>
-                        <SidebarMenuSubItem>
-                          <SidebarMenuSubButton asChild isActive={pathname === "/dashboard/info-admin/forum"}>
-                            <Link href="/dashboard/info-admin/forum" onClick={handleLinkClick}>Forum</Link>
-                          </SidebarMenuSubButton>
-                        </SidebarMenuSubItem>
-                      </SidebarMenuSub>
-                    </CollapsibleContent>
-                  </SidebarMenuItem>
-                </Collapsible>
-
-                <SidebarMenuItem>
-                  <SidebarMenuButton 
-                    asChild 
-                    isActive={pathname === "/dashboard/referral"}
-                    className={cn(
-                      "hover:bg-primary/10 hover:text-primary transition-all duration-200",
-                      pathname === "/dashboard/referral" && "bg-primary/15 text-primary"
-                    )}
-                  >
-                    <Link href="/dashboard/referral" onClick={handleLinkClick} className="flex items-center gap-3">
-                      <Trophy className="h-4 w-4" />
-                      <span className="font-medium">Referral Reward</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
 
                 <SidebarMenuItem>
                   <SidebarMenuButton 
@@ -437,6 +333,22 @@ export function AppSidebar() {
                 <SidebarMenuItem>
                   <SidebarMenuButton 
                     asChild 
+                    isActive={pathname === "/dashboard/referral"}
+                    className={cn(
+                      "hover:bg-primary/10 hover:text-primary transition-all duration-200",
+                      pathname === "/dashboard/referral" && "bg-primary/15 text-primary"
+                    )}
+                  >
+                    <Link href="/dashboard/referral" onClick={handleLinkClick} className="flex items-center gap-3">
+                      <Trophy className="h-4 w-4" />
+                      <span className="font-medium">Referral Reward</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+
+                <SidebarMenuItem>
+                  <SidebarMenuButton 
+                    asChild 
                     isActive={pathname === "/dashboard/materials"}
                     className={cn(
                       "hover:bg-primary/10 hover:text-primary transition-all duration-200",
@@ -445,7 +357,7 @@ export function AppSidebar() {
                   >
                     <Link href="/dashboard/materials" onClick={handleLinkClick} className="flex items-center gap-3">
                       <GraduationCap className="h-4 w-4" />
-                      <span className="font-medium">Free Materi</span>
+                      <span className="font-medium">Tutorial</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -473,23 +385,6 @@ export function AppSidebar() {
             <SidebarGroup>
               <SidebarGroupLabel className="text-muted-foreground/50 px-3 uppercase text-[10px] tracking-widest font-bold">System</SidebarGroupLabel>
               <SidebarMenu>
-                {profile?.role === 'admin' && (
-                  <SidebarMenuItem>
-                    <SidebarMenuButton 
-                      asChild 
-                      isActive={pathname === "/dashboard/admin/settings"}
-                      className={cn(
-                        "hover:bg-primary/10 hover:text-primary transition-all duration-200",
-                        pathname === "/dashboard/admin/settings" && "bg-primary/15 text-primary border border-primary/20"
-                      )}
-                    >
-                      <Link href="/dashboard/admin/settings" onClick={handleLinkClick} className="flex items-center gap-3">
-                        <ShieldCheck className="h-4 w-4 text-primary" />
-                        <span className="font-bold">Admin Settings</span>
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                )}
                 <SidebarMenuItem>
                   <SidebarMenuButton 
                     onClick={() => {
