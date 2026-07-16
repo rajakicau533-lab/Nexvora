@@ -138,7 +138,7 @@ export default function LoginPage() {
       return
     }
 
-    const message = `Halo Admin,\n\nSaya telah melakukan transfer aktivasi akun Nexvora sebesar Rp30.000 untuk 10 koin.\n\nEmail Akun:\n${rejectedEmail}\n\nMohon dilakukan verifikasi dan aktivasi akun.\n\nTerima kasih.`;
+    const message = `Halo Admin,\n\nSaya telah melakukan transfer aktivasi akun Nexvora sebesar Rp100.000 untuk 30 koin.\n\nEmail Akun:\n${rejectedEmail}\n\nMohon dilakukan verifikasi dan aktivasi akun.\n\nTerima kasih.`;
     const whatsappUrl = `https://wa.me/6282131974325?text=${encodeURIComponent(message)}`;
     window.open(whatsappUrl, '_blank');
   }
@@ -238,7 +238,7 @@ export default function LoginPage() {
                 </div>
                 <DialogTitle className="text-2xl font-headline font-bold text-white">Verifikasi Aktivasi Akun</DialogTitle>
                 <DialogDescription className="text-muted-foreground text-sm leading-relaxed">
-                  Untuk aktivasi akun, silakan melakukan pengisian 10 koin seharga <span className="text-white font-bold">Rp30.000</span>. Koin akan masuk ke akun Anda setelah verifikasi berhasil dilakukan.
+                  Untuk aktivasi akun, silakan melakukan pengisian 30 koin seharga <span className="text-white font-bold">Rp100.000</span>. Koin akan masuk ke akun Anda setelah verifikasi berhasil dilakukan.
                 </DialogDescription>
               </div>
 
