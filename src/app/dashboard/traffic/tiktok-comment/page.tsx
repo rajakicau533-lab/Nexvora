@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect, useCallback } from "react"
+import React, { useState, useEffect, useCallback, useMemo } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -42,10 +42,18 @@ export default function TikTokCommentPage() {
 
   const serviceConfig = TRAFFIC_SERVICES.TIKTOK_COMMENT
   
-  const commentsArray = commentsText.split('\n').map(c => c.trim()).filter(c => c.length > 0);
+  const commentsArray = useMemo(() => {
+    return commentsText
+      .split('\n')
+      .map(c => c.trim())
+      .filter(c => c.length > 0);
+  }, [commentsText]);
+
   const quantity = commentsArray.length;
-  const coinCost = quantity * serviceConfig.rate_per_comment;
+  // Perhitungan: 10 komentar = 5 koin (rate 0.5 per komen)
+  const coinCost = Math.ceil(quantity * (serviceConfig.rate_per_comment || 0.5));
   const isValidQuantity = quantity >= 10;
+  const finalCommentsPayload = useMemo(() => commentsArray.join('\n'), [commentsArray]);
 
   const apiSettingsRef = React.useMemo(() => (db ? doc(db, "system_settings", "provider_config") : null), [db])
   const { data: apiSettings } = useDoc(apiSettingsRef)
@@ -155,7 +163,7 @@ export default function TikTokCommentPage() {
         serviceId: serviceConfig.id,
         link: url,
         quantity: quantity,
-        comments: commentsText.trim()
+        comments: finalCommentsPayload
       });
 
       if (!apiResult.success) throw new Error(apiResult.error);
@@ -297,7 +305,7 @@ export default function TikTokCommentPage() {
                <p className="font-bold text-white/80 uppercase text-[9px] tracking-widest">Aturan Dasar:</p>
                <ul className="space-y-2">
                   <li className="flex items-start gap-2">• Minimal order adalah <strong>10 komentar</strong>.</li>
-                  <li className="flex items-start gap-2">• Tarif: <strong>1 Komentar = 1 Koin</strong>.</li>
+                  <li className="flex items-start gap-2">• Tarif: <strong>10 Komentar = 5 Koin</strong>.</li>
                   <li className="flex items-start gap-2">• Tulis komentar Anda baris per baris.</li>
                   <li className="flex items-start gap-2">• Status disinkronkan secara realtime dengan server provider.</li>
                </ul>
@@ -308,7 +316,7 @@ export default function TikTokCommentPage() {
 
       <div className="space-y-4">
         <h3 className="text-lg font-headline font-bold flex items-center gap-2 text-white">
-          <Clock className="h-5 w-5 text-primary" /> Riwayat TikTok Comment
+          <History className="h-5 w-5 text-primary" /> Riwayat TikTok Comment
         </h3>
         
         <Card className="premium-card rounded-2xl border-white/5 overflow-hidden bg-black/40">
