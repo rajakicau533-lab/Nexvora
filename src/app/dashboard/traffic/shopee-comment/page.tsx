@@ -49,8 +49,9 @@ export default function ShopeeCommentPage() {
   }, [commentsText]);
 
   const quantity = commentsArray.length;
-  const coinCost = quantity * (serviceConfig.rate_per_comment || 1);
-  const isValidQuantity = quantity >= 1 && quantity <= 100;
+  // Perhitungan: 10 komentar = 5 koin (rate 0.5 per komen)
+  const coinCost = Math.ceil(quantity * (serviceConfig.rate_per_comment || 0.5));
+  const isValidQuantity = quantity >= 10 && quantity <= 100;
   const finalCommentsPayload = useMemo(() => commentsArray.join('\n'), [commentsArray]);
 
   const apiSettingsRef = useMemo(() => (db ? doc(db, "system_settings", "provider_config") : null), [db])
@@ -139,7 +140,8 @@ export default function ShopeeCommentPage() {
   const handleOrder = async () => {
     if (!db || !user?.uid || !profile) return;
     if (!url) { toast({ variant: "destructive", title: "Link Wajib", description: "Masukkan link produk/video." }); return; }
-    if (!isValidQuantity) { toast({ variant: "destructive", title: "Jumlah Salah", description: "Minimal 1 dan maksimal 100 komentar." }); return; }
+    if (quantity < 10) { toast({ variant: "destructive", title: "Jumlah Salah", description: "Minimal order 10 komentar." }); return; }
+    if (quantity > 100) { toast({ variant: "destructive", title: "Jumlah Salah", description: "Maksimal 100 komentar per order." }); return; }
     if (profile.coins < coinCost) { toast({ variant: "destructive", title: "Koin Kurang", description: `Butuh ${coinCost} koin. Saldo: ${profile.coins}` }); return; }
 
     setIsOrdering(true);
@@ -224,8 +226,8 @@ export default function ShopeeCommentPage() {
                   className="bg-white/5 border-white/10 min-h-[160px] rounded-xl text-sm focus:border-primary/50"
                 />
                 <div className="flex justify-between text-[10px] font-black uppercase text-white/30 px-1">
-                  <span className={cn(quantity > 100 ? "text-red-500 font-bold" : "text-white/30")}>
-                    Terhitung: {quantity} Komentar {quantity > 100 && "(Maks 100)"}
+                  <span className={cn(quantity < 10 && quantity > 0 ? "text-red-500 font-bold" : "text-white/30")}>
+                    Terhitung: {quantity} Komentar {quantity < 10 && quantity > 0 && "(Minimal 10)"}
                   </span>
                   <span className="text-primary font-bold">Total Biaya: {coinCost} Koin</span>
                 </div>
@@ -251,8 +253,8 @@ export default function ShopeeCommentPage() {
             </CardHeader>
             <CardContent className="p-6 text-[11px] space-y-4 text-muted-foreground leading-relaxed">
               <div className="space-y-2">
-                <p>• Tarif: <strong>1 Komentar = 1 Koin</strong>.</p>
-                <p>• Maksimal: <strong>100 komentar</strong> per order.</p>
+                <p>• Tarif: <strong>10 Komentar = 5 Koin</strong>.</p>
+                <p>• Minimal: <strong>10 komentar</strong> per order.</p>
                 <p>• Status mengikuti integrasi realtime dengan provider.</p>
               </div>
               <div className="p-4 rounded-2xl bg-primary/5 border border-primary/10 flex gap-3">
