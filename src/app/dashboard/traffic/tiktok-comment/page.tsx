@@ -50,7 +50,7 @@ export default function TikTokCommentPage() {
   }, [commentsText]);
 
   const quantity = commentsArray.length;
-  // Perhitungan: 10 komentar = 5 koin (rate 0.5 per komen)
+  // Kalkulasi: 10 komentar = 5 koin (0.5 koin per komentar)
   const coinCost = Math.ceil(quantity * (serviceConfig.rate_per_comment || 0.5));
   const isValidQuantity = quantity >= 10;
   const finalCommentsPayload = useMemo(() => commentsArray.join('\n'), [commentsArray]);
@@ -297,15 +297,14 @@ export default function TikTokCommentPage() {
         <Card className="premium-card rounded-2xl border-white/5 bg-black/40 lg:col-span-4 h-fit">
           <CardHeader className="py-4 border-b border-white/5">
             <CardTitle className="text-sm font-bold flex items-center gap-2 text-white">
-              <Info className="h-4 w-4 text-primary" /> Panduan Order
+              <Info className="h-4 w-4 text-primary" /> INFO LAYANAN
             </CardTitle>
           </CardHeader>
           <CardContent className="p-5 text-xs space-y-4 text-muted-foreground leading-relaxed">
             <div className="space-y-2">
-               <p className="font-bold text-white/80 uppercase text-[9px] tracking-widest">Aturan Dasar:</p>
                <ul className="space-y-2">
-                  <li className="flex items-start gap-2">• Minimal order adalah <strong>10 komentar</strong>.</li>
                   <li className="flex items-start gap-2">• Tarif: <strong>10 Komentar = 5 Koin</strong>.</li>
+                  <li className="flex items-start gap-2">• Minimal: <strong>10 komentar</strong> per order.</li>
                   <li className="flex items-start gap-2">• Tulis komentar Anda baris per baris.</li>
                   <li className="flex items-start gap-2">• Status disinkronkan secara realtime dengan server provider.</li>
                </ul>
