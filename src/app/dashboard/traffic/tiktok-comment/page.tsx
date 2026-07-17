@@ -50,8 +50,8 @@ export default function TikTokCommentPage() {
   }, [commentsText]);
 
   const quantity = commentsArray.length;
-  // Kalkulasi: 10 komentar = 5 koin (0.5 koin per komentar)
-  const coinCost = Math.ceil(quantity * (serviceConfig.rate_per_comment || 0.5));
+  // FIX: Hardcoded 0.5 multiplier to ensure 10 comments = 5 coins
+  const coinCost = Math.ceil(quantity * 0.5);
   const isValidQuantity = quantity >= 10;
   const finalCommentsPayload = useMemo(() => commentsArray.join('\n'), [commentsArray]);
 
