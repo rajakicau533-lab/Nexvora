@@ -49,9 +49,9 @@ export default function ShopeeCommentPage() {
   }, [commentsText]);
 
   const quantity = commentsArray.length;
-  // Perhitungan: 10 komentar = 5 koin (rate 0.5 per komen)
+  // Kalkulasi: 10 komentar = 5 koin (0.5 koin per komentar)
   const coinCost = Math.ceil(quantity * (serviceConfig.rate_per_comment || 0.5));
-  const isValidQuantity = quantity >= 10 && quantity <= 100;
+  const isValidQuantity = quantity >= 10 && quantity <= 500;
   const finalCommentsPayload = useMemo(() => commentsArray.join('\n'), [commentsArray]);
 
   const apiSettingsRef = useMemo(() => (db ? doc(db, "system_settings", "provider_config") : null), [db])
@@ -134,14 +134,13 @@ export default function ShopeeCommentPage() {
 
   const handleUseTemplate = () => {
     setCommentsText(TEMPLATE_COMMENTS.join('\n'));
-    toast({ title: "Template Digunakan", description: "Contoh komentar telah diisi." });
+    toast({ title: "Template Digunakan", description: "10 contoh komentar telah diisi." });
   }
 
   const handleOrder = async () => {
     if (!db || !user?.uid || !profile) return;
     if (!url) { toast({ variant: "destructive", title: "Link Wajib", description: "Masukkan link produk/video." }); return; }
     if (quantity < 10) { toast({ variant: "destructive", title: "Jumlah Salah", description: "Minimal order 10 komentar." }); return; }
-    if (quantity > 100) { toast({ variant: "destructive", title: "Jumlah Salah", description: "Maksimal 100 komentar per order." }); return; }
     if (profile.coins < coinCost) { toast({ variant: "destructive", title: "Koin Kurang", description: `Butuh ${coinCost} koin. Saldo: ${profile.coins}` }); return; }
 
     setIsOrdering(true);
