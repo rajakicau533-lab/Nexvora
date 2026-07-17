@@ -49,9 +49,9 @@ export default function ShopeeCommentPage() {
   }, [commentsText]);
 
   const quantity = commentsArray.length;
-  // Kalkulasi: 10 komentar = 5 koin (0.5 koin per komentar)
-  const coinCost = Math.ceil(quantity * (serviceConfig.rate_per_comment || 0.5));
-  const isValidQuantity = quantity >= 10 && quantity <= 500;
+  // FIX: Hardcoded 0.5 multiplier to ensure 10 comments = 5 coins
+  const coinCost = Math.ceil(quantity * 0.5);
+  const isValidQuantity = quantity >= 10;
   const finalCommentsPayload = useMemo(() => commentsArray.join('\n'), [commentsArray]);
 
   const apiSettingsRef = useMemo(() => (db ? doc(db, "system_settings", "provider_config") : null), [db])
