@@ -26,7 +26,9 @@ import {
   Star,
   Facebook,
   Instagram,
-  Search
+  Search,
+  Zap,
+  MousePointerClick
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { APP_NAME, CONTACT_INFO } from "@/lib/constants"
@@ -180,6 +182,38 @@ export function AppSidebar() {
                   </SidebarMenuButton>
                 </SidebarMenuItem>
 
+                <SidebarMenuItem>
+                  <SidebarMenuButton 
+                    asChild 
+                    isActive={pathname === "/dashboard/boost-klik"}
+                    className={cn(
+                      "hover:bg-primary/10 hover:text-primary transition-all duration-200",
+                      pathname === "/dashboard/boost-klik" && "bg-primary/15 text-primary"
+                    )}
+                  >
+                    <Link href="/dashboard/boost-klik" onClick={handleLinkClick} className="flex items-center gap-3">
+                      <MousePointerClick className="h-4 w-4" />
+                      <span className="font-medium">Boost Klik</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+
+                <SidebarMenuItem>
+                  <SidebarMenuButton 
+                    asChild 
+                    isActive={pathname === "/dashboard/nextitle/seo"}
+                    className={cn(
+                      "hover:bg-primary/10 hover:text-primary transition-all duration-200",
+                      pathname === "/dashboard/nextitle/seo" && "bg-primary/15 text-primary"
+                    )}
+                  >
+                    <Link href="/dashboard/nextitle/seo" onClick={handleLinkClick} className="flex items-center gap-3">
+                      <Sparkles className="h-4 w-4" />
+                      <span className="font-medium">NexTitle Pro</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+
                 <Collapsible defaultOpen={pathname.startsWith('/dashboard/traffic')} className="group/collapsible">
                   <SidebarMenuItem>
                     <CollapsibleTrigger asChild>
@@ -309,6 +343,32 @@ export function AppSidebar() {
                             </CollapsibleContent>
                           </SidebarMenuSubItem>
                         </Collapsible>
+                      </SidebarMenuSub>
+                    </CollapsibleContent>
+                  </SidebarMenuItem>
+                </Collapsible>
+
+                <Collapsible defaultOpen={pathname.startsWith('/dashboard/info-admin')} className="group/collapsible-info">
+                  <SidebarMenuItem>
+                    <CollapsibleTrigger asChild>
+                      <SidebarMenuButton className="hover:bg-primary/10 hover:text-primary transition-all duration-200">
+                        <Info className="h-4 w-4" />
+                        <span className="font-medium">Info Admin</span>
+                        <ChevronDown className="ml-auto h-4 w-4 transition-transform group-data-[state=open]/collapsible-info:rotate-180" />
+                      </SidebarMenuButton>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <SidebarMenuSub className="pr-0">
+                        <SidebarMenuSubItem>
+                          <SidebarMenuSubButton asChild isActive={pathname === "/dashboard/info-admin/forum"}>
+                            <Link href="/dashboard/info-admin/forum" onClick={handleLinkClick}>Forum Komunitas</Link>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                        <SidebarMenuSubItem>
+                          <SidebarMenuSubButton asChild isActive={pathname === "/dashboard/info-admin/kelas"}>
+                            <Link href="/dashboard/info-admin/kelas" onClick={handleLinkClick}>Info Kelas</Link>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
                       </SidebarMenuSub>
                     </CollapsibleContent>
                   </SidebarMenuItem>
