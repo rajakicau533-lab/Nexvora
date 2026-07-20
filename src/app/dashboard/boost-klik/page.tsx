@@ -1,14 +1,14 @@
+
 "use client"
 
 import React from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Hammer, ArrowLeft, Construction } from "lucide-react"
+import { ArrowLeft, Construction } from "lucide-react"
 import Link from "next/link"
 
 /**
  * @fileOverview Halaman Boost Klik dalam mode Maintenance.
- * Fitur dinonaktifkan sementara untuk peningkatan sistem.
  */
 export default function BoostKlikMaintenancePage() {
   return (
@@ -25,19 +25,10 @@ export default function BoostKlikMaintenancePage() {
              
              <div className="space-y-3">
                 <h2 className="text-3xl md:text-4xl font-headline font-bold text-white tracking-tight">
-                  🚧 Boost Klik Sedang Maintenance
+                  🚧 Fitur Maintenance
                 </h2>
                 <p className="text-muted-foreground text-lg leading-relaxed max-w-md mx-auto">
-                  Fitur Boost Klik sedang dalam proses pengembangan dan peningkatan sistem agar lebih stabil dan optimal.
-                </p>
-             </div>
-
-             <div className="p-6 rounded-2xl bg-white/[0.03] border border-white/5 space-y-2">
-                <p className="text-sm text-white/70">
-                  Silakan tunggu hingga maintenance selesai.
-                </p>
-                <p className="text-xs text-primary font-black uppercase tracking-widest">
-                  Informasi pembukaan kembali akan diumumkan melalui Info Admin.
+                  Fitur sedang maintenance, akan segera tersedia kembali.
                 </p>
              </div>
           </div>
@@ -49,10 +40,6 @@ export default function BoostKlikMaintenancePage() {
                 </Link>
              </Button>
           </div>
-
-          <p className="text-[10px] font-black text-white/10 uppercase tracking-[0.5em] pt-8">
-            Nexvora Optimization Lab
-          </p>
         </CardContent>
       </Card>
     </div>
