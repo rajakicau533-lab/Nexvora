@@ -182,38 +182,6 @@ export function AppSidebar() {
                   </SidebarMenuButton>
                 </SidebarMenuItem>
 
-                <SidebarMenuItem>
-                  <SidebarMenuButton 
-                    asChild 
-                    isActive={pathname === "/dashboard/boost-klik"}
-                    className={cn(
-                      "hover:bg-primary/10 hover:text-primary transition-all duration-200",
-                      pathname === "/dashboard/boost-klik" && "bg-primary/15 text-primary"
-                    )}
-                  >
-                    <Link href="/dashboard/boost-klik" onClick={handleLinkClick} className="flex items-center gap-3">
-                      <MousePointerClick className="h-4 w-4" />
-                      <span className="font-medium">Boost Klik</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-
-                <SidebarMenuItem>
-                  <SidebarMenuButton 
-                    asChild 
-                    isActive={pathname === "/dashboard/nextitle/seo"}
-                    className={cn(
-                      "hover:bg-primary/10 hover:text-primary transition-all duration-200",
-                      pathname === "/dashboard/nextitle/seo" && "bg-primary/15 text-primary"
-                    )}
-                  >
-                    <Link href="/dashboard/nextitle/seo" onClick={handleLinkClick} className="flex items-center gap-3">
-                      <Sparkles className="h-4 w-4" />
-                      <span className="font-medium">NexTitle Pro</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-
                 <Collapsible defaultOpen={pathname.startsWith('/dashboard/traffic')} className="group/collapsible">
                   <SidebarMenuItem>
                     <CollapsibleTrigger asChild>
