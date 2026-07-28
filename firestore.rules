@@ -1,10 +1,8 @@
 
-// Deployment Timestamp: 2024-05-22
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
   
-    // Check if user is an admin or is the master developer
     function isAdmin() {
       return request.auth != null && (
         exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
@@ -12,7 +10,6 @@ service cloud.firestore {
       );
     }
 
-    // Check if user is a super admin
     function isSuperAdmin() {
       return request.auth != null && (
         (exists(/databases/$(database)/documents/admins/$(request.auth.uid)) && 
@@ -21,82 +18,20 @@ service cloud.firestore {
       );
     }
 
-    // PROFILE USER
     match /users/{userId} {
-      allow get: if request.auth != null;
-      allow list: if (request.auth == null && request.query.limit == 1) || isAdmin() || (request.auth != null && request.query.limit <= 100);
+      allow read, list: if true; 
       allow create: if request.auth != null && request.auth.uid == userId;
-      allow delete: if isSuperAdmin();
       allow update: if (request.auth != null && request.auth.uid == userId) || isAdmin();
+      allow delete: if isSuperAdmin();
     }
 
-    // ADMINS COLLECTION
     match /admins/{adminId} {
       allow get: if request.auth != null && (request.auth.uid == adminId || isAdmin());
       allow list: if isAdmin();
-      allow create: if request.auth != null && (request.auth.token.email == "adheprogramer@gmail.com" || isSuperAdmin());
-      allow update: if request.auth != null && (
-        request.auth.uid == adminId || // Allow admin to update their own coins/data
-        isSuperAdmin() || 
-        request.auth.token.email == "adheprogramer@gmail.com"
-      );
+      allow create, update: if isSuperAdmin() || request.auth.token.email == "adheprogramer@gmail.com";
       allow delete: if isSuperAdmin();
     }
 
-    // TRAFFIC ORDERS
-    match /traffic_orders/{orderId} {
-      allow read: if (request.auth != null && (resource.data.userId == request.auth.uid || isAdmin()));
-      allow create: if (request.auth != null && request.resource.data.userId == request.auth.uid) || (request.auth == null && request.resource.data.isFromSchedule == true);
-      allow update, delete: if isAdmin();
-    }
-
-    // COIN TRANSACTIONS
-    match /coin_transactions/{txId} {
-      allow read: if request.auth != null && (resource.data.userId == request.auth.uid || isAdmin());
-      allow create: if (request.auth != null && (request.resource.data.userId == request.auth.uid || isAdmin())) || (request.auth == null);
-      allow update, delete: if isAdmin();
-    }
-
-    // SUB ADMIN COIN HISTORY
-    match /sub_admin_coin_history/{txId} {
-      allow read: if isAdmin();
-      allow create: if isSuperAdmin() || (request.auth != null && request.auth.uid == request.resource.data.adminUid);
-    }
-
-    // TOPUP REQUESTS
-    match /topup_requests/{requestId} {
-      allow read: if (request.auth != null && (resource.data.userId == request.auth.uid || isAdmin()));
-      allow create: if (request.auth != null && request.resource.data.userId == request.auth.uid);
-      allow update, delete: if isAdmin();
-    }
-
-    // NEXTITLE PRO HISTORY
-    match /nextitle_history/{historyId} {
-      allow read, delete: if request.auth != null && resource.data.userId == request.auth.uid;
-      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
-    }
-
-    // REFERRAL HISTORY
-    match /referral_history/{recordId} {
-      allow read: if request.auth != null && (resource.data.referralOwnerId == request.auth.uid || isAdmin());
-      allow create: if request.auth != null && request.auth.uid == recordId;
-      allow update: if isAdmin();
-      allow delete: if isAdmin();
-    }
-
-    // AI ERROR LOGS
-    match /ai_error_logs/{logId} {
-      allow read: if isAdmin();
-      allow create: if request.auth != null;
-    }
-
-    // MATERIALS
-    match /materials/{materialId} {
-      allow read: if true;
-      allow write: if isAdmin();
-    }
-
-    // MARKETPLACE
     match /marketplace_products/{productId} {
       allow read: if true;
       allow write: if isAdmin();
@@ -108,23 +43,74 @@ service cloud.firestore {
       allow update, delete: if isAdmin();
     }
 
-    // SYSTEM SETTINGS
+    match /traffic_orders/{orderId} {
+      allow read: if (request.auth != null && (resource.data.userId == request.auth.uid || isAdmin()));
+      allow create: if (request.auth != null && request.resource.data.userId == request.auth.uid);
+      allow update, delete: if isAdmin();
+    }
+
+    match /coin_transactions/{txId} {
+      allow read: if request.auth != null && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if request.auth != null && (request.resource.data.userId == request.auth.uid || isAdmin());
+      allow update, delete: if isAdmin();
+    }
+
+    match /topup_requests/{requestId} {
+      allow read: if (request.auth != null && (resource.data.userId == request.auth.uid || isAdmin()));
+      allow create: if (request.auth != null && request.resource.data.userId == request.auth.uid);
+      allow update, delete: if isAdmin();
+    }
+
+    match /referral_history/{recordId} {
+      allow read: if request.auth != null; 
+      allow create: if request.auth != null || request.auth == null;
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    match /materials/{materialId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
     match /system_settings/{settingId} {
       allow read: if true;
-      allow write: if isSuperAdmin() || (request.auth != null && request.auth.token.email == "adheprogramer@gmail.com") || (request.auth == null);
+      allow write: if isAdmin();
     }
     
-    // ACTIVITY LOGS
     match /activity_logs/{logId} {
       allow read: if isAdmin();
       allow create: if request.auth != null;
       allow delete: if isAdmin();
     }
 
-    // API LOGS
     match /api_logs/{logId} {
       allow read: if isAdmin();
-      allow create: if request.auth != null || request.auth == null;
+      allow create: if true;
+      allow delete: if isAdmin();
+    }
+    
+    match /sub_admin_coin_history/{txId} {
+      allow read: if isAdmin();
+      allow create: if isSuperAdmin();
+    }
+
+    match /boostKlik/{id} {
+      allow read, list: if true;
+      allow create: if request.auth != null && request.resource.data.uid == request.auth.uid;
+      allow update, delete: if request.auth != null && resource.data.uid == request.auth.uid;
+    }
+
+    match /nextitle_history/{recordId} {
+      allow read, list: if request.auth != null && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if request.auth != null && resource.data.userId == request.auth.uid;
+    }
+
+    match /inject_ads_campaigns/{id} {
+      allow read, list: if request.auth != null && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      allow update: if request.auth != null && resource.data.userId == request.auth.uid;
       allow delete: if isAdmin();
     }
   }
