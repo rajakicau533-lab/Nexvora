@@ -28,7 +28,8 @@ import {
   Instagram,
   Search,
   Zap,
-  MousePointerClick
+  MousePointerClick,
+  FileText
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { APP_NAME, CONTACT_INFO } from "@/lib/constants"
@@ -178,6 +179,38 @@ export function AppSidebar() {
                     <Link href="/dashboard" onClick={handleLinkClick} className="flex items-center gap-3">
                       <LayoutDashboard className="h-4 w-4" />
                       <span className="font-medium">Dashboard Overview</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+
+                <SidebarMenuItem>
+                  <SidebarMenuButton 
+                    asChild 
+                    isActive={pathname === "/dashboard/inject-ads"}
+                    className={cn(
+                      "hover:bg-primary/10 hover:text-primary transition-all duration-200",
+                      pathname === "/dashboard/inject-ads" && "bg-primary/15 text-primary"
+                    )}
+                  >
+                    <Link href="/dashboard/inject-ads" onClick={handleLinkClick} className="flex items-center gap-3">
+                      <Rocket className="h-4 w-4" />
+                      <span className="font-medium">Inject Ads</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+
+                <SidebarMenuItem>
+                  <SidebarMenuButton 
+                    asChild 
+                    isActive={pathname === "/dashboard/compensation"}
+                    className={cn(
+                      "hover:bg-primary/10 hover:text-primary transition-all duration-200",
+                      pathname === "/dashboard/compensation" && "bg-primary/15 text-primary"
+                    )}
+                  >
+                    <Link href="/dashboard/compensation" onClick={handleLinkClick} className="flex items-center gap-3">
+                      <FileText className="h-4 w-4" />
+                      <span className="font-medium">Kompensasi Admin</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
