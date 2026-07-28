@@ -18,18 +18,48 @@
       },
       "required": ["uid", "username", "email", "coins", "role"]
     },
-    "ReferralRecord": {
-      "title": "Referral Record",
-      "description": "Log of successful user invitations.",
+    "InjectAdsCampaign": {
+      "title": "Inject Ads Campaign",
+      "description": "Premium advertising optimization campaign for Shopee Video.",
       "type": "object",
       "properties": {
-        "referralOwnerId": { "type": "string" },
-        "referralOwnerEmail": { "type": "string" },
-        "referralCode": { "type": "string" },
-        "referredUserId": { "type": "string" },
-        "referredUsername": { "type": "string" },
-        "referredEmail": { "type": "string" },
-        "status": { "type": "string" },
+        "userId": { "type": "string" },
+        "profileLink": { "type": "string" },
+        "videoLink": { "type": "string" },
+        "durationLabel": { "type": "string" },
+        "rateLabel": { "type": "string" },
+        "totalCost": { "type": "number" },
+        "status": { "type": "string", "enum": ["active", "completed"] },
+        "schedules": { "type": "array", "items": { "type": "object" } },
+        "regions": { "type": "array", "items": { "type": "string" } },
+        "startedAt": { "type": "string", "format": "date-time" },
+        "endsAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "MarketplaceProduct": {
+      "title": "Marketplace Product",
+      "description": "Digital products available for purchase with coins.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "priceCoins": { "type": "number" },
+        "imageUrls": { "type": "array", "items": { "type": "string" } },
+        "downloadUrl": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "priceCoins", "downloadUrl"]
+    },
+    "MarketplacePurchase": {
+      "title": "Marketplace Purchase",
+      "description": "User purchase records for digital products.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "productId": { "type": "string" },
+        "productName": { "type": "string" },
+        "amountCoins": { "type": "number" },
+        "downloadUrl": { "type": "string" },
         "createdAt": { "type": "string", "format": "date-time" }
       }
     },
@@ -46,34 +76,17 @@
       },
       "required": ["email", "role"]
     },
-    "SubAdminCoinHistory": {
-      "title": "Sub Admin Coin History",
-      "description": "Log of coin transfers between Master and Sub Admins.",
-      "type": "object",
-      "properties": {
-        "adminUid": { "type": "string" },
-        "adminEmail": { "type": "string" },
-        "amount": { "type": "number" },
-        "type": { "type": "string", "enum": ["add", "sub"] },
-        "processedBy": { "type": "string" },
-        "createdAt": { "type": "string", "format": "date-time" }
-      }
-    },
     "TrafficOrder": {
       "title": "Traffic Order",
       "description": "Order for Shopee or TikTok views.",
       "type": "object",
       "properties": {
         "userId": { "type": "string" },
-        "platform": { "type": "string", "enum": ["shopee", "tiktok"] },
+        "platform": { "type": "string", "enum": ["shopee", "tiktok", "facebook", "instagram"] },
         "url": { "type": "string" },
         "views": { "type": "number" },
         "coinCost": { "type": "number" },
         "status": { "type": "string", "enum": ["PENDING", "PROCESSING", "COMPLETED", "PARTIAL", "CANCELLED", "FAILED"] },
-        "providerOrderId": { "type": "string" },
-        "serviceLabel": { "type": "string" },
-        "completedAt": { "type": "string", "format": "date-time" },
-        "updatedAt": { "type": "string", "format": "date-time" },
         "createdAt": { "type": "string", "format": "date-time" }
       }
     },
@@ -102,9 +115,36 @@
         "createdAt": { "type": "string", "format": "date-time" }
       }
     },
-    "NexTitleProHistory": {
-      "title": "NexTitle Pro History",
-      "description": "History of AI SEO generations.",
+    "ReferralRecord": {
+      "title": "Referral Record",
+      "description": "Log of successful user invitations.",
+      "type": "object",
+      "properties": {
+        "referralOwnerId": { "type": "string" },
+        "referralOwnerEmail": { "type": "string" },
+        "referralCode": { "type": "string" },
+        "referredUserId": { "type": "string" },
+        "referredUsername": { "type": "string" },
+        "referredEmail": { "type": "string" },
+        "status": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "BoostKlik": {
+      "title": "Boost Klik Link",
+      "description": "Custom image-to-redirect links for boosting clicks.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "imageUrl": { "type": "string" },
+        "targetUrl": { "type": "string" },
+        "shortCode": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "NexTitleHistory": {
+      "title": "NexTitle SEO History",
+      "description": "Historical records of generated SEO content for users.",
       "type": "object",
       "properties": {
         "userId": { "type": "string" },
@@ -130,7 +170,15 @@
     },
     "/admins/{adminId}": {
       "schema": "#/entities/Admin",
-      "description": "Administrator accounts with panel access"
+      "description": "Administrator accounts"
+    },
+    "/marketplace_products/{productId}": {
+      "schema": "#/entities/MarketplaceProduct",
+      "description": "Catalog of digital products"
+    },
+    "/marketplace_purchases/{purchaseId}": {
+      "schema": "#/entities/MarketplacePurchase",
+      "description": "User digital product purchases"
     },
     "/traffic_orders/{orderId}": {
       "schema": "#/entities/TrafficOrder",
@@ -144,17 +192,21 @@
       "schema": "#/entities/TopUpRequest",
       "description": "Manual coin top-up requests"
     },
-    "/sub_admin_coin_history/{txId}": {
-      "schema": "#/entities/SubAdminCoinHistory",
-      "description": "History of sub-admin balance changes"
-    },
-    "/nextitle_history/{historyId}": {
-      "schema": "#/entities/NexTitleProHistory",
-      "description": "History of AI SEO generations"
-    },
     "/referral_history/{recordId}": {
       "schema": "#/entities/ReferralRecord",
       "description": "History of successful referrals"
+    },
+    "/boostKlik/{id}": {
+      "schema": "#/entities/BoostKlik",
+      "description": "Boost Klik short links"
+    },
+    "/nextitle_history/{recordId}": {
+      "schema": "#/entities/NexTitleHistory",
+      "description": "History of generated SEO content"
+    },
+    "/inject_ads_campaigns/{id}": {
+      "schema": "#/entities/InjectAdsCampaign",
+      "description": "Premium ad optimization campaigns"
     }
   }
 }
