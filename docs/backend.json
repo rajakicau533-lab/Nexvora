@@ -14,7 +14,10 @@
         "role": { "type": "string", "enum": ["user", "admin", "premium", "private", "vip", "mbah paijo"] },
         "referralCode": { "type": "string", "description": "Unique code for inviting others" },
         "referredBy": { "type": "string", "description": "UID of the user who invited this person" },
-        "createdAt": { "type": "string", "format": "date-time" }
+        "createdAt": { "type": "string", "format": "date-time" },
+        "adminVerified": { "type": "boolean" },
+        "premiumBadge": { "type": "boolean" },
+        "profileTrafficSub": { "type": "object" }
       },
       "required": ["uid", "username", "email", "coins", "role"]
     },
@@ -24,6 +27,7 @@
       "type": "object",
       "properties": {
         "userId": { "type": "string" },
+        "campaignName": { "type": "string" },
         "profileLink": { "type": "string" },
         "videoLink": { "type": "string" },
         "durationLabel": { "type": "string" },
@@ -32,6 +36,21 @@
         "status": { "type": "string", "enum": ["active", "completed"] },
         "schedules": { "type": "array", "items": { "type": "object" } },
         "regions": { "type": "array", "items": { "type": "string" } },
+        "startedAt": { "type": "string", "format": "date-time" },
+        "endsAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "ProfileTrafficCampaign": {
+      "title": "Profile Traffic Campaign",
+      "description": "Automated Indonesia-wide traffic distribution for Shopee profiles.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "profileLink": { "type": "string" },
+        "tier": { "type": "string" },
+        "package": { "type": "string" },
+        "regions": { "type": "array", "items": { "type": "string" } },
+        "status": { "type": "string" },
         "startedAt": { "type": "string", "format": "date-time" },
         "endsAt": { "type": "string", "format": "date-time" }
       }
@@ -207,6 +226,10 @@
     "/inject_ads_campaigns/{id}": {
       "schema": "#/entities/InjectAdsCampaign",
       "description": "Premium ad optimization campaigns"
+    },
+    "/profile_traffic_campaigns/{id}": {
+      "schema": "#/entities/ProfileTrafficCampaign",
+      "description": "Shopee profile traffic campaigns"
     }
   }
 }
