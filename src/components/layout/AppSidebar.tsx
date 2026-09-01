@@ -1,4 +1,3 @@
-
 "use client"
 
 import React, { useEffect } from "react"
@@ -29,7 +28,8 @@ import {
   Search,
   Zap,
   MousePointerClick,
-  FileText
+  FileText,
+  Video
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { APP_NAME, CONTACT_INFO } from "@/lib/constants"
@@ -255,6 +255,11 @@ export function AppSidebar() {
                                 <SidebarMenuSubItem>
                                   <SidebarMenuSubButton asChild isActive={pathname === "/dashboard/traffic/shopee-comment"}>
                                     <Link href="/dashboard/traffic/shopee-comment" onClick={handleLinkClick}>Shopee Comment</Link>
+                                  </SidebarMenuSubButton>
+                                </SidebarMenuSubItem>
+                                <SidebarMenuSubItem>
+                                  <SidebarMenuSubButton asChild isActive={pathname === "/dashboard/traffic/shopee-live"}>
+                                    <Link href="/dashboard/traffic/shopee-live" onClick={handleLinkClick}>Trafik Live</Link>
                                   </SidebarMenuSubButton>
                                 </SidebarMenuSubItem>
                               </SidebarMenuSub>
