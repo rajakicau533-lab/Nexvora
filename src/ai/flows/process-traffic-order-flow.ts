@@ -68,8 +68,6 @@ const processTrafficOrderFlow = ai.defineFlow(
       };
     }
 
-    const endpoint = apiUrl.trim();
-
     try {
       const params = new URLSearchParams();
       params.append('key', apiKey.trim());
@@ -78,29 +76,35 @@ const processTrafficOrderFlow = ai.defineFlow(
       params.append('link', link.trim());
       params.append('quantity', quantity.toString());
       
-      // Support for custom comments services (Service ID 855 etc)
       if (comments) {
         params.append('comments', comments);
       }
 
-      const response = await fetch(endpoint, {
+      const response = await fetch(apiUrl.trim(), {
         method: 'POST',
         body: params,
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
-          'Accept': 'application/json',
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         }
       });
 
       const responseText = await response.text();
+      
+      if (!response.ok) {
+        return {
+          success: false,
+          error: `Server provider merespon dengan status ${response.status}.`,
+          rawResponse: responseText.slice(0, 1000)
+        };
+      }
+
       let data;
       try {
         data = JSON.parse(responseText);
       } catch (e) {
         return {
           success: false,
-          error: `Respon server provider tidak valid.`,
+          error: `Respon server tidak valid (Bukan JSON).`,
           rawResponse: responseText.slice(0, 1000)
         };
       }
@@ -114,7 +118,7 @@ const processTrafficOrderFlow = ai.defineFlow(
       } else {
         return {
           success: false,
-          error: data.error || 'Provider menolak permintaan.',
+          error: data.error || 'Permintaan ditolak oleh provider.',
           rawResponse: data,
         };
       }
@@ -122,7 +126,7 @@ const processTrafficOrderFlow = ai.defineFlow(
       console.error("Critical Fetch Error:", err);
       return {
         success: false,
-        error: "Gagal terhubung ke server layanan. Silakan coba beberapa saat lagi.",
+        error: "Gagal terhubung ke server layanan.",
       };
     }
   }
@@ -157,7 +161,6 @@ const checkProviderBalanceFlow = ai.defineFlow(
         body: params,
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         }
       });
 
@@ -217,7 +220,6 @@ const getProviderServicesFlow = ai.defineFlow(
         body: params,
         headers: { 
           'Content-Type': 'application/x-www-form-urlencoded',
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         }
       });
 
@@ -251,7 +253,6 @@ const checkOrderStatusFlow = ai.defineFlow(
         body: params,
         headers: { 
           'Content-Type': 'application/x-www-form-urlencoded',
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         }
       });
 
