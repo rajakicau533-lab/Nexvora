@@ -1,4 +1,3 @@
-
 {
   "entities": {
     "User": {
@@ -16,10 +15,40 @@
         "referredBy": { "type": "string", "description": "UID of the user who invited this person" },
         "createdAt": { "type": "string", "format": "date-time" },
         "adminVerified": { "type": "boolean" },
+        "emailVerified": { "type": "boolean" },
         "premiumBadge": { "type": "boolean" },
         "profileTrafficSub": { "type": "object" }
       },
       "required": ["uid", "username", "email", "coins", "role"]
+    },
+    "EventClaim": {
+      "title": "Event Claim",
+      "description": "User participation record for special events and promotions.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "eventId": { "type": "string" },
+        "eventType": { "type": "string", "enum": ["monthly", "premium_activation"] },
+        "period": { "type": "string", "description": "YYYY-MM for monthly, or 'permanent' for one-time" },
+        "amount": { "type": "number" },
+        "rewardCoins": { "type": "number" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "verifiedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "SystemSettings": {
+      "title": "System Settings",
+      "description": "Global configuration for the application.",
+      "type": "object",
+      "properties": {
+        "apiUrl": { "type": "string" },
+        "apiKey": { "type": "string" },
+        "provider": { "type": "string" },
+        "serviceId": { "type": "string" },
+        "active": { "type": "boolean" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      }
     },
     "InjectAdsCampaign": {
       "title": "Inject Ads Campaign",
@@ -191,6 +220,10 @@
       "schema": "#/entities/Admin",
       "description": "Administrator accounts"
     },
+    "/system_settings/{settingId}": {
+      "schema": "#/entities/SystemSettings",
+      "description": "Global configuration and API keys"
+    },
     "/marketplace_products/{productId}": {
       "schema": "#/entities/MarketplaceProduct",
       "description": "Catalog of digital products"
@@ -230,6 +263,10 @@
     "/profile_traffic_campaigns/{id}": {
       "schema": "#/entities/ProfileTrafficCampaign",
       "description": "Shopee profile traffic campaigns"
+    },
+    "/event_claims/{claimId}": {
+      "schema": "#/entities/EventClaim",
+      "description": "Event and promotion participation records"
     }
   }
 }
