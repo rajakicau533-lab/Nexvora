@@ -1,3 +1,4 @@
+
 "use client"
 
 import React, { useEffect } from "react"
@@ -29,7 +30,9 @@ import {
   Zap,
   MousePointerClick,
   FileText,
-  Video
+  Video,
+  BarChart3,
+  Gift
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { APP_NAME, CONTACT_INFO } from "@/lib/constants"
@@ -179,6 +182,22 @@ export function AppSidebar() {
                     <Link href="/dashboard" onClick={handleLinkClick} className="flex items-center gap-3">
                       <LayoutDashboard className="h-4 w-4" />
                       <span className="font-medium">Dashboard Overview</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+
+                <SidebarMenuItem>
+                  <SidebarMenuButton 
+                    asChild 
+                    isActive={pathname === "/dashboard/event"}
+                    className={cn(
+                      "hover:bg-primary/10 hover:text-primary transition-all duration-200",
+                      pathname === "/dashboard/event" && "bg-primary/15 text-primary"
+                    )}
+                  >
+                    <Link href="/dashboard/event" onClick={handleLinkClick} className="flex items-center gap-3">
+                      <Gift className="h-4 w-4" />
+                      <span className="font-medium">Event</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
