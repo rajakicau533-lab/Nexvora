@@ -32,7 +32,8 @@ import {
   FileText,
   Video,
   BarChart3,
-  Gift
+  Gift,
+  Clapperboard
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { APP_NAME, CONTACT_INFO } from "@/lib/constants"
@@ -233,6 +234,27 @@ export function AppSidebar() {
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
+
+                <Collapsible defaultOpen={pathname.startsWith('/dashboard/jasa')} className="group/jasa-collapsible">
+                  <SidebarMenuItem>
+                    <CollapsibleTrigger asChild>
+                      <SidebarMenuButton className="hover:bg-primary/10 hover:text-primary transition-all duration-200">
+                        <Clapperboard className="h-4 w-4" />
+                        <span className="font-medium">Jasa</span>
+                        <ChevronDown className="ml-auto h-4 w-4 transition-transform group-data-[state=open]/jasa-collapsible:rotate-180" />
+                      </SidebarMenuButton>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <SidebarMenuSub className="pr-0">
+                        <SidebarMenuSubItem>
+                          <SidebarMenuSubButton asChild isActive={pathname === "/dashboard/jasa/pesan-video"}>
+                            <Link href="/dashboard/jasa/pesan-video" onClick={handleLinkClick}>Pesan Video</Link>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                      </SidebarMenuSub>
+                    </CollapsibleContent>
+                  </SidebarMenuItem>
+                </Collapsible>
 
                 <Collapsible defaultOpen={pathname.startsWith('/dashboard/traffic')} className="group/collapsible">
                   <SidebarMenuItem>
