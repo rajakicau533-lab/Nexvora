@@ -38,6 +38,12 @@ service cloud.firestore {
       allow update, delete: if isAdmin();
     }
 
+    match /bongkar_akun_orders/{orderId} {
+      allow read: if request.auth != null && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isAdmin();
+    }
+
     match /marketplace_products/{productId} {
       allow read: if true;
       allow write: if isAdmin();
