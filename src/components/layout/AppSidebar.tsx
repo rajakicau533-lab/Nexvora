@@ -33,7 +33,8 @@ import {
   Video,
   BarChart3,
   Gift,
-  Clapperboard
+  Clapperboard,
+  SearchCode
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { APP_NAME, CONTACT_INFO } from "@/lib/constants"
@@ -249,6 +250,11 @@ export function AppSidebar() {
                         <SidebarMenuSubItem>
                           <SidebarMenuSubButton asChild isActive={pathname === "/dashboard/jasa/pesan-video"}>
                             <Link href="/dashboard/jasa/pesan-video" onClick={handleLinkClick}>Pesan Video</Link>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                        <SidebarMenuSubItem>
+                          <SidebarMenuSubButton asChild isActive={pathname === "/dashboard/jasa/bongkar-akun"}>
+                            <Link href="/dashboard/jasa/bongkar-akun" onClick={handleLinkClick}>Bongkar Akun</Link>
                           </SidebarMenuSubButton>
                         </SidebarMenuSubItem>
                       </SidebarMenuSub>
