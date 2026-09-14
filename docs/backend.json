@@ -41,6 +41,22 @@
         "createdAt": { "type": "string", "format": "date-time" }
       }
     },
+    "BongkarAkunOrder": {
+      "title": "Bongkar Akun Order",
+      "description": "User orders for Shopee Video profile deep-dive analysis.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "userEmail": { "type": "string" },
+        "profileLinks": { "type": "array", "items": { "type": "string" } },
+        "numLinks": { "type": "number" },
+        "numWinningProducts": { "type": "number" },
+        "totalPrice": { "type": "number" },
+        "status": { "type": "string", "enum": ["pending", "processing", "completed", "cancelled"] },
+        "proofUrl": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      }
+    },
     "EventClaim": {
       "title": "Event Claim",
       "description": "User participation record for special events and promotions.",
@@ -243,6 +259,10 @@
     "/video_orders/{orderId}": {
       "schema": "#/entities/VideoOrder",
       "description": "Video production orders"
+    },
+    "/bongkar_akun_orders/{orderId}": {
+      "schema": "#/entities/BongkarAkunOrder",
+      "description": "Account deep-dive analysis orders"
     },
     "/system_settings/{settingId}": {
       "schema": "#/entities/SystemSettings",
