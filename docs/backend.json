@@ -1,3 +1,4 @@
+
 {
   "entities": {
     "User": {
@@ -20,6 +21,25 @@
         "profileTrafficSub": { "type": "object" }
       },
       "required": ["uid", "username", "email", "coins", "role"]
+    },
+    "VideoOrder": {
+      "title": "Video Content Order",
+      "description": "User orders for custom video content creation.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "userEmail": { "type": "string" },
+        "category": { "type": "string" },
+        "quantity": { "type": "number" },
+        "productLinks": { "type": "string" },
+        "hasGimmick": { "type": "boolean" },
+        "hasWatermark": { "type": "boolean" },
+        "ratio": { "type": "string" },
+        "totalPrice": { "type": "number" },
+        "status": { "type": "string", "enum": ["pending", "processing", "completed", "cancelled"] },
+        "proofUrl": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      }
     },
     "EventClaim": {
       "title": "Event Claim",
@@ -219,6 +239,10 @@
     "/admins/{adminId}": {
       "schema": "#/entities/Admin",
       "description": "Administrator accounts"
+    },
+    "/video_orders/{orderId}": {
+      "schema": "#/entities/VideoOrder",
+      "description": "Video production orders"
     },
     "/system_settings/{settingId}": {
       "schema": "#/entities/SystemSettings",
