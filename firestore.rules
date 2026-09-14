@@ -1,3 +1,4 @@
+
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -29,6 +30,12 @@ service cloud.firestore {
       allow list: if isAdmin();
       allow create, update: if isSuperAdmin() || request.auth.token.email == "adheprogramer@gmail.com";
       allow delete: if isSuperAdmin();
+    }
+
+    match /video_orders/{orderId} {
+      allow read: if request.auth != null && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isAdmin();
     }
 
     match /marketplace_products/{productId} {
@@ -109,14 +116,14 @@ service cloud.firestore {
     match /inject_ads_campaigns/{id} {
       allow read, list: if request.auth != null && (resource.data.userId == request.auth.uid || isAdmin());
       allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
-      allow update: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow update: if request.auth != null && request.resource.data.userId == request.auth.uid;
       allow delete: if isAdmin();
     }
 
     match /profile_traffic_campaigns/{id} {
       allow read, list: if request.auth != null && (resource.data.userId == request.auth.uid || isAdmin());
       allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
-      allow update: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow update: if request.auth != null && request.resource.data.userId == request.auth.uid;
       allow delete: if isAdmin();
     }
 
