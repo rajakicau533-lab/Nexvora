@@ -24,7 +24,7 @@
     },
     "TopUpRequest": {
       "title": "Top Up Request",
-      "description": "User request to add coins via QRIS or manual transfer.",
+      "description": "User request to add coins via manual transfer.",
       "type": "object",
       "properties": {
         "userId": { "type": "string" },
@@ -32,10 +32,8 @@
         "amountCoins": { "type": "number" },
         "idrAmount": { "type": "number" },
         "status": { "type": "string", "enum": ["pending", "approved", "rejected", "expired"] },
-        "method": { "type": "string", "enum": ["manual", "qris"] },
-        "kaseraReferenceId": { "type": "string" },
-        "qrisUrl": { "type": "string" },
-        "proofUrl": { "type": "string", "description": "Legacy field for manual transfer" },
+        "method": { "type": "string", "enum": ["manual"] },
+        "proofUrl": { "type": "string", "description": "Image URL of payment proof" },
         "createdAt": { "type": "string", "format": "date-time" },
         "updatedAt": { "type": "string", "format": "date-time" }
       }
@@ -291,7 +289,7 @@
     },
     "/topup_requests/{requestId}": {
       "schema": "#/entities/TopUpRequest",
-      "description": "Manual or QRIS coin top-up requests"
+      "description": "Manual coin top-up requests"
     },
     "/referral_history/{recordId}": {
       "schema": "#/entities/ReferralRecord",
