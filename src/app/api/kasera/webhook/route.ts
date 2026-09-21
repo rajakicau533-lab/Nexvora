@@ -1,6 +1,5 @@
-
 import { NextResponse } from 'next/server';
-import { initializeFirebase } from '@/firebase/init';
+import { initializeFirebase } from '@/firebase';
 import { 
   collection, 
   query, 
