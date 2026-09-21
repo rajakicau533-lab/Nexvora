@@ -4,7 +4,7 @@ import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 
 /**
  * @fileOverview API untuk membuat transaksi Kasera Pay resmi (v1).
- * Menggunakan inisialisasi Firebase server-side via relative path.
+ * Menghasilkan QRIS asli untuk pengisian koin Nexvora.
  */
 
 export async function POST(request: Request) {
@@ -17,23 +17,18 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { amountCoins, totalPrice, userId, userEmail } = body;
 
-    // Validasi input dasar
     if (!totalPrice || !userId) {
       return NextResponse.json({ error: "Data transaksi tidak lengkap" }, { status: 400 });
     }
 
     const apiKey = process.env.KASERA_API_KEY;
     if (!apiKey) {
-      console.error("[KASERA_CREATE] API Key missing in environment variables");
-      return NextResponse.json({ error: "Konfigurasi server tidak lengkap" }, { status: 500 });
+      return NextResponse.json({ error: "Server configuration missing (API Key)" }, { status: 500 });
     }
 
-    // ID referensi unik Nexvora untuk external_id
-    const referenceId = `NXV-${Date.now()}-${userId.slice(0, 4)}`;
+    const referenceId = `NXV-${Date.now()}-${userId.slice(0, 5)}`;
 
-    /**
-     * PANGGILAN API KASERA PAY RESMI v1
-     */
+    // PANGGILAN API KASERA PAY RESMI v1
     const response = await fetch("https://pay.kasera.id/v1/transactions", {
       method: 'POST',
       headers: {
@@ -44,37 +39,30 @@ export async function POST(request: Request) {
       body: JSON.stringify({
         amount: totalPrice,
         external_id: referenceId,
-        description: "Top Up Koin Nexvora Studio",
+        description: `Top Up ${amountCoins} Koin Nexvora Studio`,
         payment_methods: ["qris"]
       })
     });
 
     const result = await response.json();
 
-    // Validasi respons dari server Kasera
     if (!response.ok) {
-      console.error("[KASERA_API_ERROR_RESPONSE]", result);
+      console.error("[KASERA_API_ERROR]", result);
       return NextResponse.json({ 
         error: result.message || "Gagal menghubungi server Kasera Pay" 
-      }, { status: response.status || 400 });
+      }, { status: response.status });
     }
 
-    /**
-     * Mapping data dari response resmi Kasera v1
-     */
     const transactionId = result.id;
     const qrString = result.payment?.qr_string;
     const checkoutUrl = result.checkout_url;
     const expiresAt = result.expires_at;
 
-    // Konversi qr_string menjadi URL gambar QR Code
+    // QRIS URL Generator (menggunakan qr_string asli dari Kasera)
     const qrisUrl = qrString 
       ? `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(qrString)}&size=400x400` 
       : null;
 
-    /**
-     * Simpan permintaan TopUp ke Firestore
-     */
     const docRef = await addDoc(collection(firestore, "topup_requests"), {
       userId,
       userEmail,
@@ -89,7 +77,7 @@ export async function POST(request: Request) {
       checkoutUrl: checkoutUrl || null,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
-      expiredAt: expiresAt || null
+      expiresAt: expiresAt || null
     });
 
     return NextResponse.json({
@@ -98,15 +86,13 @@ export async function POST(request: Request) {
         requestId: docRef.id,
         referenceId: referenceId,
         qrisUrl: qrisUrl,
-        qrString: qrString,
-        checkoutUrl: checkoutUrl,
         amount: totalPrice,
-        expiredAt: expiresAt
+        expiresAt: expiresAt
       }
     });
 
   } catch (err: any) {
     console.error("[KASERA_CREATE_CRITICAL_ERROR]:", err);
-    return NextResponse.json({ error: "Terjadi kesalahan internal saat memproses pembayaran" }, { status: 500 });
+    return NextResponse.json({ error: "Terjadi kesalahan internal sistem pembayaran" }, { status: 500 });
   }
 }
