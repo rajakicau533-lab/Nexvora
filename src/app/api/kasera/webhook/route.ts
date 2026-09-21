@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { initializeFirebase } from '@/firebase/init';
+import { initializeFirebase } from "../../../../firebase/init";
 import { 
   collection, 
   query, 
@@ -26,8 +26,8 @@ export async function GET() {
 }
 
 /**
- * POST Handler untuk Webhook Kasera Pay Resmi
- * Verifikasi menggunakan Kasera-Signature-V1
+ * POST Handler untuk Webhook Kasera Pay Resmi (V1)
+ * Verifikasi menggunakan Kasera-Signature-V1 melalui relative import Firebase init.
  */
 export async function POST(request: Request) {
   const { firestore } = initializeFirebase();
@@ -89,7 +89,7 @@ export async function POST(request: Request) {
 
     const { external_id, amount, payment_request_id } = body.data;
 
-    // 7. Cari Transaksi di Firestore (Cegah double process)
+    // 7. Cari Transaksi di Firestore
     const topupQuery = query(
       collection(firestore, "topup_requests"), 
       where("kaseraReferenceId", "==", external_id),
@@ -106,7 +106,7 @@ export async function POST(request: Request) {
     const topupDoc = snapshot.docs[0];
     const topupData = topupDoc.data();
 
-    // 8. Validasi Nominal (Pencegahan manipulasi)
+    // 8. Validasi Nominal
     if (Number(topupData.idrAmount) !== Number(amount)) {
       console.error(`[WEBHOOK_KASERA] Amount mismatch: DB=${topupData.idrAmount}, Webhook=${amount}`);
       return NextResponse.json({ error: "Amount verification failed" }, { status: 400 });
