@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { initializeFirebase } from '@/firebase/init';
+import { initializeFirebase } from '@/firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 
 /**
@@ -65,13 +65,11 @@ export async function POST(request: Request) {
      * Field: id, status, payment.qr_string, checkout_url, expires_at
      */
     const transactionId = result.id;
-    const status = result.status;
     const qrString = result.payment?.qr_string;
     const checkoutUrl = result.checkout_url;
     const expiresAt = result.expires_at;
 
     // Konversi qr_string menjadi URL gambar QR Code agar bisa dirender oleh <img> di frontend
-    // Hal ini dilakukan untuk menjaga fungsionalitas dashboard tanpa mengubah file UI (page.tsx)
     const qrisUrl = qrString 
       ? `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(qrString)}&size=400x400` 
       : null;
