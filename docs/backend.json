@@ -22,6 +22,24 @@
       },
       "required": ["uid", "username", "email", "coins", "role"]
     },
+    "TopUpRequest": {
+      "title": "Top Up Request",
+      "description": "User request to add coins via QRIS or manual transfer.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "userEmail": { "type": "string" },
+        "amountCoins": { "type": "number" },
+        "idrAmount": { "type": "number" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected", "expired"] },
+        "method": { "type": "string", "enum": ["manual", "qris"] },
+        "kaseraReferenceId": { "type": "string" },
+        "qrisUrl": { "type": "string" },
+        "proofUrl": { "type": "string", "description": "Legacy field for manual transfer" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      }
+    },
     "VideoOrder": {
       "title": "Video Content Order",
       "description": "User orders for custom video content creation.",
@@ -186,19 +204,6 @@
         "createdAt": { "type": "string", "format": "date-time" }
       }
     },
-    "TopUpRequest": {
-      "title": "Top Up Request",
-      "description": "User request to add coins via manual transfer.",
-      "type": "object",
-      "properties": {
-        "userId": { "type": "string" },
-        "amountCoins": { "type": "number" },
-        "idrAmount": { "type": "number" },
-        "proofUrl": { "type": "string" },
-        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
-        "createdAt": { "type": "string", "format": "date-time" }
-      }
-    },
     "ReferralRecord": {
       "title": "Referral Record",
       "description": "Log of successful user invitations.",
@@ -286,7 +291,7 @@
     },
     "/topup_requests/{requestId}": {
       "schema": "#/entities/TopUpRequest",
-      "description": "Manual coin top-up requests"
+      "description": "Manual or QRIS coin top-up requests"
     },
     "/referral_history/{recordId}": {
       "schema": "#/entities/ReferralRecord",
