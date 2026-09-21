@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
-import { initializeFirebase } from '@/firebase/init';
+import { initializeFirebase } from "../../../../firebase/init";
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 
 /**
  * @fileOverview API untuk membuat transaksi Kasera Pay resmi (v1).
- * Endpoint: https://pay.kasera.id/v1/transactions
+ * Menggunakan inisialisasi Firebase server-side via relative path.
  */
 
 export async function POST(request: Request) {
@@ -33,7 +33,6 @@ export async function POST(request: Request) {
 
     /**
      * PANGGILAN API KASERA PAY RESMI v1
-     * Dokumentasi: POST https://pay.kasera.id/v1/transactions
      */
     const response = await fetch("https://pay.kasera.id/v1/transactions", {
       method: 'POST',
@@ -62,20 +61,19 @@ export async function POST(request: Request) {
 
     /**
      * Mapping data dari response resmi Kasera v1
-     * Field: id, status, payment.qr_string, checkout_url, expires_at
      */
     const transactionId = result.id;
     const qrString = result.payment?.qr_string;
     const checkoutUrl = result.checkout_url;
     const expiresAt = result.expires_at;
 
-    // Konversi qr_string menjadi URL gambar QR Code agar bisa dirender oleh <img> di frontend
+    // Konversi qr_string menjadi URL gambar QR Code
     const qrisUrl = qrString 
       ? `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(qrString)}&size=400x400` 
       : null;
 
     /**
-     * Simpan permintaan TopUp ke Firestore dengan status 'pending'
+     * Simpan permintaan TopUp ke Firestore
      */
     const docRef = await addDoc(collection(firestore, "topup_requests"), {
       userId,
@@ -84,17 +82,16 @@ export async function POST(request: Request) {
       idrAmount: totalPrice,
       status: "pending",
       method: "qris",
-      kaseraReferenceId: referenceId, // external_id
-      kaseraTransactionId: transactionId, // result.id
+      kaseraReferenceId: referenceId,
+      kaseraTransactionId: transactionId,
       qrString: qrString || null,
-      qrisUrl: qrisUrl, // Untuk ditampilkan di frontend dialog
+      qrisUrl: qrisUrl,
       checkoutUrl: checkoutUrl || null,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
       expiredAt: expiresAt || null
     });
 
-    // Kembalikan data lengkap ke frontend
     return NextResponse.json({
       success: true,
       data: {
