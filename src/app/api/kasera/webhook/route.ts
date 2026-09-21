@@ -15,19 +15,18 @@ import crypto from 'crypto';
 export const dynamic = 'force-dynamic';
 
 /**
- * GET Handler untuk Health Check
+ * Health Check Handler
  */
 export async function GET() {
   return NextResponse.json({
     ok: true,
     service: "kasera-webhook",
     timestamp: new Date().toISOString()
-  }, { status: 200 });
+  });
 }
 
 /**
- * POST Handler untuk Webhook Kasera Pay Resmi (V1)
- * Verifikasi menggunakan Kasera-Signature-V1 melalui relative import Firebase init.
+ * Webhook Handler Kasera Pay Resmi (V1)
  */
 export async function POST(request: Request) {
   const { firestore } = initializeFirebase();
@@ -38,126 +37,93 @@ export async function POST(request: Request) {
   try {
     const rawBody = await request.text();
     const signatureHeader = request.headers.get('Kasera-Signature-V1');
-    const eventId = request.headers.get('Kasera-Event-Id');
     const webhookSecret = process.env.KASERA_WEBHOOK_SECRET;
 
-    // 1. Verifikasi Kehadiran Signature & Secret
     if (!signatureHeader || !webhookSecret) {
-      console.warn("[WEBHOOK_KASERA] Unauthorized: Missing signature or secret");
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // 2. Parsing Signature Header (Format: t=<unix>,v1=<hex>)
+    // Parsing Signature: t=<unix>,v1=<hex>
     const parts = signatureHeader.split(',');
-    const timestampPart = parts.find(p => p.startsWith('t='));
-    const signaturePart = parts.find(p => p.startsWith('v1='));
+    const t = parts.find(p => p.startsWith('t='))?.split('=')[1];
+    const v1 = parts.find(p => p.startsWith('v1='))?.split('=')[1];
 
-    if (!timestampPart || !signaturePart) {
+    if (!t || !v1) {
       return NextResponse.json({ error: "Invalid signature format" }, { status: 400 });
     }
 
-    const t = timestampPart.split('=')[1];
-    const v1 = signaturePart.split('=')[1];
-
-    // 3. Verifikasi Timestamp (Tolerance 5 menit / 300 detik)
+    // Validasi Timestamp (Toleransi 5 menit)
     const now = Math.floor(Date.now() / 1000);
-    const diff = Math.abs(now - parseInt(t));
-    if (diff > 300) {
-      console.warn("[WEBHOOK_KASERA] Forbidden: Timestamp out of range", { diff });
+    if (Math.abs(now - parseInt(t)) > 300) {
       return NextResponse.json({ error: "Timestamp expired" }, { status: 403 });
     }
 
-    // 4. Hitung HMAC SHA256 (t + "." + rawBody)
+    // Verifikasi HMAC SHA256
     const hmac = crypto.createHmac('sha256', webhookSecret);
     const signedPayload = `${t}.${rawBody}`;
     const expectedSignature = hmac.update(signedPayload).digest('hex');
 
-    // 5. Secure Comparison menggunakan timingSafeEqual
-    const expectedBuffer = Buffer.from(expectedSignature, 'hex');
-    const actualBuffer = Buffer.from(v1, 'hex');
-
-    if (expectedBuffer.length !== actualBuffer.length || !crypto.timingSafeEqual(expectedBuffer, actualBuffer)) {
-      console.warn("[WEBHOOK_KASERA] Forbidden: Signature mismatch");
+    if (!crypto.timingSafeEqual(Buffer.from(expectedSignature, 'hex'), Buffer.from(v1, 'hex'))) {
       return NextResponse.json({ error: "Invalid signature" }, { status: 403 });
     }
 
-    // 6. Parse Body & Cek Tipe Event
     const body = JSON.parse(rawBody);
     if (body.type !== "payment.paid") {
-      return NextResponse.json({ message: "Event type ignored" }, { status: 200 });
+      return NextResponse.json({ message: "Ignored event type" }, { status: 200 });
     }
 
-    const { external_id, amount, payment_request_id } = body.data;
+    const { external_id, amount } = body.data;
 
-    // 7. Cari Transaksi di Firestore
-    const topupQuery = query(
+    // Cari transaksi pending
+    const q = query(
       collection(firestore, "topup_requests"), 
       where("kaseraReferenceId", "==", external_id),
       where("status", "==", "pending")
     );
     
-    const snapshot = await getDocs(topupQuery);
-
+    const snapshot = await getDocs(q);
     if (snapshot.empty) {
-      console.log(`[WEBHOOK_KASERA] Reference ${external_id} already processed or not found.`);
-      return NextResponse.json({ message: "Already processed or invalid" }, { status: 200 });
+      return NextResponse.json({ message: "Transaction already processed or not found" }, { status: 200 });
     }
 
     const topupDoc = snapshot.docs[0];
     const topupData = topupDoc.data();
 
-    // 8. Validasi Nominal
-    if (Number(topupData.idrAmount) !== Number(amount)) {
-      console.error(`[WEBHOOK_KASERA] Amount mismatch: DB=${topupData.idrAmount}, Webhook=${amount}`);
-      return NextResponse.json({ error: "Amount verification failed" }, { status: 400 });
+    // Validasi nominal
+    if (Math.round(topupData.idrAmount) !== Math.round(amount)) {
+      return NextResponse.json({ error: "Amount mismatch" }, { status: 400 });
     }
 
-    // 9. Eksekusi Batch Update (Atomic)
+    // Proses ATOMIK: Update Status & Saldo
     const batch = writeBatch(firestore);
     
-    // Update status transaksi
     batch.update(doc(firestore, "topup_requests", topupDoc.id), {
       status: "approved",
       paidAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
-      kaseraEventId: eventId || body.id,
-      kaseraPaymentRequestId: payment_request_id
+      processedBy: "kasera-webhook"
     });
 
-    // Tambahkan koin ke User
     const userRef = doc(firestore, "users", topupData.userId);
     batch.update(userRef, {
       coins: increment(topupData.amountCoins),
       updatedAt: serverTimestamp()
     });
 
-    // Catat log transaksi koin
-    const txRef = doc(collection(firestore, "coin_transactions"));
-    batch.set(txRef, {
+    batch.set(doc(collection(firestore, "coin_transactions")), {
       userId: topupData.userId,
       amount: topupData.amountCoins,
       type: "topup",
-      description: `Topup QRIS (Ref: ${external_id})`,
+      description: `Topup QRIS Berhasil (Ref: ${external_id})`,
       createdAt: serverTimestamp()
-    });
-
-    // Catat log aktivitas sistem
-    const logRef = doc(collection(firestore, "activity_logs"));
-    batch.set(logRef, {
-      type: "system",
-      action: "QRIS_AUTO_PAID",
-      details: `Ref: ${external_id} | Rp${amount} | EventId: ${eventId || body.id}`,
-      userId: topupData.userId,
-      timestamp: serverTimestamp()
     });
 
     await batch.commit();
 
-    console.log(`[WEBHOOK_KASERA] SUCCESS: Payment for ref ${external_id} processed.`);
     return NextResponse.json({ success: true }, { status: 200 });
 
   } catch (err: any) {
-    console.error("[WEBHOOK_KASERA] Internal Error:", err);
+    console.error("[WEBHOOK_ERROR]:", err);
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }
