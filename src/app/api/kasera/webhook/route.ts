@@ -13,16 +13,10 @@ import {
 } from 'firebase/firestore';
 import crypto from 'crypto';
 
-/**
- * Konfigurasi Rute Next.js App Router
- * Memastikan endpoint bersifat dinamis untuk menerima request eksternal secara real-time.
- */
 export const dynamic = 'force-dynamic';
 
 /**
  * GET Handler untuk Health Check
- * Digunakan untuk memverifikasi apakah endpoint sudah aktif di server.
- * Akses: https://nexvorastudio.my.id/api/kasera/webhook
  */
 export async function GET() {
   return NextResponse.json({
@@ -33,92 +27,105 @@ export async function GET() {
 }
 
 /**
- * POST Handler untuk Webhook Kasera
- * Menangani notifikasi pembayaran sukses dari server Kasera secara aman.
+ * POST Handler untuk Webhook Kasera Pay Resmi
+ * Verifikasi menggunakan Kasera-Signature-V1
  */
 export async function POST(request: Request) {
-  // Inisialisasi Firestore untuk penggunaan server-side
   const { firestore } = initializeFirebase();
   if (!firestore) {
-    console.error("[WEBHOOK_KASERA] Firestore initialization failed");
     return NextResponse.json({ error: "Firebase unavailable" }, { status: 500 });
   }
 
   try {
-    // 1. Ambil data mentah untuk verifikasi signature
     const rawBody = await request.text();
-    const signature = request.headers.get('Kasera-Signature');
+    const signatureHeader = request.headers.get('Kasera-Signature-V1');
+    const eventId = request.headers.get('Kasera-Event-Id');
     const webhookSecret = process.env.KASERA_WEBHOOK_SECRET;
 
-    // 2. Verifikasi Keamanan Signature
-    if (webhookSecret) {
-      if (!signature) {
-        console.warn("[WEBHOOK_KASERA] Missing signature header");
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-      }
-
-      const hmac = crypto.createHmac('sha256', webhookSecret);
-      const expectedSignature = hmac.update(rawBody).digest('hex');
-
-      if (signature !== expectedSignature) {
-        console.warn("[WEBHOOK_KASERA] Invalid signature detected");
-        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-      }
+    // 1. Verifikasi Kehadiran Signature & Secret
+    if (!signatureHeader || !webhookSecret) {
+      console.warn("[WEBHOOK_KASERA] Unauthorized: Missing signature or secret");
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // 3. Parse body request
-    let body;
-    try {
-      body = JSON.parse(rawBody);
-    } catch (e) {
-      return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+    // 2. Parsing Signature Header (Format: t=<unix>,v1=<hex>)
+    const parts = signatureHeader.split(',');
+    const timestampPart = parts.find(p => p.startsWith('t='));
+    const signaturePart = parts.find(p => p.startsWith('v1='));
+
+    if (!timestampPart || !signaturePart) {
+      return NextResponse.json({ error: "Invalid signature format" }, { status: 400 });
     }
 
-    const { reference_id, status, amount } = body;
+    const t = timestampPart.split('=')[1];
+    const v1 = signaturePart.split('=')[1];
 
-    // 4. Validasi Status Pembayaran (Hanya proses jika dibayar/sukses)
-    const validStatuses = ['paid', 'success', 'settlement', 'success_payment'];
-    const isSuccess = validStatuses.includes(status?.toLowerCase());
-
-    if (!isSuccess) {
-      console.log(`[WEBHOOK_KASERA] Status ${status} diabaikan untuk ref: ${reference_id}`);
-      return NextResponse.json({ message: "Processed (ignored status)" }, { status: 200 });
+    // 3. Verifikasi Timestamp (Tolerance 5 menit / 300 detik)
+    const now = Math.floor(Date.now() / 1000);
+    const diff = Math.abs(now - parseInt(t));
+    if (diff > 300) {
+      console.warn("[WEBHOOK_KASERA] Forbidden: Timestamp out of range", { diff });
+      return NextResponse.json({ error: "Timestamp expired" }, { status: 403 });
     }
 
-    // 5. Cari transaksi 'pending' di Firestore secara atomik
+    // 4. Hitung HMAC SHA256 (t + "." + rawBody)
+    const hmac = crypto.createHmac('sha256', webhookSecret);
+    const signedPayload = `${t}.${rawBody}`;
+    const expectedSignature = hmac.update(signedPayload).digest('hex');
+
+    // 5. Secure Comparison menggunakan timingSafeEqual
+    const expectedBuffer = Buffer.from(expectedSignature, 'hex');
+    const actualBuffer = Buffer.from(v1, 'hex');
+
+    if (expectedBuffer.length !== actualBuffer.length || !crypto.timingSafeEqual(expectedBuffer, actualBuffer)) {
+      console.warn("[WEBHOOK_KASERA] Forbidden: Signature mismatch");
+      return NextResponse.json({ error: "Invalid signature" }, { status: 403 });
+    }
+
+    // 6. Parse Body & Cek Tipe Event
+    const body = JSON.parse(rawBody);
+    if (body.type !== "payment.paid") {
+      return NextResponse.json({ message: "Event type ignored" }, { status: 200 });
+    }
+
+    const { external_id, amount, payment_request_id } = body.data;
+
+    // 7. Cari Transaksi di Firestore (Cegah double process)
     const topupQuery = query(
       collection(firestore, "topup_requests"), 
-      where("kaseraReferenceId", "==", reference_id),
+      where("kaseraReferenceId", "==", external_id),
       where("status", "==", "pending")
     );
     
     const snapshot = await getDocs(topupQuery);
 
     if (snapshot.empty) {
-      console.log(`[WEBHOOK_KASERA] Reference ${reference_id} sudah diproses atau tidak valid.`);
-      return NextResponse.json({ message: "No action required (already processed)" }, { status: 200 });
+      console.log(`[WEBHOOK_KASERA] Reference ${external_id} already processed or not found.`);
+      return NextResponse.json({ message: "Already processed or invalid" }, { status: 200 });
     }
 
     const topupDoc = snapshot.docs[0];
     const topupData = topupDoc.data();
 
-    // 6. Validasi Nominal (Pencegahan manipulasi data)
+    // 8. Validasi Nominal (Pencegahan manipulasi)
     if (Number(topupData.idrAmount) !== Number(amount)) {
-      console.error(`[WEBHOOK_KASERA] Nominal tidak sesuai untuk ${reference_id}`);
-      return NextResponse.json({ error: "Verification failed (amount mismatch)" }, { status: 400 });
+      console.error(`[WEBHOOK_KASERA] Amount mismatch: DB=${topupData.idrAmount}, Webhook=${amount}`);
+      return NextResponse.json({ error: "Amount verification failed" }, { status: 400 });
     }
 
-    // 7. Eksekusi Batch Update (Atomisitas Data)
+    // 9. Eksekusi Batch Update (Atomic)
     const batch = writeBatch(firestore);
     
-    // Update status transaksi menjadi approved
+    // Update status transaksi
     batch.update(doc(firestore, "topup_requests", topupDoc.id), {
       status: "approved",
       paidAt: serverTimestamp(),
-      updatedAt: serverTimestamp()
+      updatedAt: serverTimestamp(),
+      kaseraEventId: eventId || body.id,
+      kaseraPaymentRequestId: payment_request_id
     });
 
-    // Tambahkan koin ke saldo User
+    // Tambahkan koin ke User
     const userRef = doc(firestore, "users", topupData.userId);
     batch.update(userRef, {
       coins: increment(topupData.amountCoins),
@@ -131,7 +138,7 @@ export async function POST(request: Request) {
       userId: topupData.userId,
       amount: topupData.amountCoins,
       type: "topup",
-      description: `Topup QRIS (Ref: ${reference_id})`,
+      description: `Topup QRIS (Ref: ${external_id})`,
       createdAt: serverTimestamp()
     });
 
@@ -140,14 +147,14 @@ export async function POST(request: Request) {
     batch.set(logRef, {
       type: "system",
       action: "QRIS_AUTO_PAID",
-      details: `Reference: ${reference_id} | Rp${amount}`,
+      details: `Ref: ${external_id} | Rp${amount} | EventId: ${eventId || body.id}`,
       userId: topupData.userId,
       timestamp: serverTimestamp()
     });
 
     await batch.commit();
 
-    console.log(`[WEBHOOK_KASERA] BERHASIL: Pembayaran ref ${reference_id} selesai diproses.`);
+    console.log(`[WEBHOOK_KASERA] SUCCESS: Payment for ref ${external_id} processed.`);
     return NextResponse.json({ success: true }, { status: 200 });
 
   } catch (err: any) {
